@@ -1,0 +1,120 @@
+import * as SQLite from 'expo-sqlite';
+
+let db;
+
+export const initDB = async () => {
+  db = await SQLite.openDatabaseAsync('inventory.db');
+  await db.execAsync(`
+    PRAGMA journal_mode = WAL;
+
+    CREATE TABLE IF NOT EXISTS items (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_code TEXT NOT NULL,
+      barcode   TEXT UNIQUE NOT NULL,
+      item_name TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS transactions (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_barcode TEXT NOT NULL,
+      item_name    TEXT NOT NULL,
+      frombin      TEXT NOT NULL,
+      tobin        TEXT NOT NULL,
+      qty          INTEGER NOT NULL,
+      timestamp    TEXT NOT NULL,
+      synced       INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+};
+
+// ─── Items ────────────────────────────────────────────────────────────────────
+
+export const upsertItems = async (itemsArray) => {
+  if (!itemsArray || itemsArray.length === 0) return;
+  await db.withTransactionAsync(async () => {
+    for (const item of itemsArray) {
+      await db.runAsync(
+        `INSERT INTO items (item_code, barcode, item_name)
+         VALUES (?, ?, ?)
+         ON CONFLICT(barcode) DO UPDATE SET
+           item_code = excluded.item_code,
+           item_name = excluded.item_name`,
+        [item.ItemCode, item.Barcode, item.Item_Name]
+      );
+    }
+  });
+};
+
+export const getItemByBarcode = async (barcode) => {
+  const row = await db.getFirstAsync(
+    'SELECT * FROM items WHERE barcode = ? LIMIT 1',
+    [barcode]
+  );
+  return row || null;
+};
+
+export const searchItems = async (query) => {
+  const q = `%${query}%`;
+  return await db.getAllAsync(
+    `SELECT * FROM items
+     WHERE item_name LIKE ? OR barcode LIKE ? OR item_code LIKE ?
+     ORDER BY item_name ASC
+     LIMIT 200`,
+    [q, q, q]
+  );
+};
+
+export const getAllItems = async () => {
+  return await db.getAllAsync(
+    'SELECT * FROM items ORDER BY item_name ASC LIMIT 1000'
+  );
+};
+
+// ─── Transactions ─────────────────────────────────────────────────────────────
+
+export const insertTransaction = async ({ item_barcode, item_name, frombin, tobin, qty }) => {
+  const timestamp = new Date().toISOString();
+  const result = await db.runAsync(
+    `INSERT INTO transactions (item_barcode, item_name, frombin, tobin, qty, timestamp, synced)
+     VALUES (?, ?, ?, ?, ?, ?, 0)`,
+    [item_barcode, item_name, frombin, tobin, qty, timestamp]
+  );
+  return result.lastInsertRowId;
+};
+
+export const getPendingTransactions = async () => {
+  return await db.getAllAsync(
+    'SELECT * FROM transactions WHERE synced = 0 ORDER BY timestamp ASC'
+  );
+};
+
+export const markTransactionsSynced = async (ids) => {
+  if (!ids || ids.length === 0) return;
+  const placeholders = ids.map(() => '?').join(',');
+  await db.runAsync(
+    `UPDATE transactions SET synced = 1 WHERE id IN (${placeholders})`,
+    ids
+  );
+};
+
+export const getRecentTransactions = async (limit = 20) => {
+  return await db.getAllAsync(
+    'SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?',
+    [limit]
+  );
+};
+
+// ─── Dashboard Stats ──────────────────────────────────────────────────────────
+
+export const getDashboardStats = async () => {
+  const [itemsRow, txRow, pendingRow] = await Promise.all([
+    db.getFirstAsync('SELECT COUNT(*) as count FROM items'),
+    db.getFirstAsync('SELECT COUNT(*) as count FROM transactions'),
+    db.getFirstAsync('SELECT COUNT(*) as count FROM transactions WHERE synced = 0'),
+  ]);
+  return {
+    totalItems: itemsRow?.count ?? 0,
+    totalTransactions: txRow?.count ?? 0,
+    pendingSync: pendingRow?.count ?? 0,
+  };
+};

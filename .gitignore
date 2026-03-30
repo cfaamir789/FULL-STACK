@@ -1,0 +1,14 @@
+# Root
+.DS_Store
+Thumbs.db
+
+# Backend
+backend/node_modules/
+backend/.env
+
+# Mobile
+InventoryApp/node_modules/
+InventoryApp/.expo/
+InventoryApp/dist/
+InventoryApp/web-build/
+InventoryApp/.env
