@@ -31,15 +31,19 @@ export const initDB = async () => {
 
 export const upsertItems = async (itemsArray) => {
   if (!itemsArray || itemsArray.length === 0) return;
+  // 300 rows × 3 params = 900, safely under SQLite's 999 param limit
+  const CHUNK_SIZE = 300;
   await db.withTransactionAsync(async () => {
-    for (const item of itemsArray) {
+    for (let i = 0; i < itemsArray.length; i += CHUNK_SIZE) {
+      const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => '(?,?,?)').join(',');
+      const params = chunk.flatMap((item) => [item.ItemCode, item.Barcode, item.Item_Name]);
       await db.runAsync(
-        `INSERT INTO items (item_code, barcode, item_name)
-         VALUES (?, ?, ?)
+        `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
          ON CONFLICT(barcode) DO UPDATE SET
            item_code = excluded.item_code,
            item_name = excluded.item_name`,
-        [item.ItemCode, item.Barcode, item.Item_Name]
+        params
       );
     }
   });
@@ -49,6 +53,14 @@ export const getItemByBarcode = async (barcode) => {
   const row = await db.getFirstAsync(
     'SELECT * FROM items WHERE barcode = ? LIMIT 1',
     [barcode]
+  );
+  return row || null;
+};
+
+export const getItemByItemCode = async (itemCode) => {
+  const row = await db.getFirstAsync(
+    'SELECT * FROM items WHERE item_code = ? LIMIT 1',
+    [itemCode.trim()]
   );
   return row || null;
 };

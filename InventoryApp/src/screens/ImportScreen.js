@@ -38,15 +38,19 @@ export default function ImportScreen() {
         const text = await file.text();
         const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
         const firstRow = parsed.data[0];
-        if (!firstRow || !('Barcode' in firstRow) || !('Item_Name' in firstRow)) {
-          setError('CSV must have headers: ItemCode, Barcode, Item_Name');
+        const hasNewFormat = firstRow && ('Barcode' in firstRow) && ('Item_Name' in firstRow);
+        const hasOldFormat = firstRow && ('Barcode No.' in firstRow) && ('Item Description' in firstRow);
+        if (!firstRow || (!hasNewFormat && !hasOldFormat)) {
+          setError('CSV must have headers: ItemCode, Barcode, Item_Name (or Item No., Barcode No., Item Description)');
           return;
         }
-        const items = parsed.data.filter((r) => r.Barcode && r.Item_Name).map((r) => ({
-          ItemCode: r.ItemCode || r.Barcode,
-          Barcode: String(r.Barcode).trim(),
-          Item_Name: String(r.Item_Name).trim(),
-        }));
+        const items = parsed.data
+          .filter((r) => (hasOldFormat ? r['Barcode No.'] && r['Item Description'] : r.Barcode && r.Item_Name))
+          .map((r) => ({
+            ItemCode: hasOldFormat ? (r['Item No.'] || r['Barcode No.']) : (r.ItemCode || r.Barcode),
+            Barcode: String(hasOldFormat ? r['Barcode No.'] : r.Barcode).trim(),
+            Item_Name: String(hasOldFormat ? r['Item Description'] : r.Item_Name).trim(),
+          }));
         setAllParsed(items);
         setPreview(items.slice(0, 10));
       };
@@ -73,18 +77,20 @@ export default function ImportScreen() {
 
       // Validate required columns
       const firstRow = parsed.data[0];
-      if (!firstRow || !('Barcode' in firstRow) || !('Item_Name' in firstRow)) {
-        setError('CSV must have headers: ItemCode, Barcode, Item_Name');
+      const hasNewFormat = firstRow && ('Barcode' in firstRow) && ('Item_Name' in firstRow);
+      const hasOldFormat = firstRow && ('Barcode No.' in firstRow) && ('Item Description' in firstRow);
+      if (!firstRow || (!hasNewFormat && !hasOldFormat)) {
+        setError('CSV must have headers: ItemCode, Barcode, Item_Name (or Item No., Barcode No., Item Description)');
         return;
       }
 
       // Normalize: ensure all required fields present
       const items = parsed.data
-        .filter((row) => row.Barcode && row.Item_Name)
+        .filter((row) => (hasOldFormat ? row['Barcode No.'] && row['Item Description'] : row.Barcode && row.Item_Name))
         .map((row) => ({
-          ItemCode: row.ItemCode || row.Barcode,
-          Barcode: String(row.Barcode).trim(),
-          Item_Name: String(row.Item_Name).trim(),
+          ItemCode: hasOldFormat ? (row['Item No.'] || row['Barcode No.']) : (row.ItemCode || row.Barcode),
+          Barcode: String(hasOldFormat ? row['Barcode No.'] : row.Barcode).trim(),
+          Item_Name: String(hasOldFormat ? row['Item Description'] : row.Item_Name).trim(),
         }));
 
       setAllParsed(items);
@@ -101,21 +107,12 @@ export default function ImportScreen() {
     setError(null);
 
     try {
-      // Always save to local SQLite
+      // Save to local storage only — backend sync happens separately via sync service
       await upsertItems(allParsed);
-      let backendResult = null;
-
-      // Attempt to sync to backend if reachable
-      try {
-        await checkHealth();
-        backendResult = await importItemsToBackend(allParsed);
-      } catch {
-        // Backend unreachable — that's fine, data is in SQLite
-      }
 
       setResult({
         total: allParsed.length,
-        backend: backendResult,
+        backend: null,
       });
       setAllParsed([]);
       setPreview([]);

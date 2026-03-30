@@ -1,13 +1,16 @@
-const mongoose = require('mongoose');
+const Datastore = require('@seald-io/nedb');
+const path = require('path');
+const fs = require('fs');
 
-const connectDB = async () => {
-  try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI);
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-  } catch (err) {
-    console.error('MongoDB connection error:', err.message);
-    process.exit(1);
-  }
+const dataDir = path.join(__dirname, '..', 'data');
+fs.mkdirSync(dataDir, { recursive: true });
+
+const db = {
+  items: new Datastore({ filename: path.join(dataDir, 'items.db'), autoload: true }),
+  transactions: new Datastore({ filename: path.join(dataDir, 'transactions.db'), autoload: true }),
 };
 
-module.exports = connectDB;
+// Unique index on Barcode
+db.items.ensureIndex({ fieldName: 'Barcode', unique: true });
+
+module.exports = db;

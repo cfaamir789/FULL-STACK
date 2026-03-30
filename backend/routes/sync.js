@@ -9,8 +9,6 @@ router.post('/', async (req, res) => {
     if (!Array.isArray(transactions) || transactions.length === 0) {
       return res.status(400).json({ success: false, error: 'transactions array is required' });
     }
-
-    // Validate required fields
     for (const tx of transactions) {
       if (!tx.Item_Barcode || !tx.Item_Name || !tx.Frombin || !tx.Tobin || !tx.Qty || !tx.Timestamp) {
         return res.status(400).json({
@@ -19,7 +17,6 @@ router.post('/', async (req, res) => {
         });
       }
     }
-
     const docs = transactions.map((tx) => ({
       Item_Barcode: tx.Item_Barcode,
       Item_Name: tx.Item_Name,
@@ -28,17 +25,12 @@ router.post('/', async (req, res) => {
       Qty: Number(tx.Qty),
       Timestamp: new Date(tx.Timestamp),
       deviceId: tx.deviceId || 'unknown',
+      createdAt: new Date(),
     }));
-
-    await Transaction.insertMany(docs, { ordered: false });
+    await Transaction.insertAsync(docs);
     res.json({ success: true, synced: docs.length });
   } catch (err) {
-    // insertMany with ordered:false may partially succeed
-    if (err.insertedDocs) {
-      res.json({ success: true, synced: err.insertedDocs.length });
-    } else {
-      res.status(500).json({ success: false, error: err.message });
-    }
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -49,8 +41,8 @@ router.get('/', async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
     const skip = (page - 1) * limit;
     const [transactions, total] = await Promise.all([
-      Transaction.find().sort({ Timestamp: -1 }).skip(skip).limit(limit).lean(),
-      Transaction.countDocuments(),
+      Transaction.findAsync({}).sort({ Timestamp: -1 }).skip(skip).limit(limit).execAsync(),
+      Transaction.countAsync({}),
     ]);
     res.json({ success: true, total, page, limit, transactions });
   } catch (err) {

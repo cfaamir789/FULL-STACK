@@ -2,6 +2,7 @@
   "expo": {
     "name": "Inventory Manager",
     "slug": "inventory-manager",
+    "owner": "aamircf",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -48,6 +49,11 @@
           "iCloudContainerEnvironment": "Production"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "19c33651-d605-4c84-992a-7eee0df51e22"
+      }
+    }
   }
 }
