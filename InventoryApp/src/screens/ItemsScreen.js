@@ -27,17 +27,32 @@ export default function ItemsScreen({ navigation }) {
     }, [loadItems])
   );
 
+  // Group raw items by trimmed item_code — one card per unique product
+  const grouped = (() => {
+    const map = new Map();
+    for (const i of allItems) {
+      const key = (i.item_code || i.item_name).trim().toLowerCase();
+      if (map.has(key)) {
+        map.get(key).barcodes.push(i.barcode);
+      } else {
+        map.set(key, { item_code: (i.item_code || '').trim(), item_name: i.item_name, barcodes: [i.barcode] });
+      }
+    }
+    return Array.from(map.values());
+  })();
+
+  // Filter grouped list
   const items = query.trim()
     ? (() => {
         const q = query.trim().toLowerCase();
-        return allItems.filter(
+        return grouped.filter(
           (i) =>
             i.item_name.toLowerCase().includes(q) ||
-            i.barcode.toLowerCase().includes(q) ||
-            i.item_code.toLowerCase().includes(q)
+            i.item_code.toLowerCase().includes(q) ||
+            i.barcodes.some((b) => b.toLowerCase().includes(q))
         );
       })()
-    : allItems;
+    : grouped;
 
   const handleQueryChange = (text) => {
     setQuery(text);
@@ -65,7 +80,7 @@ export default function ItemsScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.countText}>{items.length} items</Text>
+      <Text style={styles.countText}>{items.length} item{items.length !== 1 ? 's' : ''}</Text>
 
       {loading ? (
         <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />
@@ -79,7 +94,7 @@ export default function ItemsScreen({ navigation }) {
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={(item) => item.item_code || item.item_name}
           renderItem={({ item }) => <ItemCard item={item} />}
           contentContainerStyle={{ paddingBottom: 24 }}
           initialNumToRender={20}

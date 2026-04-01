@@ -13,9 +13,14 @@ export default function App() {
   useEffect(() => {
     let stopSync;
     const bootstrap = async () => {
-      await initDB();
-      stopSync = startAutoSync(30000);
-      setReady(true);
+      try {
+        await initDB();
+        stopSync = startAutoSync(30000);
+      } catch (e) {
+        console.warn('bootstrap error:', e);
+      } finally {
+        setReady(true);
+      }
     };
 
     bootstrap();
