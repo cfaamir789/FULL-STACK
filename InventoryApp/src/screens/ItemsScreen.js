@@ -1,39 +1,46 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, FlatList,
   TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { searchItems, getAllItems } from '../database/db';
+import { getAllItems } from '../database/db';
 import ItemCard from '../components/ItemCard';
 import Colors from '../theme/colors';
 
 export default function ItemsScreen({ navigation }) {
-  const [items, setItems] = useState([]);
+  const [allItems, setAllItems] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const debounceTimer = useRef(null);
 
-  const loadItems = useCallback(async (q = '') => {
+  const loadItems = useCallback(async () => {
     setLoading(true);
-    const results = q.trim() ? await searchItems(q.trim()) : await getAllItems();
-    setItems(results);
+    const results = await getAllItems();
+    setAllItems(results);
     setLoading(false);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadItems(query);
-    }, [loadItems, query])
+      loadItems();
+    }, [loadItems])
   );
+
+  const items = query.trim()
+    ? (() => {
+        const q = query.trim().toLowerCase();
+        return allItems.filter(
+          (i) =>
+            i.item_name.toLowerCase().includes(q) ||
+            i.barcode.toLowerCase().includes(q) ||
+            i.item_code.toLowerCase().includes(q)
+        );
+      })()
+    : allItems;
 
   const handleQueryChange = (text) => {
     setQuery(text);
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      loadItems(text);
-    }, 300);
   };
 
   return (

@@ -14,9 +14,12 @@ export const initDB = async () => {
       item_name TEXT NOT NULL
     );
 
+    CREATE INDEX IF NOT EXISTS idx_items_item_code ON items(item_code);
+
     CREATE TABLE IF NOT EXISTS transactions (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       item_barcode TEXT NOT NULL,
+      item_code    TEXT NOT NULL DEFAULT '',
       item_name    TEXT NOT NULL,
       frombin      TEXT NOT NULL,
       tobin        TEXT NOT NULL,
@@ -24,6 +27,30 @@ export const initDB = async () => {
       timestamp    TEXT NOT NULL,
       synced       INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE INDEX IF NOT EXISTS idx_transactions_synced ON transactions(synced);
+  `);
+
+  // Migration 1: add item_code column if it doesn't exist yet (for existing DBs)
+  try {
+    await db.execAsync(`ALTER TABLE transactions ADD COLUMN item_code TEXT NOT NULL DEFAULT ''`);
+  } catch (_) {
+    // Column already exists — safe to ignore
+  }
+
+  // Migration 2: backfill item_code for any transactions where it is still empty
+  await db.execAsync(`
+    UPDATE transactions
+    SET item_code = (
+      SELECT item_code FROM items
+      WHERE items.barcode = transactions.item_barcode
+      LIMIT 1
+    )
+    WHERE (item_code IS NULL OR item_code = '')
+      AND EXISTS (
+        SELECT 1 FROM items
+        WHERE items.barcode = transactions.item_barcode
+      )
   `);
 };
 
@@ -84,12 +111,12 @@ export const getAllItems = async () => {
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
 
-export const insertTransaction = async ({ item_barcode, item_name, frombin, tobin, qty }) => {
+export const insertTransaction = async ({ item_barcode, item_code = '', item_name, frombin, tobin, qty }) => {
   const timestamp = new Date().toISOString();
   const result = await db.runAsync(
-    `INSERT INTO transactions (item_barcode, item_name, frombin, tobin, qty, timestamp, synced)
-     VALUES (?, ?, ?, ?, ?, ?, 0)`,
-    [item_barcode, item_name, frombin, tobin, qty, timestamp]
+    `INSERT INTO transactions (item_barcode, item_code, item_name, frombin, tobin, qty, timestamp, synced)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+    [item_barcode, item_code, item_name, frombin, tobin, qty, timestamp]
   );
   return result.lastInsertRowId;
 };
@@ -114,6 +141,17 @@ export const getRecentTransactions = async (limit = 20) => {
     'SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?',
     [limit]
   );
+};
+
+export const updateTransaction = async (id, { frombin, tobin, qty }) => {
+  await db.runAsync(
+    `UPDATE transactions SET frombin = ?, tobin = ?, qty = ?, synced = 0 WHERE id = ?`,
+    [frombin.trim(), tobin.trim(), Number(qty), id]
+  );
+};
+
+export const deleteTransaction = async (id) => {
+  await db.runAsync('DELETE FROM transactions WHERE id = ?', [id]);
 };
 
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────

@@ -13,8 +13,15 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Separate client with a short timeout just for reachability checks
+const healthClient = axios.create({
+  baseURL: BASE_URL,
+  timeout: 3000,
+  headers: { 'Content-Type': 'application/json' },
+});
+
 export const checkHealth = async () => {
-  const res = await apiClient.get('/health');
+  const res = await healthClient.get('/health');
   return res.data;
 };
 

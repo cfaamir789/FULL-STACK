@@ -1,0 +1,7 @@
+{
+  "livePreview.serverRoot": "InventoryApp",
+  "livePreview.defaultPreviewPath": "http://localhost:19006",
+  "livePreview.openPreviewTarget": "embedded",
+  "simpleBrowser.focusLockIndicator.enabled": true,
+  "terminal.integrated.tabs.enabled": true
+}

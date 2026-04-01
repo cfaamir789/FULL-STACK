@@ -17,7 +17,7 @@ export default function ItemCard({ item }) {
           Barcode: {item.barcode}
         </Text>
         <Text style={styles.sub}>
-          Code: {item.item_code}
+          Item Code: {item.item_code}
         </Text>
       </View>
     </View>

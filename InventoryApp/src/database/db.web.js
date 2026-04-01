@@ -23,6 +23,21 @@ const openIDB = () => new Promise((resolve, reject) => {
   req.onerror = (e) => reject(e.target.error);
 });
 
+// ─── In-Memory Cache ──────────────────────────────────────────────────────────
+// Loaded once via getAll() (bulk read, much faster than cursor), then all
+// searches are pure in-memory JS — near-instant regardless of dataset size.
+let _itemsCache = null;
+
+const getItemsCache = async () => {
+  if (_itemsCache) return _itemsCache;
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(ITEMS_STORE, 'readonly').objectStore(ITEMS_STORE).getAll();
+    req.onsuccess = () => { _itemsCache = req.result || []; resolve(_itemsCache); };
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
 // ─── localStorage for Transactions (small dataset) ───────────────────────────
 
 const KEY_TRANSACTIONS = 'inv_transactions';
@@ -36,7 +51,7 @@ export const initDB = async () => { await openIDB(); };
 export const upsertItems = async (itemsArray) => {
   if (!itemsArray || itemsArray.length === 0) return;
   const db = await openIDB();
-  // Bulk put in one IndexedDB transaction — very fast for large datasets
+  _itemsCache = null; // invalidate cache so next read reflects new data
   return new Promise((resolve, reject) => {
     const tx = db.transaction(ITEMS_STORE, 'readwrite');
     const store = tx.objectStore(ITEMS_STORE);
@@ -58,62 +73,25 @@ export const getItemByBarcode = async (barcode) => {
 };
 
 export const getItemByItemCode = async (itemCode) => {
-  const db = await openIDB();
-  const code = itemCode.trim();
-  return new Promise((resolve, reject) => {
-    const results = [];
-    const req = db.transaction(ITEMS_STORE, 'readonly').objectStore(ITEMS_STORE).openCursor();
-    req.onsuccess = (e) => {
-      const cursor = e.target.result;
-      if (cursor) {
-        if (cursor.value.item_code === code) { resolve(cursor.value); return; }
-        cursor.continue();
-      } else {
-        resolve(null);
-      }
-    };
-    req.onerror = (e) => reject(e.target.error);
-  });
+  const code = itemCode.trim().toLowerCase();
+  const items = await getItemsCache();
+  return items.find((i) => i.item_code.toLowerCase() === code) || null;
 };
 
 export const searchItems = async (query) => {
-  const db = await openIDB();
+  const items = await getItemsCache();
   const q = query.toLowerCase();
-  return new Promise((resolve, reject) => {
-    const results = [];
-    const req = db.transaction(ITEMS_STORE, 'readonly').objectStore(ITEMS_STORE).openCursor();
-    req.onsuccess = (e) => {
-      const cursor = e.target.result;
-      if (cursor && results.length < 200) {
-        const { item_name, barcode, item_code } = cursor.value;
-        if (item_name.toLowerCase().includes(q) || barcode.toLowerCase().includes(q) || item_code.toLowerCase().includes(q)) {
-          results.push(cursor.value);
-        }
-        cursor.continue();
-      } else {
-        resolve(results);
-      }
-    };
-    req.onerror = (e) => reject(e.target.error);
-  });
+  const results = items.filter((i) =>
+    i.item_name.toLowerCase().includes(q) ||
+    i.barcode.toLowerCase().includes(q) ||
+    i.item_code.toLowerCase().includes(q)
+  );
+  return results.sort((a, b) => a.item_name.localeCompare(b.item_name));
 };
 
 export const getAllItems = async () => {
-  const db = await openIDB();
-  return new Promise((resolve, reject) => {
-    const results = [];
-    const req = db.transaction(ITEMS_STORE, 'readonly').objectStore(ITEMS_STORE).openCursor();
-    req.onsuccess = (e) => {
-      const cursor = e.target.result;
-      if (cursor && results.length < 1000) {
-        results.push(cursor.value);
-        cursor.continue();
-      } else {
-        resolve(results.sort((a, b) => a.item_name.localeCompare(b.item_name)));
-      }
-    };
-    req.onerror = (e) => reject(e.target.error);
-  });
+  const items = await getItemsCache();
+  return [...items].sort((a, b) => a.item_name.localeCompare(b.item_name));
 };
 
 export const getItemCount = async () => {
@@ -127,10 +105,14 @@ export const getItemCount = async () => {
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
 
-export const insertTransaction = async ({ item_barcode, item_name, frombin, tobin, qty }) => {
+export const insertTransaction = async ({ item_barcode, item_code = '', item_name, frombin, tobin, qty }) => {
   const txs = loadTx();
   const id = txs.length > 0 ? Math.max(...txs.map((t) => t.id)) + 1 : 1;
-  txs.push({ id, item_barcode, item_name, frombin, tobin, qty, timestamp: new Date().toISOString(), synced: 0 });
+  let resolvedCode = item_code;
+  if (!resolvedCode) {
+    try { const found = await getItemByBarcode(item_barcode); if (found) resolvedCode = found.item_code || ''; } catch {}
+  }
+  txs.push({ id, item_barcode, item_code: resolvedCode, item_name, frombin, tobin, qty, timestamp: new Date().toISOString(), synced: 0 });
   saveTx(txs);
   return id;
 };
@@ -144,7 +126,28 @@ export const markTransactionsSynced = async (ids) => {
 };
 
 export const getRecentTransactions = async (limit = 20) => {
-  return loadTx().sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, limit);
+  const txs = loadTx().sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, limit);
+  // Backfill item_code for rows saved before this field existed
+  const needsBackfill = txs.filter((t) => !t.item_code);
+  if (needsBackfill.length > 0) {
+    await Promise.all(needsBackfill.map(async (t) => {
+      try { const found = await getItemByBarcode(t.item_barcode); if (found && found.item_code) t.item_code = found.item_code; } catch {}
+    }));
+    const codeMap = {};
+    txs.forEach((t) => { if (t.item_code) codeMap[t.id] = t.item_code; });
+    saveTx(loadTx().map((t) => (codeMap[t.id] ? { ...t, item_code: codeMap[t.id] } : t)));
+  }
+  return txs;
+};
+
+export const updateTransaction = async (id, { frombin, tobin, qty }) => {
+  saveTx(loadTx().map((t) =>
+    t.id === id ? { ...t, frombin: frombin.trim(), tobin: tobin.trim(), qty: Number(qty), synced: 0 } : t
+  ));
+};
+
+export const deleteTransaction = async (id) => {
+  saveTx(loadTx().filter((t) => t.id !== id));
 };
 
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────

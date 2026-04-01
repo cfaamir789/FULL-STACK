@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, FlatList, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,12 +18,24 @@ export default function DashboardScreen() {
   const [syncStatus, setSyncStatus] = useState({ online: null, lastSync: null, pendingCount: 0 });
   const [syncing, setSyncing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState('');
 
   const loadData = useCallback(async () => {
-    const [s, r] = await Promise.all([getDashboardStats(), getRecentTransactions(5)]);
+    const [s, r] = await Promise.all([getDashboardStats(), getRecentTransactions(200)]);
     setStats(s);
     setRecent(r);
   }, []);
+
+  const filtered = query.trim()
+    ? recent.filter((tx) => {
+        const q = query.trim().toLowerCase();
+        return (
+          (tx.item_code && tx.item_code.toLowerCase().includes(q)) ||
+          (tx.item_barcode && tx.item_barcode.toLowerCase().includes(q)) ||
+          (tx.item_name && tx.item_name.toLowerCase().includes(q))
+        );
+      })
+    : recent.slice(0, 5);
 
   useFocusEffect(
     useCallback(() => {
@@ -82,14 +94,34 @@ export default function DashboardScreen() {
           <Text style={styles.syncBtnText}>{syncing ? 'Syncing...' : 'Sync Now'}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.sectionTitle}>Recent Transactions</Text>
-        {recent.length === 0 ? (
+        {/* Search Bar */}
+        <View style={styles.searchBar}>
+          <MaterialCommunityIcons name="magnify" size={20} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by item code, barcode or name..."
+            value={query}
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery('')}>
+              <MaterialCommunityIcons name="close-circle" size={18} color={Colors.textLight} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <Text style={styles.sectionTitle}>
+          {query.trim() ? `${filtered.length} result${filtered.length !== 1 ? 's' : ''}` : 'Recent Transactions'}
+        </Text>
+        {filtered.length === 0 ? (
           <View style={styles.empty}>
-            <MaterialCommunityIcons name="history" size={40} color={Colors.textLight} />
-            <Text style={styles.emptyText}>No transactions yet</Text>
+            <MaterialCommunityIcons name={query.trim() ? 'magnify-close' : 'history'} size={40} color={Colors.textLight} />
+            <Text style={styles.emptyText}>{query.trim() ? 'No matches found' : 'No transactions yet'}</Text>
           </View>
         ) : (
-          recent.map((tx) => <TransactionRow key={tx.id} item={tx} />)
+          filtered.map((tx) => <TransactionRow key={tx.id} item={tx} />)
         )}
       </ScrollView>
     </View>
@@ -126,4 +158,25 @@ const styles = StyleSheet.create({
   syncBtnText: { color: '#fff', fontWeight: '700', fontSize: 15, marginLeft: 8 },
   empty: { alignItems: 'center', paddingVertical: 32 },
   emptyText: { color: Colors.textLight, marginTop: 8 },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginHorizontal: 16,
+    marginTop: 16,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.textPrimary,
+    paddingVertical: 2,
+  },
 });
