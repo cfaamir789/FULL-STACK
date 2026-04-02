@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Transaction = require('../models/Transaction');
+const { appendTransactions } = require('../services/googleSheets');
 
 // POST /api/sync — receive array of offline transactions
 router.post('/', async (req, res) => {
@@ -28,6 +29,8 @@ router.post('/', async (req, res) => {
       createdAt: new Date(),
     }));
     await Transaction.insertAsync(docs);
+    // Append to Google Sheet asynchronously — never blocks the phone response
+    appendTransactions(docs).catch(() => {});
     res.json({ success: true, synced: docs.length });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

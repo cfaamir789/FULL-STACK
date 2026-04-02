@@ -105,14 +105,14 @@ export const getItemCount = async () => {
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
 
-export const insertTransaction = async ({ item_barcode, item_code = '', item_name, frombin, tobin, qty }) => {
+export const insertTransaction = async ({ item_barcode, item_code = '', item_name, frombin, tobin, qty, worker_name = 'unknown' }) => {
   const txs = loadTx();
   const id = txs.length > 0 ? Math.max(...txs.map((t) => t.id)) + 1 : 1;
   let resolvedCode = item_code;
   if (!resolvedCode) {
     try { const found = await getItemByBarcode(item_barcode); if (found) resolvedCode = found.item_code || ''; } catch {}
   }
-  txs.push({ id, item_barcode, item_code: resolvedCode, item_name, frombin, tobin, qty, timestamp: new Date().toISOString(), synced: 0 });
+  txs.push({ id, item_barcode, item_code: resolvedCode, item_name, frombin, tobin, qty, timestamp: new Date().toISOString(), synced: 0, worker_name });
   saveTx(txs);
   return id;
 };

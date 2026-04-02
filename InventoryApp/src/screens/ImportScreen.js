@@ -107,12 +107,21 @@ export default function ImportScreen() {
     setError(null);
 
     try {
-      // Save to local storage only — backend sync happens separately via sync service
+      // Save to local SQLite
       await upsertItems(allParsed);
+
+      // Also push to backend if reachable (so all workers pull it on next sync)
+      let backendResult = null;
+      try {
+        await checkHealth();
+        backendResult = await importItemsToBackend(allParsed);
+      } catch (_) {
+        // Backend unreachable — items already saved locally, workers will pull when online
+      }
 
       setResult({
         total: allParsed.length,
-        backend: null,
+        backend: backendResult,
       });
       setAllParsed([]);
       setPreview([]);

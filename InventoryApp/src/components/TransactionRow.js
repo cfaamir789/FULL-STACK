@@ -21,6 +21,11 @@ export default function TransactionRow({ item, onEdit, onDelete }) {
         <Text style={styles.meta}>
           {item.frombin} → {item.tobin}  •  Qty: {item.qty}
         </Text>
+        {item.worker_name && item.worker_name !== 'unknown' ? (
+          <Text style={styles.worker}>
+            <MaterialCommunityIcons name="account" size={11} color={Colors.textLight} /> {item.worker_name}
+          </Text>
+        ) : null}
         <Text style={styles.time}>{timeStr}</Text>
       </View>
 
@@ -70,6 +75,7 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
   barcode: { fontSize: 11, color: Colors.textLight, marginTop: 1, fontFamily: 'monospace' },
   meta: { fontSize: 12, color: Colors.textSecondary, marginTop: 3 },
+  worker: { fontSize: 11, color: Colors.textLight, marginTop: 2 },
   time: { fontSize: 11, color: Colors.textLight, marginTop: 2 },
   right: { alignItems: 'flex-end', gap: 6 },
   actions: { flexDirection: 'row', gap: 4 },

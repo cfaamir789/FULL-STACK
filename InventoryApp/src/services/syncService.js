@@ -1,8 +1,10 @@
 import { Platform } from 'react-native';
-import { checkHealth, syncTransactions } from './api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { checkHealth, syncTransactions, fetchItems } from './api';
 import {
   getPendingTransactions,
   markTransactionsSynced,
+  upsertItems,
 } from '../database/db';
 
 let _onStatusChange = null;
@@ -50,6 +52,9 @@ export const attemptSync = async () => {
     return { synced: 0, reason: 'nothing_pending' };
   }
 
+  // Read worker name saved by LoginScreen
+  const workerName = (await AsyncStorage.getItem('workerName')) || 'unknown';
+
   // Map SQLite rows to the shape the backend expects
   const payload = pending.map((tx) => ({
     Item_Barcode: tx.item_barcode,
@@ -58,19 +63,37 @@ export const attemptSync = async () => {
     Tobin: tx.tobin,
     Qty: tx.qty,
     Timestamp: tx.timestamp,
-    deviceId: 'mobile',
+    deviceId: workerName,
   }));
 
+  let synced = 0;
   try {
     const result = await syncTransactions(payload);
     const ids = pending.map((tx) => tx.id);
     await markTransactionsSynced(ids);
-    const lastSync = new Date().toISOString();
-    notifyStatus({ online: true, lastSync, pendingCount: 0 });
-    return { synced: result.synced ?? ids.length, reason: 'success', lastSync };
+    synced = result.synced ?? ids.length;
   } catch (err) {
     return { synced: 0, reason: 'sync_failed', error: err.message };
   }
+
+  // Pull latest item master from backend so worker always has new items
+  try {
+    const latestItems = await fetchItems();
+    if (latestItems && latestItems.length > 0) {
+      // fetchItems returns { ItemCode, Barcode, Item_Name } objects
+      await upsertItems(latestItems.map((i) => ({
+        ItemCode: i.ItemCode,
+        Barcode: i.Barcode,
+        Item_Name: i.Item_Name,
+      })));
+    }
+  } catch (_) {
+    // Item pull failure must not break transaction sync
+  }
+
+  const lastSync = new Date().toISOString();
+  notifyStatus({ online: true, lastSync, pendingCount: 0 });
+  return { synced, reason: 'success', lastSync };
 };
 
 export const startAutoSync = (intervalMs = 30000) => {

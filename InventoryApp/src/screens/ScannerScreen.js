@@ -15,6 +15,7 @@ if (!IS_WEB) {
   useCameraPermissions = () => [{ granted: false }, async () => {}];
 }
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getItemByBarcode, getItemByItemCode, searchItems, insertTransaction } from '../database/db';
 import { attemptSync } from '../services/syncService';
 import Colors from '../theme/colors';
@@ -126,6 +127,7 @@ export default function ScannerScreen() {
     if (!qty || isNaN(qtyNum) || qtyNum < 1) { Alert.alert('Error', 'Quantity must be a positive number.'); return; }
     setSaving(true);
     try {
+      const workerName = (await AsyncStorage.getItem('workerName')) || 'unknown';
       await insertTransaction({
         item_barcode: barcodeVal,
         item_code: foundItem?.item_code || '',
@@ -133,6 +135,7 @@ export default function ScannerScreen() {
         frombin: frombin.trim(),
         tobin: tobin.trim(),
         qty: qtyNum,
+        worker_name: workerName,
       });
       await attemptSync();
       resetForm();

@@ -38,6 +38,13 @@ export const initDB = async () => {
     // Column already exists — safe to ignore
   }
 
+  // Migration 3: add worker_name column to tag which worker did each transaction
+  try {
+    await db.execAsync(`ALTER TABLE transactions ADD COLUMN worker_name TEXT NOT NULL DEFAULT 'unknown'`);
+  } catch (_) {
+    // Column already exists — safe to ignore
+  }
+
   // Migration 2: backfill item_code for any transactions where it is still empty
   await db.execAsync(`
     UPDATE transactions
@@ -111,12 +118,12 @@ export const getAllItems = async () => {
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
 
-export const insertTransaction = async ({ item_barcode, item_code = '', item_name, frombin, tobin, qty }) => {
+export const insertTransaction = async ({ item_barcode, item_code = '', item_name, frombin, tobin, qty, worker_name = 'unknown' }) => {
   const timestamp = new Date().toISOString();
   const result = await db.runAsync(
-    `INSERT INTO transactions (item_barcode, item_code, item_name, frombin, tobin, qty, timestamp, synced)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-    [item_barcode, item_code, item_name, frombin, tobin, qty, timestamp]
+    `INSERT INTO transactions (item_barcode, item_code, item_name, frombin, tobin, qty, timestamp, synced, worker_name)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+    [item_barcode, item_code, item_name, frombin, tobin, qty, timestamp, worker_name]
   );
   return result.lastInsertRowId;
 };
