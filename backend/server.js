@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const itemsRouter = require('./routes/items');
 const syncRouter = require('./routes/sync');
+const authRouter = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,6 +18,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Routes
+app.use('/api/auth', authRouter);
 app.use('/api/items', itemsRouter);
 app.use('/api/transactions', syncRouter);
 app.use('/api/sync', syncRouter);

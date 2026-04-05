@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Colors from '../theme/colors';
 
-export default function TransactionRow({ item, onEdit, onDelete }) {
+export default function TransactionRow({ item, onEdit, onDelete, canEdit = false, canDelete = false }) {
   const synced = item.synced === 1;
   const date = new Date(item.timestamp);
   const timeStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -30,14 +30,18 @@ export default function TransactionRow({ item, onEdit, onDelete }) {
       </View>
 
       <View style={styles.right}>
-        {!!onEdit && (
+        {(canEdit || canDelete) && (
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => onEdit(item)}>
-              <MaterialCommunityIcons name="pencil-outline" size={18} color={Colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete && onDelete(item)}>
-              <MaterialCommunityIcons name="trash-can-outline" size={18} color={Colors.error} />
-            </TouchableOpacity>
+            {canEdit && (
+              <TouchableOpacity style={styles.actionBtn} onPress={() => onEdit(item)}>
+                <MaterialCommunityIcons name="pencil-outline" size={18} color={Colors.primary} />
+              </TouchableOpacity>
+            )}
+            {canDelete && (
+              <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete && onDelete(item)}>
+                <MaterialCommunityIcons name="trash-can-outline" size={18} color={Colors.error} />
+              </TouchableOpacity>
+            )}
           </View>
         )}
         <View style={[styles.badge, { backgroundColor: synced ? Colors.success + '20' : Colors.pending + '20' }]}>

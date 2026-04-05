@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Item = require('../models/Item');
+const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
 // GET /api/items — return all items
 router.get('/', async (req, res) => {
@@ -36,8 +37,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// POST /api/items/import — bulk upsert array of items
-router.post('/import', async (req, res) => {
+// POST /api/items/import — bulk upsert array of items (admin only)
+router.post('/import', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { items } = req.body;
     if (!Array.isArray(items) || items.length === 0) {

@@ -9,7 +9,8 @@ import { getAllItems } from '../database/db';
 import ItemCard from '../components/ItemCard';
 import Colors from '../theme/colors';
 
-export default function ItemsScreen({ navigation }) {
+export default function ItemsScreen({ navigation, route }) {
+  const role = route?.params?.role || 'worker';
   const [allItems, setAllItems] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -72,12 +73,14 @@ export default function ItemsScreen({ navigation }) {
             clearButtonMode="while-editing"
           />
         </View>
-        <TouchableOpacity
-          style={styles.importBtn}
-          onPress={() => navigation.navigate('Import')}
-        >
-          <MaterialCommunityIcons name="file-import" size={20} color="#fff" />
-        </TouchableOpacity>
+        {role === 'admin' && (
+          <TouchableOpacity
+            style={styles.importBtn}
+            onPress={() => navigation.navigate('Import')}
+          >
+            <MaterialCommunityIcons name="file-import" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <Text style={styles.countText}>{items.length} item{items.length !== 1 ? 's' : ''}</Text>

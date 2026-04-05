@@ -12,12 +12,15 @@ import ItemsScreen from '../screens/ItemsScreen';
 import ImportScreen from '../screens/ImportScreen';
 import TransactionsScreen from '../screens/TransactionsScreen';
 import LoginScreen from '../screens/LoginScreen';
+import AdminScreen from '../screens/AdminScreen';
 import Colors from '../theme/colors';
+import { loadServerUrl } from '../services/api';
+import { attemptSync } from '../services/syncService';
 
 const Tab = createBottomTabNavigator();
 const ItemsStack = createStackNavigator();
 
-const ItemsStackNavigator = () => (
+const ItemsStackNavigator = ({ role }) => (
   <ItemsStack.Navigator
     screenOptions={{
       headerStyle: { backgroundColor: Colors.primary },
@@ -25,29 +28,46 @@ const ItemsStackNavigator = () => (
       headerTitleStyle: { fontWeight: 'bold' },
     }}
   >
-    <ItemsStack.Screen name="ItemsList" component={ItemsScreen} options={{ title: 'Items' }} />
+    <ItemsStack.Screen name="ItemsList" component={ItemsScreen} initialParams={{ role }} options={{ title: 'Items' }} />
     <ItemsStack.Screen name="Import" component={ImportScreen} options={{ title: 'Import CSV' }} />
   </ItemsStack.Navigator>
 );
 
 export default function AppNavigator() {
-  const [workerName, setWorkerName] = useState(null);
+  const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem('workerName').then((name) => {
-      setWorkerName(name || null);
+    const init = async () => {
+      // Load saved server IP before anything else
+      await loadServerUrl();
+      const pairs = await AsyncStorage.multiGet(['workerName', 'workerRole', 'authToken']);
+      const name = pairs[0][1];
+      const role = pairs[1][1];
+      const token = pairs[2][1];
+      if (name && (token || role)) {
+        setSession({ username: name, role: role || 'worker' });
+        // Kick off a background sync (pulls items + sends pending transactions)
+        attemptSync().catch(() => {});
+      }
       setChecking(false);
-    });
+    };
+    init();
   }, []);
 
-  // Still loading stored name
+  // Still loading stored session
   if (checking) return null;
 
-  // No name saved yet — show login screen
-  if (!workerName) {
-    return <LoginScreen onLogin={(name) => setWorkerName(name)} />;
+  // Not logged in — show login screen
+  if (!session) {
+    return <LoginScreen onLogin={(s) => {
+      setSession(s);
+      // Pull items from backend immediately after login
+      attemptSync().catch(() => {});
+    }} />;
   }
+
+  const { username: workerName, role } = session;
 
   return (
     <NavigationContainer>
@@ -59,6 +79,7 @@ export default function AppNavigator() {
               Scanner: 'barcode-scan',
               Items: 'package-variant',
               Transactions: 'history',
+              Admin: 'account-cog',
             };
             return (
               <MaterialCommunityIcons
@@ -84,23 +105,33 @@ export default function AppNavigator() {
         <Tab.Screen name="Scanner" component={ScannerScreen} options={{ headerShown: false }} />
         <Tab.Screen
           name="Items"
-          component={ItemsStackNavigator}
           options={{ headerShown: false }}
-        />
-        <Tab.Screen name="Transactions" component={TransactionsScreen} options={{
+        >
+          {() => <ItemsStackNavigator role={role} />}
+        </Tab.Screen>
+        <Tab.Screen name="Transactions" options={{
           title: 'Transactions',
           headerRight: () => (
             <TouchableOpacity
               onPress={async () => {
-                await AsyncStorage.removeItem('workerName');
-                setWorkerName(null);
+                await AsyncStorage.multiRemove(['workerName', 'workerRole', 'authToken']);
+                setSession(null);
               }}
               style={{ marginRight: 14 }}
             >
               <MaterialCommunityIcons name="account-switch" size={22} color="#fff" />
             </TouchableOpacity>
           ),
-        }} />
+        }}>
+          {() => <TransactionsScreen username={workerName} role={role} />}
+        </Tab.Screen>
+        {role === 'admin' && (
+          <Tab.Screen
+            name="Admin"
+            component={AdminScreen}
+            options={{ title: 'Users' }}
+          />
+        )}
       </Tab.Navigator>
     </NavigationContainer>
   );

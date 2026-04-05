@@ -150,14 +150,26 @@ export const getRecentTransactions = async (limit = 20) => {
   );
 };
 
-export const updateTransaction = async (id, { frombin, tobin, qty }) => {
+export const updateTransaction = async (id, { frombin, tobin, qty }, username, role) => {
+  if (role !== 'admin') {
+    const tx = await db.getFirstAsync('SELECT worker_name FROM transactions WHERE id = ?', [id]);
+    if (tx && tx.worker_name !== username) {
+      throw new Error('You can only edit your own transactions.');
+    }
+  }
   await db.runAsync(
     `UPDATE transactions SET frombin = ?, tobin = ?, qty = ?, synced = 0 WHERE id = ?`,
     [frombin.trim(), tobin.trim(), Number(qty), id]
   );
 };
 
-export const deleteTransaction = async (id) => {
+export const deleteTransaction = async (id, username, role) => {
+  if (role !== 'admin') {
+    const tx = await db.getFirstAsync('SELECT worker_name FROM transactions WHERE id = ?', [id]);
+    if (tx && tx.worker_name !== username) {
+      throw new Error('You can only delete your own transactions.');
+    }
+  }
   await db.runAsync('DELETE FROM transactions WHERE id = ?', [id]);
 };
 

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, FlatList, StyleSheet, ActivityIndicator, Text,
+  View, FlatList, StyleSheet, ActivityIndicator, Text, Alert,
   Modal, TextInput, TouchableOpacity, KeyboardAvoidingView,
   Platform, ScrollView,
 } from 'react-native';
@@ -10,7 +10,7 @@ import { getRecentTransactions, updateTransaction, deleteTransaction } from '../
 import TransactionRow from '../components/TransactionRow';
 import Colors from '../theme/colors';
 
-export default function TransactionsScreen() {
+export default function TransactionsScreen({ username, role }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
@@ -78,10 +78,15 @@ export default function TransactionsScreen() {
     }
     setValidationMsg('');
     setSaving(true);
-    await updateTransaction(editItem.id, { frombin: editFrombin, tobin: editTobin, qty });
-    await loadTransactions();
-    setSaving(false);
-    closeEdit();
+    try {
+      await updateTransaction(editItem.id, { frombin: editFrombin, tobin: editTobin, qty }, username, role);
+      await loadTransactions();
+      closeEdit();
+    } catch (err) {
+      setValidationMsg(err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openDelete = (item) => {
@@ -97,10 +102,15 @@ export default function TransactionsScreen() {
   const handleDelete = async () => {
     if (!deleteConfirmed) return;
     setDeleting(true);
-    await deleteTransaction(deleteItem.id);
-    await loadTransactions();
-    setDeleting(false);
-    closeDelete();
+    try {
+      await deleteTransaction(deleteItem.id, username, role);
+      await loadTransactions();
+    } catch (err) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setDeleting(false);
+      closeDelete();
+    }
   };
 
   if (loading) {
@@ -157,7 +167,13 @@ export default function TransactionsScreen() {
               data={filtered}
               keyExtractor={(item) => String(item.id)}
               renderItem={({ item }) => (
-                <TransactionRow item={item} onEdit={openEdit} onDelete={openDelete} />
+                <TransactionRow
+                  item={item}
+                  onEdit={openEdit}
+                  onDelete={openDelete}
+                  canEdit={role === 'admin' || item.worker_name === username}
+                  canDelete={role === 'admin' || item.worker_name === username}
+                />
               )}
               contentContainerStyle={{ paddingVertical: 8, paddingBottom: 24 }}
               initialNumToRender={20}

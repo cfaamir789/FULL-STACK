@@ -39,6 +39,9 @@ export default function ScannerScreen() {
   const fromBinRef = useRef(null);
   const toBinRef = useRef(null);
   const qtyRef = useRef(null);
+  const barcodeRef = useRef(null);
+  const itemCodeRef = useRef(null);
+  const itemNameRef = useRef(null);
 
   const focusFromBin = () => setTimeout(() => fromBinRef.current?.focus(), 120);
 
@@ -139,6 +142,12 @@ export default function ScannerScreen() {
       });
       await attemptSync();
       resetForm();
+      // Return focus to the active search input for quick next entry
+      setTimeout(() => {
+        if (mode === 'barcode') barcodeRef.current?.focus();
+        else if (mode === 'itemcode') itemCodeRef.current?.focus();
+        else if (mode === 'itemname') itemNameRef.current?.focus();
+      }, 150);
     } catch (err) {
       Alert.alert('Error', err.message);
     } finally {
@@ -180,6 +189,7 @@ export default function ScannerScreen() {
         <Text style={styles.label}>Barcode</Text>
         <View style={styles.searchRow}>
           <TextInput
+            ref={barcodeRef}
             style={[styles.input, { flex: 1 }]}
             value={barcode}
             onChangeText={setBarcode}
@@ -201,6 +211,7 @@ export default function ScannerScreen() {
         <Text style={styles.label}>Item Code</Text>
         <View style={styles.searchRow}>
           <TextInput
+            ref={itemCodeRef}
             style={[styles.input, { flex: 1 }]}
             value={itemCode}
             onChangeText={setItemCode}
@@ -222,6 +233,7 @@ export default function ScannerScreen() {
         <Text style={styles.label}>Item Name</Text>
         <View style={styles.searchRow}>
           <TextInput
+            ref={itemNameRef}
             style={[styles.input, { flex: 1 }]}
             value={itemName}
             onChangeText={setItemName}

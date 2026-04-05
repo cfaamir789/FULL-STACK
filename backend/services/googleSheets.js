@@ -4,7 +4,7 @@ const fs = require('fs');
 
 const CREDENTIALS_PATH = path.join(__dirname, '..', 'config', 'google-credentials.json');
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
-const SHEET_TAB = 'Transactions';
+const SHEET_TAB = process.env.GOOGLE_SHEET_TAB || 'Transactions';
 
 // Build an authenticated Sheets client from the service-account JSON key.
 // Returns null (with a console warning) if credentials or Sheet ID are missing.
@@ -48,7 +48,7 @@ async function appendTransactions(transactions) {
     return [
       date,
       time,
-      tx.deviceId || 'unknown',   // Worker name
+      tx.Worker_Name || tx.deviceId || 'unknown',
       tx.Item_Barcode || '',
       tx.Item_Name || '',
       tx.Frombin || '',

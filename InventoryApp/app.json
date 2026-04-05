@@ -3,7 +3,7 @@
     "name": "Inventory Manager",
     "slug": "inventory-manager",
     "owner": "aamircf",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,6 +18,7 @@
       "bundleIdentifier": "com.inventory.manager"
     },
     "android": {
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1565C0"
@@ -29,7 +30,8 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_NETWORK_STATE",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -52,7 +54,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "19c33651-d605-4c84-992a-7eee0df51e22"
+        "projectId": "e38f8ee8-1b02-4452-b109-b9ad8465236c"
       }
     }
   }
