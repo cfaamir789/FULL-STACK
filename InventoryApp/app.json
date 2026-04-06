@@ -53,6 +53,12 @@
       ],
       "expo-font"
     ],
+    "updates": {
+      "url": "https://u.expo.dev/e38f8ee8-1b02-4452-b109-b9ad8465236c"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "extra": {
       "eas": {
         "projectId": "e38f8ee8-1b02-4452-b109-b9ad8465236c"
