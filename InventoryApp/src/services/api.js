@@ -1,7 +1,7 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const DEFAULT_SERVER_IP = "192.168.2.56";
+export const DEFAULT_SERVER_IP = "localhost";
 
 // Builds the API base URL from a server address.
 // Supports: bare IP ("192.168.1.5"), IP:port ("192.168.1.5:5000"),
@@ -20,6 +20,12 @@ const buildBaseUrl = (addr) => {
 let currentBaseUrl = buildBaseUrl(DEFAULT_SERVER_IP);
 
 export const getBaseUrl = () => currentBaseUrl;
+
+// Returns a display-friendly server address (for showing in UI)
+export const getDisplayUrl = () => {
+  // Strip /api suffix for display
+  return currentBaseUrl.replace(/\/api$/, "");
+};
 
 const apiClient = axios.create({
   baseURL: currentBaseUrl,

@@ -265,6 +265,36 @@
         color: #fff;
         border-color: #1565c0;
       }
+      .tab-bar { display:flex; gap:0; margin-bottom:16px; border-bottom:2px solid #e0e0e0; }
+      .tab-bar button { padding:10px 20px; border:none; background:none; cursor:pointer; font-size:14px; font-weight:600; color:#888; border-bottom:3px solid transparent; margin-bottom:-2px; transition:all 0.2s; }
+      .tab-bar button.active { color:#1565c0; border-bottom-color:#1565c0; }
+      .tab-bar button:hover { color:#1565c0; }
+      .user-card { display:flex; align-items:center; justify-content:space-between; background:#f5f7fa; border-radius:8px; padding:12px 16px; margin-bottom:8px; }
+      .user-card .name { font-weight:600; font-size:15px; }
+      .user-card .role { font-size:12px; padding:3px 10px; border-radius:12px; font-weight:600; }
+      .user-card .role.admin { background:#e3f2fd; color:#1565c0; }
+      .user-card .role.worker { background:#e8f5e9; color:#2e7d32; }
+      .btn-sm { padding:6px 14px; font-size:13px; border-radius:6px; border:none; cursor:pointer; font-weight:600; }
+      .btn-copy { background:#e3f2fd; color:#1565c0; }
+      .btn-copy:hover { background:#bbdefb; }
+      .btn-export { background:#e8f5e9; color:#2e7d32; }
+      .btn-export:hover { background:#c8e6c9; }
+      .copy-msg { display:inline-block; margin-left:8px; color:#2e7d32; font-size:13px; font-weight:600; opacity:0; transition:opacity 0.3s; }
+      .copy-msg.show { opacity:1; }
+      .tx-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+      .tx-filters select, .tx-filters input { padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:13px; }
+      .tx-filters select:focus, .tx-filters input:focus { outline:none; border-color:#1565c0; }
+      /* ChatGPT-style copy button */
+      .copy-icon-btn { display:inline-flex; align-items:center; gap:4px; background:none; border:1px solid #d0d5dd; border-radius:6px; padding:5px 10px; cursor:pointer; color:#555; font-size:12px; font-weight:500; transition:all 0.15s; position:relative; }
+      .copy-icon-btn:hover { background:#f5f5f5; border-color:#1565c0; color:#1565c0; }
+      .copy-icon-btn svg { width:14px; height:14px; }
+      .copy-icon-btn.copied { border-color:#2e7d32; color:#2e7d32; }
+      .copy-icon-btn.copied svg { display:none; }
+      .copy-icon-btn .check-icon { display:none; }
+      .copy-icon-btn.copied .check-icon { display:inline; }
+      .copy-icon-btn.copied .copy-svg { display:none; }
+      .tx-actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+      .tx-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
     </style>
   </head>
   <body>
@@ -379,6 +409,38 @@
         >
           &#128260; Refresh
         </button>
+      </div>
+
+      <!-- Transactions -->
+      <div class="card">
+        <div class="tx-header">
+          <h2>&#128196; Transactions (Worker Data)</h2>
+          <div class="tx-actions">
+            <button class="copy-icon-btn" id="copyAllBtn" onclick="copyTransactionsToClipboard()" title="Copy all to clipboard">
+              <svg class="copy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span class="copy-label">Copy</span>
+            </button>
+            <button class="copy-icon-btn" onclick="downloadTransactionsCSV()" title="Download CSV for Excel / NAV ERP">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              CSV
+            </button>
+          </div>
+        </div>
+        <p style="color:#888;margin-bottom:12px;font-size:13px">Copy &rarr; paste into Excel &rarr; NAV ERP. All worker movements with bin &amp; qty details.</p>
+        <div class="tx-filters">
+          <select id="txWorkerFilter" onchange="filterTransactions()">
+            <option value="">All Workers</option>
+          </select>
+          <input type="text" id="txSearch" placeholder="Search item code, barcode, name..." oninput="filterTransactions()" style="flex:1;min-width:180px" />
+        </div>
+        <div id="txContainer"><div class="loading">Loading...</div></div>
+      </div>
+
+      <!-- Users -->
+      <div class="card">
+        <h2>&#128101; Users</h2>
+        <div id="usersContainer"><div class="loading">Loading...</div></div>
       </div>
 
       <!-- Items List -->
@@ -525,6 +587,8 @@
         loadStats();
         loadItems();
         loadWorkerStatus();
+        loadTransactions();
+        loadUsers();
       }
 
       // ─── Stats ───────────────────────────────────────────────────────────────────
@@ -674,6 +738,187 @@
         } catch (err) {
           container.innerHTML =
             '<div class="alert alert-error">' + err.message + "</div>";
+        }
+      }
+
+      // ─── Transactions ────────────────────────────────────────────────────────────
+      let allTransactions = [];
+      let filteredTransactions = [];
+
+      async function loadTransactions() {
+        const container = document.getElementById('txContainer');
+        container.innerHTML = '<div class="loading">Loading transactions...</div>';
+        try {
+          // Fetch ALL pages to get every transaction
+          let all = [];
+          let page = 1;
+          while (true) {
+            const data = await apiFetch('/transactions?page=' + page + '&limit=200');
+            all = all.concat(data.transactions || []);
+            if (all.length >= (data.total || 0)) break;
+            page++;
+            if (page > 100) break; // safety
+          }
+          allTransactions = all;
+          // Populate worker filter dropdown (keep current selection)
+          const workers = [...new Set(all.map(t => t.Worker_Name).filter(Boolean))].sort();
+          const sel = document.getElementById('txWorkerFilter');
+          const prevVal = sel.value;
+          sel.innerHTML = '<option value="">All Workers (' + all.length + ')</option>' + workers.map(w => {
+            const cnt = all.filter(t => t.Worker_Name === w).length;
+            return '<option value="' + esc(w) + '"' + (w === prevVal ? ' selected' : '') + '>' + esc(w) + ' (' + cnt + ')</option>';
+          }).join('');
+          // Default to All Workers on first load
+          if (!prevVal) sel.value = '';
+          // Apply filters & render
+          filterTransactions();
+        } catch (err) {
+          container.innerHTML = '<div class="alert alert-error">' + err.message + '</div>';
+        }
+      }
+
+      function filterTransactions() {
+        const workerFilter = document.getElementById('txWorkerFilter').value;
+        const search = (document.getElementById('txSearch').value || '').toLowerCase();
+        filteredTransactions = allTransactions.filter(tx => {
+          if (workerFilter && tx.Worker_Name !== workerFilter) return false;
+          if (search) {
+            const hay = [tx.Item_Code, tx.Item_Barcode, tx.Item_Name, tx.Frombin, tx.Tobin, tx.Worker_Name].join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+          }
+          return true;
+        });
+        renderTransactions(filteredTransactions);
+      }
+
+      function renderTransactions(txs) {
+        const container = document.getElementById('txContainer');
+        if (txs.length === 0) {
+          container.innerHTML = '<div class="loading">No transactions found.</div>';
+          return;
+        }
+        const pageSize = 50;
+        const pages = Math.ceil(txs.length / pageSize);
+        let page = 1;
+        function render() {
+          const start = (page - 1) * pageSize;
+          const slice = txs.slice(start, start + pageSize);
+          let html = '<div class="preview-count" style="display:flex;justify-content:space-between;align-items:center">Showing ' + (start + 1) + '–' + (start + slice.length) + ' of ' + txs.length + ' transactions</div>';
+          html += '<div style="overflow-x:auto"><table id="txTable"><thead><tr><th>#</th><th>Item Code</th><th>Barcode</th><th>Item Name</th><th>From Bin</th><th>To Bin</th><th>Qty</th><th>Worker</th><th>Date/Time</th><th></th></tr></thead><tbody>';
+          slice.forEach((tx, i) => {
+            const idx = start + i;
+            const dt = tx.Timestamp ? new Date(tx.Timestamp).toLocaleString() : '';
+            html += '<tr>';
+            html += '<td>' + (idx + 1) + '</td>';
+            html += '<td>' + esc(tx.Item_Code) + '</td>';
+            html += '<td>' + esc(tx.Item_Barcode) + '</td>';
+            html += '<td>' + esc(tx.Item_Name) + '</td>';
+            html += '<td>' + esc(tx.Frombin) + '</td>';
+            html += '<td>' + esc(tx.Tobin) + '</td>';
+            html += '<td>' + (tx.Qty || '') + '</td>';
+            html += '<td>' + esc(tx.Worker_Name) + '</td>';
+            html += '<td style="white-space:nowrap">' + esc(dt) + '</td>';
+            html += '<td><button class="copy-icon-btn" onclick="copyRow(' + idx + ', this)" title="Copy this row"><svg class="copy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><polyline points="20 6 9 17 4 12"></polyline></svg></button></td>';
+            html += '</tr>';
+          });
+          html += '</tbody></table></div>';
+          if (pages > 1) {
+            html += '<div class="pagination">';
+            html += '<button ' + (page <= 1 ? 'disabled' : '') + ' onclick="txPage(' + (page - 1) + ')">Prev</button>';
+            html += '<span style="padding:6px;">' + page + ' / ' + pages + '</span>';
+            html += '<button ' + (page >= pages ? 'disabled' : '') + ' onclick="txPage(' + (page + 1) + ')">Next</button>';
+            html += '</div>';
+          }
+          container.innerHTML = html;
+        }
+        window.txPage = function(p) { page = p; render(); };
+        render();
+      }
+
+      function copyRow(idx, btnEl) {
+        const tx = filteredTransactions[idx];
+        if (!tx) return;
+        const dt = tx.Timestamp ? new Date(tx.Timestamp).toLocaleString() : '';
+        const text = [tx.Item_Code||'', tx.Item_Barcode||'', tx.Item_Name||'', tx.Frombin||'', tx.Tobin||'', tx.Qty||'', tx.Worker_Name||'', dt].join('\t');
+        copyToClip(text);
+        flashCopyBtn(btnEl);
+      }
+
+      function copyToClip(text) {
+        // Works on HTTP (non-secure) contexts too
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+
+      function flashCopyBtn(btnEl) {
+        btnEl.classList.add('copied');
+        const label = btnEl.querySelector('.copy-label');
+        if (label) label.textContent = 'Copied!';
+        setTimeout(() => {
+          btnEl.classList.remove('copied');
+          if (label) label.textContent = 'Copy';
+        }, 1500);
+      }
+
+      function copyTransactionsToClipboard() {
+        const txs = filteredTransactions;
+        if (txs.length === 0) { alert('No transactions to copy.'); return; }
+        let text = 'Item_Code\tBarcode\tItem_Name\tFrom_Bin\tTo_Bin\tQty\tWorker\tTimestamp\n';
+        txs.forEach(tx => {
+          const dt = tx.Timestamp ? new Date(tx.Timestamp).toLocaleString() : '';
+          text += [tx.Item_Code||'', tx.Item_Barcode||'', tx.Item_Name||'', tx.Frombin||'', tx.Tobin||'', tx.Qty||'', tx.Worker_Name||'', dt].join('\t') + '\n';
+        });
+        copyToClip(text);
+        flashCopyBtn(document.getElementById('copyAllBtn'));
+      }
+
+      function downloadTransactionsCSV() {
+        const workerFilter = document.getElementById('txWorkerFilter').value;
+        let url = API + '/transactions/export';
+        if (workerFilter) url += '?worker=' + encodeURIComponent(workerFilter);
+        // Add auth token as query param for direct download
+        const a = document.createElement('a');
+        a.href = url;
+        // Use fetch to get CSV with auth header
+        fetch(url, { headers: { 'Authorization': 'Bearer ' + authToken } })
+          .then(r => r.blob())
+          .then(blob => {
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = 'transactions_export' + (workerFilter ? '_' + workerFilter : '') + '.csv';
+            a.click();
+            URL.revokeObjectURL(blobUrl);
+          }).catch(err => alert('Export failed: ' + err.message));
+      }
+
+      // ─── Users ────────────────────────────────────────────────────────────────────
+      async function loadUsers() {
+        const container = document.getElementById('usersContainer');
+        container.innerHTML = '<div class="loading">Loading users...</div>';
+        try {
+          const data = await apiFetch('/auth/users');
+          const users = data.users || [];
+          if (users.length === 0) {
+            container.innerHTML = '<div class="loading">No users found.</div>';
+            return;
+          }
+          let html = '';
+          users.forEach(u => {
+            html += '<div class="user-card"><div><span class="name">' + esc(u.username) + '</span> <span class="role ' + u.role + '">' + u.role.toUpperCase() + '</span></div>';
+            html += '<div style="font-size:12px;color:#888">' + (u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '') + '</div></div>';
+          });
+          container.innerHTML = html;
+        } catch (err) {
+          container.innerHTML = '<div class="alert alert-error">' + err.message + '</div>';
         }
       }
 
