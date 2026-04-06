@@ -1,420 +1,829 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Inventory Admin Panel</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #333; }
-    .header { background: #1565C0; color: #fff; padding: 20px 32px; }
-    .header h1 { font-size: 24px; font-weight: 600; }
-    .header p { opacity: 0.8; margin-top: 4px; }
-    .container { max-width: 900px; margin: 24px auto; padding: 0 16px; }
-    .card { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 24px; margin-bottom: 20px; }
-    .card h2 { font-size: 18px; margin-bottom: 16px; color: #1565C0; display: flex; align-items: center; gap: 8px; }
-    .stats-row { display: flex; gap: 16px; flex-wrap: wrap; }
-    .stat { flex: 1; min-width: 120px; background: #f5f7fa; border-radius: 8px; padding: 16px; text-align: center; }
-    .stat .num { font-size: 28px; font-weight: 700; color: #1565C0; }
-    .stat .label { font-size: 12px; color: #888; margin-top: 4px; }
-    .upload-area { border: 2px dashed #ccc; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; }
-    .upload-area:hover, .upload-area.dragover { border-color: #1565C0; background: #e3f2fd; }
-    .upload-area input { display: none; }
-    .upload-area .icon { font-size: 48px; margin-bottom: 12px; }
-    .upload-area p { color: #666; }
-    .upload-area .filename { color: #1565C0; font-weight: 600; margin-top: 8px; }
-    .mode-toggle { display: flex; gap: 8px; margin: 16px 0; }
-    .mode-toggle button { flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; font-size: 14px; transition: all 0.2s; }
-    .mode-toggle button.active { border-color: #1565C0; background: #e3f2fd; color: #1565C0; font-weight: 600; }
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 24px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; }
-    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-    .btn-primary { background: #1565C0; color: #fff; }
-    .btn-primary:hover:not(:disabled) { background: #0d47a1; }
-    .btn-danger { background: #e53935; color: #fff; }
-    .btn-danger:hover:not(:disabled) { background: #c62828; }
-    .btn-success { background: #2e7d32; color: #fff; }
-    .btn-success:hover:not(:disabled) { background: #1b5e20; }
-    .alert { padding: 12px 16px; border-radius: 8px; margin: 12px 0; font-size: 14px; }
-    .alert-success { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-    .alert-error { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
-    .alert-info { background: #e3f2fd; color: #1565C0; border: 1px solid #bbdefb; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
-    th { background: #f5f7fa; text-align: left; padding: 10px 12px; font-weight: 600; color: #555; border-bottom: 2px solid #e0e0e0; }
-    td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
-    tr:hover td { background: #fafbfc; }
-    .search-box { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 12px; }
-    .search-box:focus { outline: none; border-color: #1565C0; }
-    .loading { text-align: center; padding: 20px; color: #888; }
-    .login-card { max-width: 400px; margin: 80px auto; }
-    .login-card input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; margin-bottom: 12px; }
-    .login-card input:focus { outline: none; border-color: #1565C0; }
-    .hidden { display: none; }
-    .preview-count { font-size: 13px; color: #888; margin-bottom: 8px; }
-    .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
-    .pagination button { padding: 6px 14px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; }
-    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .pagination button.active { background: #1565C0; color: #fff; border-color: #1565C0; }
-  </style>
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Inventory Admin Panel</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #f0f2f5;
+        color: #333;
+      }
+      .header {
+        background: #1565c0;
+        color: #fff;
+        padding: 20px 32px;
+      }
+      .header h1 {
+        font-size: 24px;
+        font-weight: 600;
+      }
+      .header p {
+        opacity: 0.8;
+        margin-top: 4px;
+      }
+      .container {
+        max-width: 900px;
+        margin: 24px auto;
+        padding: 0 16px;
+      }
+      .card {
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        padding: 24px;
+        margin-bottom: 20px;
+      }
+      .card h2 {
+        font-size: 18px;
+        margin-bottom: 16px;
+        color: #1565c0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .stats-row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .stat {
+        flex: 1;
+        min-width: 120px;
+        background: #f5f7fa;
+        border-radius: 8px;
+        padding: 16px;
+        text-align: center;
+      }
+      .stat .num {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1565c0;
+      }
+      .stat .label {
+        font-size: 12px;
+        color: #888;
+        margin-top: 4px;
+      }
+      .upload-area {
+        border: 2px dashed #ccc;
+        border-radius: 12px;
+        padding: 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .upload-area:hover,
+      .upload-area.dragover {
+        border-color: #1565c0;
+        background: #e3f2fd;
+      }
+      .upload-area input {
+        display: none;
+      }
+      .upload-area .icon {
+        font-size: 48px;
+        margin-bottom: 12px;
+      }
+      .upload-area p {
+        color: #666;
+      }
+      .upload-area .filename {
+        color: #1565c0;
+        font-weight: 600;
+        margin-top: 8px;
+      }
+      .mode-toggle {
+        display: flex;
+        gap: 8px;
+        margin: 16px 0;
+      }
+      .mode-toggle button {
+        flex: 1;
+        padding: 10px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        background: #fff;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
+      }
+      .mode-toggle button.active {
+        border-color: #1565c0;
+        background: #e3f2fd;
+        color: #1565c0;
+        font-weight: 600;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        width: 100%;
+      }
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: #1565c0;
+        color: #fff;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: #0d47a1;
+      }
+      .btn-danger {
+        background: #e53935;
+        color: #fff;
+      }
+      .btn-danger:hover:not(:disabled) {
+        background: #c62828;
+      }
+      .btn-success {
+        background: #2e7d32;
+        color: #fff;
+      }
+      .btn-success:hover:not(:disabled) {
+        background: #1b5e20;
+      }
+      .alert {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin: 12px 0;
+        font-size: 14px;
+      }
+      .alert-success {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #c8e6c9;
+      }
+      .alert-error {
+        background: #ffebee;
+        color: #c62828;
+        border: 1px solid #ffcdd2;
+      }
+      .alert-info {
+        background: #e3f2fd;
+        color: #1565c0;
+        border: 1px solid #bbdefb;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        font-size: 14px;
+      }
+      th {
+        background: #f5f7fa;
+        text-align: left;
+        padding: 10px 12px;
+        font-weight: 600;
+        color: #555;
+        border-bottom: 2px solid #e0e0e0;
+      }
+      td {
+        padding: 8px 12px;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      tr:hover td {
+        background: #fafbfc;
+      }
+      .search-box {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        margin-bottom: 12px;
+      }
+      .search-box:focus {
+        outline: none;
+        border-color: #1565c0;
+      }
+      .loading {
+        text-align: center;
+        padding: 20px;
+        color: #888;
+      }
+      .login-card {
+        max-width: 400px;
+        margin: 80px auto;
+      }
+      .login-card input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 15px;
+        margin-bottom: 12px;
+      }
+      .login-card input:focus {
+        outline: none;
+        border-color: #1565c0;
+      }
+      .hidden {
+        display: none;
+      }
+      .preview-count {
+        font-size: 13px;
+        color: #888;
+        margin-bottom: 8px;
+      }
+      .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .pagination button {
+        padding: 6px 14px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        background: #fff;
+        cursor: pointer;
+      }
+      .pagination button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .pagination button.active {
+        background: #1565c0;
+        color: #fff;
+        border-color: #1565c0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>&#128230; Inventory Admin Panel</h1>
+      <p>Upload master CSV &bull; Manage items &bull; Push to all phones</p>
+    </div>
 
-<div class="header">
-  <h1>&#128230; Inventory Admin Panel</h1>
-  <p>Upload master CSV &bull; Manage items &bull; Push to all phones</p>
-</div>
-
-<!-- LOGIN -->
-<div id="loginSection" class="container">
-  <div class="card login-card">
-    <h2>&#128274; Admin Login</h2>
-    <input id="loginUser" type="text" placeholder="Username" autocomplete="username">
-    <input id="loginPin" type="password" placeholder="PIN" autocomplete="current-password">
-    <div id="loginError" class="alert alert-error hidden"></div>
-    <button class="btn btn-primary" onclick="doLogin()">Login</button>
-    <div style="margin-top:16px;text-align:center">
-      <div id="setupSection" class="hidden">
-        <p style="color:#888;margin-bottom:8px">No admin exists yet. Create initial admin:</p>
-        <button class="btn btn-success" onclick="doSetup()">Create Admin Account</button>
+    <!-- LOGIN -->
+    <div id="loginSection" class="container">
+      <div class="card login-card">
+        <h2>&#128274; Admin Login</h2>
+        <input
+          id="loginUser"
+          type="text"
+          placeholder="Username"
+          autocomplete="username"
+        />
+        <input
+          id="loginPin"
+          type="password"
+          placeholder="PIN"
+          autocomplete="current-password"
+        />
+        <div id="loginError" class="alert alert-error hidden"></div>
+        <button class="btn btn-primary" onclick="doLogin()">Login</button>
+        <div style="margin-top: 16px; text-align: center">
+          <div id="setupSection" class="hidden">
+            <p style="color: #888; margin-bottom: 8px">
+              No admin exists yet. Create initial admin:
+            </p>
+            <button class="btn btn-success" onclick="doSetup()">
+              Create Admin Account
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- MAIN PANEL -->
-<div id="mainPanel" class="container hidden">
-  <!-- Stats -->
-  <div class="card">
-    <h2>&#128202; Overview</h2>
-    <div class="stats-row">
-      <div class="stat"><div class="num" id="statItems">-</div><div class="label">Total Items</div></div>
-      <div class="stat"><div class="num" id="statUsers">-</div><div class="label">Users</div></div>
-      <div class="stat"><div class="num" id="statTx">-</div><div class="label">Transactions</div></div>
+    <!-- MAIN PANEL -->
+    <div id="mainPanel" class="container hidden">
+      <!-- Stats -->
+      <div class="card">
+        <h2>&#128202; Overview</h2>
+        <div class="stats-row">
+          <div class="stat">
+            <div class="num" id="statItems">-</div>
+            <div class="label">Total Items</div>
+          </div>
+          <div class="stat">
+            <div class="num" id="statUsers">-</div>
+            <div class="label">Users</div>
+          </div>
+          <div class="stat">
+            <div class="num" id="statTx">-</div>
+            <div class="label">Transactions</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload CSV -->
+      <div class="card">
+        <h2>&#128194; Upload Master CSV</h2>
+        <p style="color: #888; margin-bottom: 12px">
+          CSV headers: <code>ItemCode, Barcode, Item_Name</code> &mdash; or
+          &mdash; <code>Item No., Barcode No., Item Description</code>
+        </p>
+        <div
+          class="upload-area"
+          id="dropZone"
+          onclick="document.getElementById('csvFile').click()"
+        >
+          <input type="file" id="csvFile" accept=".csv,text/csv" />
+          <div class="icon">&#128196;</div>
+          <p>Click or drag CSV file here</p>
+          <div class="filename" id="fileName"></div>
+        </div>
+
+        <div class="mode-toggle">
+          <button id="modeReplace" class="active" onclick="setMode('replace')">
+            &#128260; Replace All Items
+          </button>
+          <button id="modeMerge" onclick="setMode('merge')">
+            &#128279; Merge (Add/Update)
+          </button>
+        </div>
+
+        <button
+          class="btn btn-primary"
+          id="uploadBtn"
+          onclick="uploadCSV()"
+          disabled
+        >
+          &#128640; Upload &amp; Push to Server
+        </button>
+        <div id="uploadResult"></div>
+      </div>
+
+      <!-- Worker Sync Status -->
+      <div class="card">
+        <h2>&#128225; Worker Sync Status</h2>
+        <p style="color: #888; margin-bottom: 12px">
+          Live view of when each worker last synced their phone data
+        </p>
+        <div id="workerStatusContainer">
+          <div class="loading">Loading...</div>
+        </div>
+        <button
+          class="btn btn-primary"
+          style="margin-top: 12px; max-width: 220px"
+          onclick="loadWorkerStatus()"
+        >
+          &#128260; Refresh
+        </button>
+      </div>
+
+      <!-- Items List -->
+      <div class="card">
+        <h2>&#128230; Current Items</h2>
+        <input
+          type="text"
+          class="search-box"
+          placeholder="Search by item code, barcode, or name..."
+          oninput="searchItems(this.value)"
+        />
+        <div id="itemsContainer">
+          <div class="loading">Loading items...</div>
+        </div>
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="card" style="border: 1px solid #ffcdd2">
+        <h2 style="color: #e53935">&#9888;&#65039; Danger Zone</h2>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap">
+          <button
+            class="btn btn-danger"
+            style="flex: 1; min-width: 200px"
+            onclick="clearAllItems()"
+          >
+            Delete All Items
+          </button>
+          <button
+            class="btn btn-danger"
+            style="flex: 1; min-width: 200px"
+            onclick="clearAllTransactions()"
+          >
+            Delete All Transactions
+          </button>
+        </div>
+      </div>
+
+      <div style="text-align: center; padding: 16px">
+        <button
+          class="btn"
+          style="background: #eee; color: #888; width: auto"
+          onclick="doLogout()"
+        >
+          &#128682; Logout
+        </button>
+      </div>
     </div>
-  </div>
 
-  <!-- Upload CSV -->
-  <div class="card">
-    <h2>&#128194; Upload Master CSV</h2>
-    <p style="color:#888;margin-bottom:12px">CSV headers: <code>ItemCode, Barcode, Item_Name</code> &mdash; or &mdash; <code>Item No., Barcode No., Item Description</code></p>
-    <div class="upload-area" id="dropZone" onclick="document.getElementById('csvFile').click()">
-      <input type="file" id="csvFile" accept=".csv,text/csv">
-      <div class="icon">&#128196;</div>
-      <p>Click or drag CSV file here</p>
-      <div class="filename" id="fileName"></div>
-    </div>
+    <script>
+      const API = window.location.origin + "/api";
+      let authToken = localStorage.getItem("adminToken") || "";
+      let uploadMode = "replace";
+      let selectedFile = null;
+      let allItems = [];
 
-    <div class="mode-toggle">
-      <button id="modeReplace" class="active" onclick="setMode('replace')">&#128260; Replace All Items</button>
-      <button id="modeMerge" onclick="setMode('merge')">&#128279; Merge (Add/Update)</button>
-    </div>
+      // ─── Auth ────────────────────────────────────────────────────────────────────
+      async function apiFetch(path, opts = {}) {
+        const headers = { ...(opts.headers || {}) };
+        if (authToken) headers["Authorization"] = "Bearer " + authToken;
+        if (!(opts.body instanceof FormData))
+          headers["Content-Type"] = "application/json";
+        const res = await fetch(API + path, { ...opts, headers });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Request failed");
+        return data;
+      }
 
-    <button class="btn btn-primary" id="uploadBtn" onclick="uploadCSV()" disabled>&#128640; Upload &amp; Push to Server</button>
-    <div id="uploadResult"></div>
-  </div>
+      async function checkSetup() {
+        try {
+          const data = await apiFetch("/auth/check-setup");
+          if (data.needsSetup)
+            document.getElementById("setupSection").classList.remove("hidden");
+        } catch {}
+      }
 
-  <!-- Worker Sync Status -->
-  <div class="card">
-    <h2>&#128225; Worker Sync Status</h2>
-    <p style="color:#888;margin-bottom:12px">Live view of when each worker last synced their phone data</p>
-    <div id="workerStatusContainer"><div class="loading">Loading...</div></div>
-    <button class="btn btn-primary" style="margin-top:12px;max-width:220px" onclick="loadWorkerStatus()">&#128260; Refresh</button>
-  </div>
+      async function doLogin() {
+        const username = document.getElementById("loginUser").value.trim();
+        const pin = document.getElementById("loginPin").value.trim();
+        const errEl = document.getElementById("loginError");
+        errEl.classList.add("hidden");
+        if (!username || !pin) {
+          errEl.textContent = "Enter username and PIN";
+          errEl.classList.remove("hidden");
+          return;
+        }
+        try {
+          const data = await apiFetch("/auth/login", {
+            method: "POST",
+            body: JSON.stringify({ username, pin }),
+          });
+          if (data.role !== "admin") {
+            errEl.textContent = "Only admins can access this panel";
+            errEl.classList.remove("hidden");
+            return;
+          }
+          authToken = data.token;
+          localStorage.setItem("adminToken", authToken);
+          showPanel();
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.classList.remove("hidden");
+        }
+      }
 
-  <!-- Items List -->
-  <div class="card">
-    <h2>&#128230; Current Items</h2>
-    <input type="text" class="search-box" placeholder="Search by item code, barcode, or name..." oninput="searchItems(this.value)">
-    <div id="itemsContainer"><div class="loading">Loading items...</div></div>
-  </div>
+      async function doSetup() {
+        const username = document.getElementById("loginUser").value.trim();
+        const pin = document.getElementById("loginPin").value.trim();
+        const errEl = document.getElementById("loginError");
+        errEl.classList.add("hidden");
+        if (!username || !pin) {
+          errEl.textContent = "Enter username and PIN";
+          errEl.classList.remove("hidden");
+          return;
+        }
+        if (pin.length < 4) {
+          errEl.textContent = "PIN must be at least 4 digits";
+          errEl.classList.remove("hidden");
+          return;
+        }
+        try {
+          const data = await apiFetch("/auth/setup", {
+            method: "POST",
+            body: JSON.stringify({ username, pin }),
+          });
+          authToken = data.token;
+          localStorage.setItem("adminToken", authToken);
+          showPanel();
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.classList.remove("hidden");
+        }
+      }
 
-  <!-- Danger Zone -->
-  <div class="card" style="border: 1px solid #ffcdd2;">
-    <h2 style="color: #e53935;">&#9888;&#65039; Danger Zone</h2>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      <button class="btn btn-danger" style="flex:1;min-width:200px" onclick="clearAllItems()">Delete All Items</button>
-      <button class="btn btn-danger" style="flex:1;min-width:200px" onclick="clearAllTransactions()">Delete All Transactions</button>
-    </div>
-  </div>
+      function doLogout() {
+        authToken = "";
+        localStorage.removeItem("adminToken");
+        document.getElementById("mainPanel").classList.add("hidden");
+        document.getElementById("loginSection").classList.remove("hidden");
+      }
 
-  <div style="text-align:center;padding:16px">
-    <button class="btn" style="background:#eee;color:#888;width:auto" onclick="doLogout()">&#128682; Logout</button>
-  </div>
-</div>
+      async function showPanel() {
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("mainPanel").classList.remove("hidden");
+        loadStats();
+        loadItems();
+        loadWorkerStatus();
+      }
 
-<script>
-const API = window.location.origin + '/api';
-let authToken = localStorage.getItem('adminToken') || '';
-let uploadMode = 'replace';
-let selectedFile = null;
-let allItems = [];
+      // ─── Stats ───────────────────────────────────────────────────────────────────
+      async function loadStats() {
+        try {
+          const items = await apiFetch("/items");
+          document.getElementById("statItems").textContent = items.count || 0;
+        } catch {
+          document.getElementById("statItems").textContent = "?";
+        }
+        try {
+          const users = await apiFetch("/auth/users");
+          document.getElementById("statUsers").textContent = users.users
+            ? users.users.length
+            : 0;
+        } catch {
+          document.getElementById("statUsers").textContent = "?";
+        }
+        try {
+          const stats = await apiFetch("/transactions/stats");
+          document.getElementById("statTx").textContent = stats.total || 0;
+        } catch {
+          document.getElementById("statTx").textContent = "?";
+        }
+      }
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
-async function apiFetch(path, opts = {}) {
-  const headers = { ...(opts.headers || {}) };
-  if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
-  if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
-  const res = await fetch(API + path, { ...opts, headers });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
-  return data;
-}
+      // ─── File Upload ─────────────────────────────────────────────────────────────
+      const dropZone = document.getElementById("dropZone");
+      const csvInput = document.getElementById("csvFile");
 
-async function checkSetup() {
-  try {
-    const data = await apiFetch('/auth/check-setup');
-    if (data.needsSetup) document.getElementById('setupSection').classList.remove('hidden');
-  } catch { }
-}
+      csvInput.addEventListener("change", (e) => {
+        selectedFile = e.target.files[0];
+        if (selectedFile) {
+          document.getElementById("fileName").textContent = selectedFile.name;
+          document.getElementById("uploadBtn").disabled = false;
+        }
+      });
 
-async function doLogin() {
-  const username = document.getElementById('loginUser').value.trim();
-  const pin = document.getElementById('loginPin').value.trim();
-  const errEl = document.getElementById('loginError');
-  errEl.classList.add('hidden');
-  if (!username || !pin) { errEl.textContent = 'Enter username and PIN'; errEl.classList.remove('hidden'); return; }
-  try {
-    const data = await apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ username, pin }) });
-    if (data.role !== 'admin') { errEl.textContent = 'Only admins can access this panel'; errEl.classList.remove('hidden'); return; }
-    authToken = data.token;
-    localStorage.setItem('adminToken', authToken);
-    showPanel();
-  } catch (err) {
-    errEl.textContent = err.message; errEl.classList.remove('hidden');
-  }
-}
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("dragover");
+      });
+      dropZone.addEventListener("dragleave", () =>
+        dropZone.classList.remove("dragover"),
+      );
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("dragover");
+        if (e.dataTransfer.files.length) {
+          selectedFile = e.dataTransfer.files[0];
+          document.getElementById("fileName").textContent = selectedFile.name;
+          document.getElementById("uploadBtn").disabled = false;
+        }
+      });
 
-async function doSetup() {
-  const username = document.getElementById('loginUser').value.trim();
-  const pin = document.getElementById('loginPin').value.trim();
-  const errEl = document.getElementById('loginError');
-  errEl.classList.add('hidden');
-  if (!username || !pin) { errEl.textContent = 'Enter username and PIN'; errEl.classList.remove('hidden'); return; }
-  if (pin.length < 4) { errEl.textContent = 'PIN must be at least 4 digits'; errEl.classList.remove('hidden'); return; }
-  try {
-    const data = await apiFetch('/auth/setup', { method: 'POST', body: JSON.stringify({ username, pin }) });
-    authToken = data.token;
-    localStorage.setItem('adminToken', authToken);
-    showPanel();
-  } catch (err) {
-    errEl.textContent = err.message; errEl.classList.remove('hidden');
-  }
-}
+      function setMode(mode) {
+        uploadMode = mode;
+        document.getElementById("modeReplace").className =
+          mode === "replace" ? "active" : "";
+        document.getElementById("modeMerge").className =
+          mode === "merge" ? "active" : "";
+      }
 
-function doLogout() {
-  authToken = '';
-  localStorage.removeItem('adminToken');
-  document.getElementById('mainPanel').classList.add('hidden');
-  document.getElementById('loginSection').classList.remove('hidden');
-}
+      async function uploadCSV() {
+        if (!selectedFile) return;
+        const btn = document.getElementById("uploadBtn");
+        const resultDiv = document.getElementById("uploadResult");
+        btn.disabled = true;
+        btn.textContent = "Uploading...";
+        resultDiv.innerHTML = "";
 
-async function showPanel() {
-  document.getElementById('loginSection').classList.add('hidden');
-  document.getElementById('mainPanel').classList.remove('hidden');
-  loadStats();
-  loadItems();
-  loadWorkerStatus();
-}
+        const formData = new FormData();
+        formData.append("file", selectedFile);
 
-// ─── Stats ───────────────────────────────────────────────────────────────────
-async function loadStats() {
-  try {
-    const items = await apiFetch('/items');
-    document.getElementById('statItems').textContent = items.count || 0;
-  } catch { document.getElementById('statItems').textContent = '?'; }
-  try {
-    const users = await apiFetch('/auth/users');
-    document.getElementById('statUsers').textContent = users.users ? users.users.length : 0;
-  } catch { document.getElementById('statUsers').textContent = '?'; }
-  try {
-    const stats = await apiFetch('/transactions/stats');
-    document.getElementById('statTx').textContent = stats.total || 0;
-  } catch { document.getElementById('statTx').textContent = '?'; }
-}
+        try {
+          const headers = {};
+          if (authToken) headers["Authorization"] = "Bearer " + authToken;
+          const res = await fetch(
+            API + "/items/upload-csv?mode=" + uploadMode,
+            {
+              method: "POST",
+              headers,
+              body: formData,
+            },
+          );
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Upload failed");
+          resultDiv.innerHTML =
+            '<div class="alert alert-success">&#10004; Uploaded! ' +
+            data.totalItems +
+            " items on server. (Inserted: " +
+            data.inserted +
+            ", Updated: " +
+            data.modified +
+            ")</div>";
+          loadStats();
+          loadItems();
+          selectedFile = null;
+          document.getElementById("fileName").textContent = "";
+        } catch (err) {
+          resultDiv.innerHTML =
+            '<div class="alert alert-error">&#10008; ' + err.message + "</div>";
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "\u{1F680} Upload & Push to Server";
+        }
+      }
 
-// ─── File Upload ─────────────────────────────────────────────────────────────
-const dropZone = document.getElementById('dropZone');
-const csvInput = document.getElementById('csvFile');
+      // ─── Worker Sync Status ──────────────────────────────────────────────────────
+      async function loadWorkerStatus() {
+        const container = document.getElementById("workerStatusContainer");
+        container.innerHTML = '<div class="loading">Loading...</div>';
+        try {
+          const data = await apiFetch("/sync/worker-status");
+          const workers = data.workers || [];
+          if (workers.length === 0) {
+            container.innerHTML =
+              '<div class="loading">No sync activity recorded yet.</div>';
+            return;
+          }
+          let html =
+            "<table><thead><tr><th>Worker</th><th>Last Sync</th><th>Ago</th><th>Today</th></tr></thead><tbody>";
+          workers.forEach((w) => {
+            let color = "#4caf50";
+            if (w.minutesAgo > 240) color = "#f44336";
+            else if (w.minutesAgo > 30) color = "#ff9800";
+            const ago =
+              w.minutesAgo < 60
+                ? w.minutesAgo + " min"
+                : Math.round(w.minutesAgo / 60) + " hr";
+            html +=
+              "<tr><td>" +
+              w.worker +
+              "</td><td>" +
+              new Date(w.lastSync).toLocaleTimeString() +
+              "</td>";
+            html +=
+              '<td style="color:' +
+              color +
+              ';font-weight:bold">' +
+              ago +
+              "</td>";
+            html += "<td>" + (w.totalToday || 0) + "</td></tr>";
+          });
+          html += "</tbody></table>";
+          container.innerHTML = html;
+        } catch (err) {
+          container.innerHTML =
+            '<div class="alert alert-error">' + err.message + "</div>";
+        }
+      }
 
-csvInput.addEventListener('change', (e) => {
-  selectedFile = e.target.files[0];
-  if (selectedFile) {
-    document.getElementById('fileName').textContent = selectedFile.name;
-    document.getElementById('uploadBtn').disabled = false;
-  }
-});
+      // ─── Items List ──────────────────────────────────────────────────────────────
+      async function loadItems() {
+        const container = document.getElementById("itemsContainer");
+        container.innerHTML = '<div class="loading">Loading items...</div>';
+        try {
+          const data = await apiFetch("/items");
+          allItems = data.items || [];
+          renderItems(allItems);
+        } catch (err) {
+          container.innerHTML =
+            '<div class="alert alert-error">' + err.message + "</div>";
+        }
+      }
 
-dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', (e) => {
-  e.preventDefault(); dropZone.classList.remove('dragover');
-  if (e.dataTransfer.files.length) {
-    selectedFile = e.dataTransfer.files[0];
-    document.getElementById('fileName').textContent = selectedFile.name;
-    document.getElementById('uploadBtn').disabled = false;
-  }
-});
+      function renderItems(items) {
+        const container = document.getElementById("itemsContainer");
+        if (items.length === 0) {
+          container.innerHTML =
+            '<div class="loading">No items found. Upload a CSV to get started.</div>';
+          return;
+        }
+        const pageSize = 50;
+        const pages = Math.ceil(items.length / pageSize);
+        let page = 1;
 
-function setMode(mode) {
-  uploadMode = mode;
-  document.getElementById('modeReplace').className = mode === 'replace' ? 'active' : '';
-  document.getElementById('modeMerge').className = mode === 'merge' ? 'active' : '';
-}
+        function render() {
+          const start = (page - 1) * pageSize;
+          const slice = items.slice(start, start + pageSize);
+          let html =
+            '<div class="preview-count">Showing ' +
+            (start + 1) +
+            "–" +
+            (start + slice.length) +
+            " of " +
+            items.length +
+            "</div>";
+          html +=
+            "<table><thead><tr><th>#</th><th>ItemCode</th><th>Barcode</th><th>Item Name</th></tr></thead><tbody>";
+          slice.forEach((it, i) => {
+            html +=
+              "<tr><td>" +
+              (start + i + 1) +
+              "</td><td>" +
+              esc(it.ItemCode) +
+              "</td><td>" +
+              esc(it.Barcode) +
+              "</td><td>" +
+              esc(it.Item_Name) +
+              "</td></tr>";
+          });
+          html += "</tbody></table>";
+          if (pages > 1) {
+            html += '<div class="pagination">';
+            html +=
+              "<button " +
+              (page <= 1 ? "disabled" : "") +
+              ' onclick="itemPage(' +
+              (page - 1) +
+              ')">Prev</button>';
+            html +=
+              '<span style="padding:6px;">' + page + " / " + pages + "</span>";
+            html +=
+              "<button " +
+              (page >= pages ? "disabled" : "") +
+              ' onclick="itemPage(' +
+              (page + 1) +
+              ')">Next</button>';
+            html += "</div>";
+          }
+          container.innerHTML = html;
+        }
 
-async function uploadCSV() {
-  if (!selectedFile) return;
-  const btn = document.getElementById('uploadBtn');
-  const resultDiv = document.getElementById('uploadResult');
-  btn.disabled = true;
-  btn.textContent = 'Uploading...';
-  resultDiv.innerHTML = '';
+        window.itemPage = function (p) {
+          page = p;
+          render();
+        };
+        render();
+      }
 
-  const formData = new FormData();
-  formData.append('file', selectedFile);
+      function searchItems(q) {
+        if (!q) {
+          renderItems(allItems);
+          return;
+        }
+        const lower = q.toLowerCase();
+        const filtered = allItems.filter(
+          (it) =>
+            (it.ItemCode || "").toLowerCase().includes(lower) ||
+            (it.Barcode || "").toLowerCase().includes(lower) ||
+            (it.Item_Name || "").toLowerCase().includes(lower),
+        );
+        renderItems(filtered);
+      }
 
-  try {
-    const headers = {};
-    if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
-    const res = await fetch(API + '/items/upload-csv?mode=' + uploadMode, {
-      method: 'POST', headers, body: formData,
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Upload failed');
-    resultDiv.innerHTML = '<div class="alert alert-success">&#10004; Uploaded! ' + data.totalItems + ' items on server. (Inserted: ' + data.inserted + ', Updated: ' + data.modified + ')</div>';
-    loadStats();
-    loadItems();
-    selectedFile = null;
-    document.getElementById('fileName').textContent = '';
-  } catch (err) {
-    resultDiv.innerHTML = '<div class="alert alert-error">&#10008; ' + err.message + '</div>';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '\u{1F680} Upload & Push to Server';
-  }
-}
+      function esc(str) {
+        if (!str) return "";
+        const d = document.createElement("div");
+        d.textContent = str;
+        return d.innerHTML;
+      }
 
-// ─── Worker Sync Status ──────────────────────────────────────────────────────
-async function loadWorkerStatus() {
-  const container = document.getElementById('workerStatusContainer');
-  container.innerHTML = '<div class="loading">Loading...</div>';
-  try {
-    const data = await apiFetch('/sync/worker-status');
-    const workers = data.workers || [];
-    if (workers.length === 0) {
-      container.innerHTML = '<div class="loading">No sync activity recorded yet.</div>';
-      return;
-    }
-    let html = '<table><thead><tr><th>Worker</th><th>Last Sync</th><th>Ago</th><th>Today</th></tr></thead><tbody>';
-    workers.forEach(w => {
-      let color = '#4caf50';
-      if (w.minutesAgo > 240) color = '#f44336';
-      else if (w.minutesAgo > 30) color = '#ff9800';
-      const ago = w.minutesAgo < 60 ? w.minutesAgo + ' min' : Math.round(w.minutesAgo / 60) + ' hr';
-      html += '<tr><td>' + w.worker + '</td><td>' + new Date(w.lastSync).toLocaleTimeString() + '</td>';
-      html += '<td style="color:' + color + ';font-weight:bold">' + ago + '</td>';
-      html += '<td>' + (w.totalToday || 0) + '</td></tr>';
-    });
-    html += '</tbody></table>';
-    container.innerHTML = html;
-  } catch (err) {
-    container.innerHTML = '<div class="alert alert-error">' + err.message + '</div>';
-  }
-}
+      // ─── Danger Zone ─────────────────────────────────────────────────────────────
+      async function clearAllItems() {
+        if (
+          !confirm("DELETE ALL ITEMS from the server? This cannot be undone!")
+        )
+          return;
+        try {
+          await apiFetch("/items/all", { method: "DELETE" });
+          loadStats();
+          loadItems();
+          alert("All items deleted.");
+        } catch (err) {
+          alert("Error: " + err.message);
+        }
+      }
 
-// ─── Items List ──────────────────────────────────────────────────────────────
-async function loadItems() {
-  const container = document.getElementById('itemsContainer');
-  container.innerHTML = '<div class="loading">Loading items...</div>';
-  try {
-    const data = await apiFetch('/items');
-    allItems = data.items || [];
-    renderItems(allItems);
-  } catch (err) {
-    container.innerHTML = '<div class="alert alert-error">' + err.message + '</div>';
-  }
-}
+      async function clearAllTransactions() {
+        if (
+          !confirm(
+            "DELETE ALL TRANSACTIONS from the server? This cannot be undone!",
+          )
+        )
+          return;
+        try {
+          await apiFetch("/transactions/all", { method: "DELETE" });
+          loadStats();
+          alert("All transactions deleted.");
+        } catch (err) {
+          alert("Error: " + err.message);
+        }
+      }
 
-function renderItems(items) {
-  const container = document.getElementById('itemsContainer');
-  if (items.length === 0) {
-    container.innerHTML = '<div class="loading">No items found. Upload a CSV to get started.</div>';
-    return;
-  }
-  const pageSize = 50;
-  const pages = Math.ceil(items.length / pageSize);
-  let page = 1;
-
-  function render() {
-    const start = (page - 1) * pageSize;
-    const slice = items.slice(start, start + pageSize);
-    let html = '<div class="preview-count">Showing ' + (start + 1) + '–' + (start + slice.length) + ' of ' + items.length + '</div>';
-    html += '<table><thead><tr><th>#</th><th>ItemCode</th><th>Barcode</th><th>Item Name</th></tr></thead><tbody>';
-    slice.forEach((it, i) => {
-      html += '<tr><td>' + (start + i + 1) + '</td><td>' + esc(it.ItemCode) + '</td><td>' + esc(it.Barcode) + '</td><td>' + esc(it.Item_Name) + '</td></tr>';
-    });
-    html += '</tbody></table>';
-    if (pages > 1) {
-      html += '<div class="pagination">';
-      html += '<button ' + (page <= 1 ? 'disabled' : '') + ' onclick="itemPage(' + (page-1) + ')">Prev</button>';
-      html += '<span style="padding:6px;">' + page + ' / ' + pages + '</span>';
-      html += '<button ' + (page >= pages ? 'disabled' : '') + ' onclick="itemPage(' + (page+1) + ')">Next</button>';
-      html += '</div>';
-    }
-    container.innerHTML = html;
-  }
-
-  window.itemPage = function(p) { page = p; render(); };
-  render();
-}
-
-function searchItems(q) {
-  if (!q) { renderItems(allItems); return; }
-  const lower = q.toLowerCase();
-  const filtered = allItems.filter(it =>
-    (it.ItemCode || '').toLowerCase().includes(lower) ||
-    (it.Barcode || '').toLowerCase().includes(lower) ||
-    (it.Item_Name || '').toLowerCase().includes(lower)
-  );
-  renderItems(filtered);
-}
-
-function esc(str) {
-  if (!str) return '';
-  const d = document.createElement('div');
-  d.textContent = str;
-  return d.innerHTML;
-}
-
-// ─── Danger Zone ─────────────────────────────────────────────────────────────
-async function clearAllItems() {
-  if (!confirm('DELETE ALL ITEMS from the server? This cannot be undone!')) return;
-  try {
-    await apiFetch('/items/all', { method: 'DELETE' });
-    loadStats(); loadItems();
-    alert('All items deleted.');
-  } catch (err) { alert('Error: ' + err.message); }
-}
-
-async function clearAllTransactions() {
-  if (!confirm('DELETE ALL TRANSACTIONS from the server? This cannot be undone!')) return;
-  try {
-    await apiFetch('/transactions/all', { method: 'DELETE' });
-    loadStats();
-    alert('All transactions deleted.');
-  } catch (err) { alert('Error: ' + err.message); }
-}
-
-// ─── Init ────────────────────────────────────────────────────────────────────
-async function init() {
-  if (authToken) {
-    try {
-      await apiFetch('/auth/users');
-      showPanel();
-      return;
-    } catch { doLogout(); }
-  }
-  checkSetup();
-}
-init();
-</script>
-</body>
+      // ─── Init ────────────────────────────────────────────────────────────────────
+      async function init() {
+        if (authToken) {
+          try {
+            await apiFetch("/auth/users");
+            showPanel();
+            return;
+          } catch {
+            doLogout();
+          }
+        }
+        checkSetup();
+      }
+      init();
+    </script>
+  </body>
 </html>

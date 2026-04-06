@@ -1,13 +1,18 @@
-import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { checkHealth, syncTransactions, fetchItems, fetchItemsVersion } from './api';
+import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  checkHealth,
+  syncTransactions,
+  fetchItems,
+  fetchItemsVersion,
+} from "./api";
 import {
   getPendingTransactions,
   markTransactionsSynced,
   upsertItems,
   clearSyncedTransactions,
   clearAllItems,
-} from '../database/db';
+} from "../database/db";
 
 let _onStatusChange = null;
 
@@ -20,11 +25,11 @@ const notifyStatus = (status) => {
 };
 
 export const checkConnectivity = async () => {
-  if (Platform.OS === 'web') {
+  if (Platform.OS === "web") {
     return navigator.onLine;
   }
   try {
-    const Network = require('expo-network');
+    const Network = require("expo-network");
     const state = await Network.getNetworkStateAsync();
     return state.isConnected && state.isInternetReachable !== false;
   } catch {
@@ -36,19 +41,21 @@ export const checkConnectivity = async () => {
 const pullItemsIfNeeded = async () => {
   try {
     const serverVer = await fetchItemsVersion();
-    const localVer = await AsyncStorage.getItem('itemsVersion');
+    const localVer = await AsyncStorage.getItem("itemsVersion");
     if (localVer === String(serverVer.version)) return; // already up-to-date
 
     const latestItems = await fetchItems();
     if (latestItems && latestItems.length > 0) {
       await clearAllItems();
-      await upsertItems(latestItems.map((i) => ({
-        ItemCode: i.ItemCode,
-        Barcode: i.Barcode,
-        Item_Name: i.Item_Name,
-      })));
+      await upsertItems(
+        latestItems.map((i) => ({
+          ItemCode: i.ItemCode,
+          Barcode: i.Barcode,
+          Item_Name: i.Item_Name,
+        })),
+      );
     }
-    await AsyncStorage.setItem('itemsVersion', String(serverVer.version));
+    await AsyncStorage.setItem("itemsVersion", String(serverVer.version));
   } catch (_) {
     // Item pull failure must not break sync
   }
@@ -70,7 +77,7 @@ export const attemptSync = async () => {
   const isConnected = await checkConnectivity();
   if (!isConnected) {
     notifyStatus({ online: false, lastSync: null, pendingCount: null });
-    return { synced: 0, reason: 'offline' };
+    return { synced: 0, reason: "offline" };
   }
 
   // Check that our backend is actually reachable on the LAN
@@ -78,7 +85,7 @@ export const attemptSync = async () => {
     await checkHealth();
   } catch {
     notifyStatus({ online: false, lastSync: null, pendingCount: null });
-    return { synced: 0, reason: 'backend_unreachable' };
+    return { synced: 0, reason: "backend_unreachable" };
   }
 
   notifyStatus({ online: true, lastSync: null, pendingCount: null });
@@ -90,16 +97,16 @@ export const attemptSync = async () => {
   if (pending.length === 0) {
     const lastSync = new Date().toISOString();
     notifyStatus({ online: true, lastSync, pendingCount: 0 });
-    return { synced: 0, reason: 'nothing_pending', lastSync };
+    return { synced: 0, reason: "nothing_pending", lastSync };
   }
 
   // Read worker name saved by LoginScreen
-  const workerName = (await AsyncStorage.getItem('workerName')) || 'unknown';
+  const workerName = (await AsyncStorage.getItem("workerName")) || "unknown";
 
   // Map SQLite rows to the shape the backend expects
   const payload = pending.map((tx) => ({
     Item_Barcode: tx.item_barcode,
-    Item_Code: tx.item_code || '',
+    Item_Code: tx.item_code || "",
     Item_Name: tx.item_name,
     Frombin: tx.frombin,
     Tobin: tx.tobin,
@@ -114,7 +121,7 @@ export const attemptSync = async () => {
     const ids = pending.map((tx) => tx.id);
     await markTransactionsSynced(ids);
   } catch (err) {
-    return { synced: 0, reason: 'sync_failed', error: err.message };
+    return { synced: 0, reason: "sync_failed", error: err.message };
   }
 
   // Clean up: remove synced transactions from phone to keep it lean
@@ -124,12 +131,15 @@ export const attemptSync = async () => {
 
   const lastSync = new Date().toISOString();
   notifyStatus({ online: true, lastSync, pendingCount: 0 });
-  return { synced, reason: 'success', lastSync };
+  return { synced, reason: "success", lastSync };
 };
 
 export const startAutoSync = (intervalMs = 30000) => {
   // Delay the first run so the app can finish rendering before hitting the network
   const firstRun = setTimeout(attemptSync, 2000);
   const timer = setInterval(attemptSync, intervalMs);
-  return () => { clearTimeout(firstRun); clearInterval(timer); };
+  return () => {
+    clearTimeout(firstRun);
+    clearInterval(timer);
+  };
 };

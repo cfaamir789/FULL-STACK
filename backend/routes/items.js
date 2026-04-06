@@ -1,19 +1,19 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const multer = require('multer');
-const Papa = require('papaparse');
-const Item = require('../models/Item');
-const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
+const multer = require("multer");
+const Papa = require("papaparse");
+const Item = require("../models/Item");
+const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
 
 // ─── Item Version Tracking ──────────────────────────────────────────────────
 // In-memory counter; persisted to NeDB so it survives restarts.
-const db = require('../config/database');
+const db = require("../config/database");
 let _itemsVersion = 0;
 
 // Load persisted version on startup
 (async () => {
   try {
-    const doc = await db.items.findOneAsync({ _meta: 'itemsVersion' });
+    const doc = await db.items.findOneAsync({ _meta: "itemsVersion" });
     if (doc) _itemsVersion = doc.version;
   } catch (_) {}
 })();
@@ -21,29 +21,33 @@ let _itemsVersion = 0;
 async function bumpItemsVersion() {
   _itemsVersion++;
   await db.items.updateAsync(
-    { _meta: 'itemsVersion' },
-    { $set: { _meta: 'itemsVersion', version: _itemsVersion } },
-    { upsert: true }
+    { _meta: "itemsVersion" },
+    { $set: { _meta: "itemsVersion", version: _itemsVersion } },
+    { upsert: true },
   );
   return _itemsVersion;
 }
 
 // GET /api/items/version — lightweight check for phones (no auth needed)
-router.get('/version', async (req, res) => {
+router.get("/version", async (req, res) => {
   res.json({ success: true, version: _itemsVersion });
 });
 
 // GET /api/items — return all items
-router.get('/', async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const { q } = req.query;
     let query = {};
     if (q) {
-      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-      query = { $or: [{ Item_Name: regex }, { Barcode: regex }, { ItemCode: regex }] };
+      const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      query = {
+        $or: [{ Item_Name: regex }, { Barcode: regex }, { ItemCode: regex }],
+      };
     }
     query._meta = { $exists: false }; // exclude version meta doc
-    const items = await Item.findAsync(query).sort({ Item_Name: 1 }).execAsync();
+    const items = await Item.findAsync(query)
+      .sort({ Item_Name: 1 })
+      .execAsync();
     res.json({ success: true, count: items.length, items });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -51,16 +55,21 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/items — add a single item
-router.post('/', async (req, res) => {
+router.post("/", async (req, res) => {
   try {
     const { ItemCode, Barcode, Item_Name } = req.body;
     if (!ItemCode || !Barcode || !Item_Name) {
-      return res.status(400).json({ success: false, error: 'ItemCode, Barcode, and Item_Name are required' });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          error: "ItemCode, Barcode, and Item_Name are required",
+        });
     }
     const { affectedDocuments } = await Item.updateAsync(
       { Barcode },
       { $set: { ItemCode, Barcode, Item_Name } },
-      { upsert: true, returnUpdatedDocs: true }
+      { upsert: true, returnUpdatedDocs: true },
     );
     await bumpItemsVersion();
     res.status(201).json({ success: true, item: affectedDocuments });
@@ -70,11 +79,13 @@ router.post('/', async (req, res) => {
 });
 
 // POST /api/items/import — bulk upsert array of items (admin only)
-router.post('/import', requireAuth, requireAdmin, async (req, res) => {
+router.post("/import", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { items } = req.body;
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, error: 'items array is required' });
+      return res
+        .status(400)
+        .json({ success: false, error: "items array is required" });
     }
     let inserted = 0;
     let modified = 0;
@@ -82,11 +93,18 @@ router.post('/import', requireAuth, requireAdmin, async (req, res) => {
       items.map(async (item) => {
         const { upsert } = await Item.updateAsync(
           { Barcode: item.Barcode },
-          { $set: { ItemCode: item.ItemCode, Barcode: item.Barcode, Item_Name: item.Item_Name } },
-          { upsert: true }
+          {
+            $set: {
+              ItemCode: item.ItemCode,
+              Barcode: item.Barcode,
+              Item_Name: item.Item_Name,
+            },
+          },
+          { upsert: true },
         );
-        if (upsert) inserted++; else modified++;
-      })
+        if (upsert) inserted++;
+        else modified++;
+      }),
     );
     await bumpItemsVersion();
     res.json({ success: true, inserted, modified });
@@ -96,7 +114,7 @@ router.post('/import', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // DELETE /api/items/all — admin: clear all items before re-import
-router.delete('/all', requireAuth, requireAdmin, async (req, res) => {
+router.delete("/all", requireAuth, requireAdmin, async (req, res) => {
   try {
     const count = await Item.countAsync({});
     await Item.removeAsync({}, { multi: true });
@@ -108,11 +126,13 @@ router.delete('/all', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // POST /api/items/replace — admin: delete all items then import fresh CSV
-router.post('/replace', requireAuth, requireAdmin, async (req, res) => {
+router.post("/replace", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { items } = req.body;
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, error: 'items array is required' });
+      return res
+        .status(400)
+        .json({ success: false, error: "items array is required" });
     }
     // Clear old items
     await Item.removeAsync({}, { multi: true });
@@ -126,7 +146,7 @@ router.post('/replace', requireAuth, requireAdmin, async (req, res) => {
           Item_Name: item.Item_Name,
         });
         inserted++;
-      })
+      }),
     );
     await bumpItemsVersion();
     res.json({ success: true, inserted });
@@ -136,61 +156,91 @@ router.post('/replace', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // POST /api/items/upload-csv — admin web panel: upload a CSV file
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
-router.post('/upload-csv', upload.single('file'), async (req, res) => {
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+router.post("/upload-csv", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No file uploaded' });
+      return res
+        .status(400)
+        .json({ success: false, error: "No file uploaded" });
     }
-    const csvText = req.file.buffer.toString('utf8');
+    const csvText = req.file.buffer.toString("utf8");
     const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
 
     if (parsed.errors.length > 0 && parsed.data.length === 0) {
-      return res.status(400).json({ success: false, error: 'CSV parsing failed: ' + parsed.errors[0].message });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          error: "CSV parsing failed: " + parsed.errors[0].message,
+        });
     }
 
     const firstRow = parsed.data[0];
     if (!firstRow) {
-      return res.status(400).json({ success: false, error: 'CSV is empty' });
+      return res.status(400).json({ success: false, error: "CSV is empty" });
     }
 
-    const hasNewFormat = ('Barcode' in firstRow) && ('Item_Name' in firstRow);
-    const hasOldFormat = ('Barcode No.' in firstRow) && ('Item Description' in firstRow);
+    const hasNewFormat = "Barcode" in firstRow && "Item_Name" in firstRow;
+    const hasOldFormat =
+      "Barcode No." in firstRow && "Item Description" in firstRow;
 
     if (!hasNewFormat && !hasOldFormat) {
       return res.status(400).json({
         success: false,
-        error: 'CSV must have headers: ItemCode, Barcode, Item_Name (or Item No., Barcode No., Item Description)',
+        error:
+          "CSV must have headers: ItemCode, Barcode, Item_Name (or Item No., Barcode No., Item Description)",
         foundHeaders: Object.keys(firstRow),
       });
     }
 
     const items = parsed.data
-      .filter(r => hasOldFormat ? r['Barcode No.'] && r['Item Description'] : r.Barcode && r.Item_Name)
-      .map(r => ({
-        ItemCode: hasOldFormat ? (r['Item No.'] || r['Barcode No.']) : (r.ItemCode || r.Barcode),
-        Barcode: String(hasOldFormat ? r['Barcode No.'] : r.Barcode).trim(),
-        Item_Name: String(hasOldFormat ? r['Item Description'] : r.Item_Name).trim(),
+      .filter((r) =>
+        hasOldFormat
+          ? r["Barcode No."] && r["Item Description"]
+          : r.Barcode && r.Item_Name,
+      )
+      .map((r) => ({
+        ItemCode: hasOldFormat
+          ? r["Item No."] || r["Barcode No."]
+          : r.ItemCode || r.Barcode,
+        Barcode: String(hasOldFormat ? r["Barcode No."] : r.Barcode).trim(),
+        Item_Name: String(
+          hasOldFormat ? r["Item Description"] : r.Item_Name,
+        ).trim(),
       }));
 
     if (items.length === 0) {
-      return res.status(400).json({ success: false, error: 'No valid rows found in CSV' });
+      return res
+        .status(400)
+        .json({ success: false, error: "No valid rows found in CSV" });
     }
 
-    const mode = req.query.mode || 'replace'; // 'replace' or 'merge'
+    const mode = req.query.mode || "replace"; // 'replace' or 'merge'
 
-    if (mode === 'replace') {
+    if (mode === "replace") {
       await Item.removeAsync({}, { multi: true });
     }
 
-    let inserted = 0, modified = 0;
+    let inserted = 0,
+      modified = 0;
     for (const item of items) {
       const result = await Item.updateAsync(
         { Barcode: item.Barcode },
-        { $set: { ItemCode: item.ItemCode, Barcode: item.Barcode, Item_Name: item.Item_Name } },
-        { upsert: true }
+        {
+          $set: {
+            ItemCode: item.ItemCode,
+            Barcode: item.Barcode,
+            Item_Name: item.Item_Name,
+          },
+        },
+        { upsert: true },
       );
-      if (result.upsert) inserted++; else modified++;
+      if (result.upsert) inserted++;
+      else modified++;
     }
 
     const totalItems = await Item.countAsync({});
