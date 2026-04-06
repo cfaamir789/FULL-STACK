@@ -112,6 +112,14 @@
     <div id="uploadResult"></div>
   </div>
 
+  <!-- Worker Sync Status -->
+  <div class="card">
+    <h2>&#128225; Worker Sync Status</h2>
+    <p style="color:#888;margin-bottom:12px">Live view of when each worker last synced their phone data</p>
+    <div id="workerStatusContainer"><div class="loading">Loading...</div></div>
+    <button class="btn btn-primary" style="margin-top:12px;max-width:220px" onclick="loadWorkerStatus()">&#128260; Refresh</button>
+  </div>
+
   <!-- Items List -->
   <div class="card">
     <h2>&#128230; Current Items</h2>
@@ -204,6 +212,7 @@ async function showPanel() {
   document.getElementById('mainPanel').classList.remove('hidden');
   loadStats();
   loadItems();
+  loadWorkerStatus();
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────────────
@@ -280,6 +289,34 @@ async function uploadCSV() {
   } finally {
     btn.disabled = false;
     btn.textContent = '\u{1F680} Upload & Push to Server';
+  }
+}
+
+// ─── Worker Sync Status ──────────────────────────────────────────────────────
+async function loadWorkerStatus() {
+  const container = document.getElementById('workerStatusContainer');
+  container.innerHTML = '<div class="loading">Loading...</div>';
+  try {
+    const data = await apiFetch('/sync/worker-status');
+    const workers = data.workers || [];
+    if (workers.length === 0) {
+      container.innerHTML = '<div class="loading">No sync activity recorded yet.</div>';
+      return;
+    }
+    let html = '<table><thead><tr><th>Worker</th><th>Last Sync</th><th>Ago</th><th>Today</th></tr></thead><tbody>';
+    workers.forEach(w => {
+      let color = '#4caf50';
+      if (w.minutesAgo > 240) color = '#f44336';
+      else if (w.minutesAgo > 30) color = '#ff9800';
+      const ago = w.minutesAgo < 60 ? w.minutesAgo + ' min' : Math.round(w.minutesAgo / 60) + ' hr';
+      html += '<tr><td>' + w.worker + '</td><td>' + new Date(w.lastSync).toLocaleTimeString() + '</td>';
+      html += '<td style="color:' + color + ';font-weight:bold">' + ago + '</td>';
+      html += '<td>' + (w.totalToday || 0) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = '<div class="alert alert-error">' + err.message + '</div>';
   }
 }
 

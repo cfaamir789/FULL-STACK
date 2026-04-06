@@ -4,6 +4,31 @@ const Transaction = require('../models/Transaction');
 const { appendTransactions } = require('../services/googleSheets');
 const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
+// ─── Worker Sync Status Tracking ─────────────────────────────────────────────
+// In-memory map: { workerName: { lastSync, pendingPushed, totalToday } }
+const workerSyncStatus = {};
+
+function recordWorkerSync(workerName, count) {
+  const now = new Date().toISOString();
+  if (!workerSyncStatus[workerName]) {
+    workerSyncStatus[workerName] = { lastSync: now, totalToday: 0 };
+  }
+  workerSyncStatus[workerName].lastSync = now;
+  workerSyncStatus[workerName].totalToday += count;
+}
+
+// GET /api/sync/worker-status — admin: see last sync time per worker
+router.get('/worker-status', requireAuth, requireAdmin, async (req, res) => {
+  const workers = Object.entries(workerSyncStatus).map(([name, info]) => ({
+    worker: name,
+    lastSync: info.lastSync,
+    totalToday: info.totalToday,
+    minutesAgo: Math.round((Date.now() - new Date(info.lastSync).getTime()) / 60000),
+  }));
+  workers.sort((a, b) => new Date(b.lastSync) - new Date(a.lastSync));
+  res.json({ success: true, workers });
+});
+
 // POST /api/sync — receive array of offline transactions (requires login)
 router.post('/', requireAuth, async (req, res) => {
   try {
@@ -34,6 +59,8 @@ router.post('/', requireAuth, async (req, res) => {
       createdAt: new Date(),
     }));
     await Transaction.insertAsync(docs);
+    // Track this worker's sync activity
+    recordWorkerSync(workerName, docs.length);
     // Append to Google Sheet asynchronously — never blocks the phone response
     appendTransactions(docs).catch(() => {});
     res.json({ success: true, synced: docs.length });

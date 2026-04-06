@@ -4,6 +4,15 @@
     "expo.vscode-expo-tools",
     "msjsdiag.vscode-react-native",
     "dbaeumer.vscode-eslint",
-    "esbenp.prettier-vscode"
+    "esbenp.prettier-vscode",
+    "mongodb.mongodb-vscode",
+    "humao.rest-client",
+    "rangav.vscode-thunder-client",
+    "mikestead.dotenv",
+    "pkief.material-icon-theme",
+    "ms-azuretools.vscode-docker",
+    "christian-kohler.path-intellisense",
+    "formulahendry.auto-rename-tag",
+    "ms-vscode.node-debug2"
   ]
 }

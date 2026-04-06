@@ -96,6 +96,11 @@ export const fetchItems = async () => {
   return res.data.items;
 };
 
+export const fetchItemsVersion = async () => {
+  const res = await healthClient.get('/items/version');
+  return res.data; // { version: <number> }
+};
+
 export const syncTransactions = async (transactions) => {
   const res = await apiClient.post('/sync', { transactions });
   return res.data;

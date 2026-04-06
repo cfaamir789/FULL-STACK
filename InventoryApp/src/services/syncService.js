@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { checkHealth, syncTransactions, fetchItems } from './api';
+import { checkHealth, syncTransactions, fetchItems, fetchItemsVersion } from './api';
 import {
   getPendingTransactions,
   markTransactionsSynced,
@@ -32,6 +32,40 @@ export const checkConnectivity = async () => {
   }
 };
 
+// Pull latest item master if server version differs from local
+const pullItemsIfNeeded = async () => {
+  try {
+    const serverVer = await fetchItemsVersion();
+    const localVer = await AsyncStorage.getItem('itemsVersion');
+    if (localVer === String(serverVer.version)) return; // already up-to-date
+
+    const latestItems = await fetchItems();
+    if (latestItems && latestItems.length > 0) {
+      await clearAllItems();
+      await upsertItems(latestItems.map((i) => ({
+        ItemCode: i.ItemCode,
+        Barcode: i.Barcode,
+        Item_Name: i.Item_Name,
+      })));
+    }
+    await AsyncStorage.setItem('itemsVersion', String(serverVer.version));
+  } catch (_) {
+    // Item pull failure must not break sync
+  }
+};
+
+// Chunk large transaction arrays to avoid payload limits
+const CHUNK_SIZE = 200;
+const syncInChunks = async (payload) => {
+  let totalSynced = 0;
+  for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
+    const chunk = payload.slice(i, i + CHUNK_SIZE);
+    const result = await syncTransactions(chunk);
+    totalSynced += result.synced ?? chunk.length;
+  }
+  return totalSynced;
+};
+
 export const attemptSync = async () => {
   const isConnected = await checkConnectivity();
   if (!isConnected) {
@@ -49,9 +83,14 @@ export const attemptSync = async () => {
 
   notifyStatus({ online: true, lastSync: null, pendingCount: null });
 
+  // ALWAYS pull latest items when online (version-aware to save bandwidth)
+  await pullItemsIfNeeded();
+
   const pending = await getPendingTransactions();
   if (pending.length === 0) {
-    return { synced: 0, reason: 'nothing_pending' };
+    const lastSync = new Date().toISOString();
+    notifyStatus({ online: true, lastSync, pendingCount: 0 });
+    return { synced: 0, reason: 'nothing_pending', lastSync };
   }
 
   // Read worker name saved by LoginScreen
@@ -71,28 +110,11 @@ export const attemptSync = async () => {
 
   let synced = 0;
   try {
-    const result = await syncTransactions(payload);
+    synced = await syncInChunks(payload);
     const ids = pending.map((tx) => tx.id);
     await markTransactionsSynced(ids);
-    synced = result.synced ?? ids.length;
   } catch (err) {
     return { synced: 0, reason: 'sync_failed', error: err.message };
-  }
-
-  // Pull latest item master from backend so worker always has new items
-  try {
-    const latestItems = await fetchItems();
-    if (latestItems && latestItems.length > 0) {
-      // Replace local items with server items (handles admin re-import)
-      await clearAllItems();
-      await upsertItems(latestItems.map((i) => ({
-        ItemCode: i.ItemCode,
-        Barcode: i.Barcode,
-        Item_Name: i.Item_Name,
-      })));
-    }
-  } catch (_) {
-    // Item pull failure must not break transaction sync
   }
 
   // Clean up: remove synced transactions from phone to keep it lean

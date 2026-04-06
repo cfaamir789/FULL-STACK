@@ -5,6 +5,34 @@ const Papa = require('papaparse');
 const Item = require('../models/Item');
 const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
+// ─── Item Version Tracking ──────────────────────────────────────────────────
+// In-memory counter; persisted to NeDB so it survives restarts.
+const db = require('../config/database');
+let _itemsVersion = 0;
+
+// Load persisted version on startup
+(async () => {
+  try {
+    const doc = await db.items.findOneAsync({ _meta: 'itemsVersion' });
+    if (doc) _itemsVersion = doc.version;
+  } catch (_) {}
+})();
+
+async function bumpItemsVersion() {
+  _itemsVersion++;
+  await db.items.updateAsync(
+    { _meta: 'itemsVersion' },
+    { $set: { _meta: 'itemsVersion', version: _itemsVersion } },
+    { upsert: true }
+  );
+  return _itemsVersion;
+}
+
+// GET /api/items/version — lightweight check for phones (no auth needed)
+router.get('/version', async (req, res) => {
+  res.json({ success: true, version: _itemsVersion });
+});
+
 // GET /api/items — return all items
 router.get('/', async (req, res) => {
   try {
@@ -14,6 +42,7 @@ router.get('/', async (req, res) => {
       const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       query = { $or: [{ Item_Name: regex }, { Barcode: regex }, { ItemCode: regex }] };
     }
+    query._meta = { $exists: false }; // exclude version meta doc
     const items = await Item.findAsync(query).sort({ Item_Name: 1 }).execAsync();
     res.json({ success: true, count: items.length, items });
   } catch (err) {
@@ -33,6 +62,7 @@ router.post('/', async (req, res) => {
       { $set: { ItemCode, Barcode, Item_Name } },
       { upsert: true, returnUpdatedDocs: true }
     );
+    await bumpItemsVersion();
     res.status(201).json({ success: true, item: affectedDocuments });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -58,6 +88,7 @@ router.post('/import', requireAuth, requireAdmin, async (req, res) => {
         if (upsert) inserted++; else modified++;
       })
     );
+    await bumpItemsVersion();
     res.json({ success: true, inserted, modified });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -69,6 +100,7 @@ router.delete('/all', requireAuth, requireAdmin, async (req, res) => {
   try {
     const count = await Item.countAsync({});
     await Item.removeAsync({}, { multi: true });
+    await bumpItemsVersion();
     res.json({ success: true, deleted: count });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -96,6 +128,7 @@ router.post('/replace', requireAuth, requireAdmin, async (req, res) => {
         inserted++;
       })
     );
+    await bumpItemsVersion();
     res.json({ success: true, inserted });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -161,6 +194,7 @@ router.post('/upload-csv', upload.single('file'), async (req, res) => {
     }
 
     const totalItems = await Item.countAsync({});
+    await bumpItemsVersion();
     res.json({ success: true, inserted, modified, totalItems });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
