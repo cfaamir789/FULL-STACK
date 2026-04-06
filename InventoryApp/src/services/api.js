@@ -1,9 +1,23 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const DEFAULT_SERVER_IP = "192.168.1.44";
+export const DEFAULT_SERVER_IP = "192.168.2.56";
 
-let currentBaseUrl = `http://${DEFAULT_SERVER_IP}:5000/api`;
+// Builds the API base URL from a server address.
+// Supports: bare IP ("192.168.1.5"), IP:port ("192.168.1.5:5000"),
+// or full URL ("https://myapp.onrender.com")
+const buildBaseUrl = (addr) => {
+  const s = (addr || DEFAULT_SERVER_IP).trim();
+  if (s.startsWith('http://') || s.startsWith('https://')) {
+    // Full URL — strip trailing slash, append /api if missing
+    const clean = s.replace(/\/+$/, '');
+    return clean.endsWith('/api') ? clean : `${clean}/api`;
+  }
+  // Bare IP or IP:port
+  return s.includes(':') ? `http://${s}/api` : `http://${s}:5000/api`;
+};
+
+let currentBaseUrl = buildBaseUrl(DEFAULT_SERVER_IP);
 
 export const getBaseUrl = () => currentBaseUrl;
 
@@ -20,12 +34,12 @@ const healthClient = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Call on app start — loads saved server IP from storage
+// Call on app start — loads saved server address from storage
 export const loadServerUrl = async () => {
   try {
     const saved = await AsyncStorage.getItem("serverIp");
     if (saved && saved.trim()) {
-      currentBaseUrl = `http://${saved.trim()}:5000/api`;
+      currentBaseUrl = buildBaseUrl(saved);
       apiClient.defaults.baseURL = currentBaseUrl;
       healthClient.defaults.baseURL = currentBaseUrl;
       return saved.trim();
@@ -34,10 +48,10 @@ export const loadServerUrl = async () => {
   return DEFAULT_SERVER_IP;
 };
 
-// Update server IP and persist it
+// Update server address and persist it (accepts IP, IP:port, or full URL)
 export const setServerIp = async (ip) => {
   const trimmed = ip.trim();
-  currentBaseUrl = `http://${trimmed}:5000/api`;
+  currentBaseUrl = buildBaseUrl(trimmed);
   apiClient.defaults.baseURL = currentBaseUrl;
   healthClient.defaults.baseURL = currentBaseUrl;
   await AsyncStorage.setItem("serverIp", trimmed);
