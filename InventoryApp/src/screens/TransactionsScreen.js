@@ -14,17 +14,31 @@ export default function TransactionsScreen({ username, role }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
+  const [workerFilter, setWorkerFilter] = useState('all');
 
-  const filtered = query.trim()
-    ? transactions.filter((tx) => {
-        const q = query.trim().toLowerCase();
-        return (
-          (tx.item_code && tx.item_code.toLowerCase().includes(q)) ||
-          (tx.item_barcode && tx.item_barcode.toLowerCase().includes(q)) ||
-          (tx.item_name && tx.item_name.toLowerCase().includes(q))
-        );
-      })
-    : transactions;
+  // Get unique worker names for filter chips
+  const workerNames = role === 'admin'
+    ? [...new Set(transactions.map(tx => tx.worker_name || 'unknown').filter(Boolean))]
+    : [];
+
+  const filtered = (() => {
+    let result = transactions;
+    // Worker filter (admin only)
+    if (workerFilter !== 'all') {
+      result = result.filter(tx => (tx.worker_name || 'unknown') === workerFilter);
+    }
+    // Text search
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      result = result.filter((tx) =>
+        (tx.item_code && tx.item_code.toLowerCase().includes(q)) ||
+        (tx.item_barcode && tx.item_barcode.toLowerCase().includes(q)) ||
+        (tx.item_name && tx.item_name.toLowerCase().includes(q)) ||
+        (tx.worker_name && tx.worker_name.toLowerCase().includes(q))
+      );
+    }
+    return result;
+  })();
 
   // Edit modal state
   const [editItem, setEditItem] = useState(null);
@@ -141,6 +155,28 @@ export default function TransactionsScreen({ username, role }) {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Worker filter chips (admin only) */}
+      {role === 'admin' && workerNames.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.workerFilterBar} contentContainerStyle={styles.workerFilterContent}>
+          <TouchableOpacity
+            style={[styles.workerChip, workerFilter === 'all' && styles.workerChipActive]}
+            onPress={() => setWorkerFilter('all')}
+          >
+            <Text style={[styles.workerChipText, workerFilter === 'all' && styles.workerChipTextActive]}>All Workers</Text>
+          </TouchableOpacity>
+          {workerNames.map(name => (
+            <TouchableOpacity
+              key={name}
+              style={[styles.workerChip, workerFilter === name && styles.workerChipActive]}
+              onPress={() => setWorkerFilter(workerFilter === name ? 'all' : name)}
+            >
+              <MaterialCommunityIcons name="account" size={14} color={workerFilter === name ? '#fff' : Colors.textSecondary} />
+              <Text style={[styles.workerChipText, workerFilter === name && styles.workerChipTextActive]}>{name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {transactions.length === 0 ? (
         <View style={styles.empty}>
@@ -347,6 +383,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingVertical: 4,
     color: Colors.textPrimary,
+  },
+  workerFilterBar: {
+    backgroundColor: Colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    maxHeight: 48,
+  },
+  workerFilterContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  workerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  workerChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  workerChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  workerChipTextActive: {
+    color: '#fff',
   },
   countBar: {
     backgroundColor: Colors.card,

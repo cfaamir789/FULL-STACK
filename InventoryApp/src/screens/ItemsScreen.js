@@ -73,14 +73,12 @@ export default function ItemsScreen({ navigation, route }) {
             clearButtonMode="while-editing"
           />
         </View>
-        {role === 'admin' && (
-          <TouchableOpacity
-            style={styles.importBtn}
-            onPress={() => navigation.navigate('Import')}
-          >
-            <MaterialCommunityIcons name="file-import" size={20} color="#fff" />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.importBtn}
+          onPress={() => navigation.navigate('Import')}
+        >
+          <MaterialCommunityIcons name="file-import" size={20} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.countText}>{items.length} item{items.length !== 1 ? 's' : ''}</Text>
@@ -93,6 +91,15 @@ export default function ItemsScreen({ navigation, route }) {
           <Text style={styles.emptyText}>
             {query ? 'No items found' : 'No items yet. Import a CSV to get started.'}
           </Text>
+          {!query && (
+            <TouchableOpacity
+              style={styles.emptyImportBtn}
+              onPress={() => navigation.navigate('Import')}
+            >
+              <MaterialCommunityIcons name="file-import" size={20} color="#fff" />
+              <Text style={styles.emptyImportText}>Import CSV</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <FlatList
@@ -145,4 +152,16 @@ const styles = StyleSheet.create({
   },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyText: { color: Colors.textSecondary, textAlign: 'center', marginTop: 12 },
+  emptyImportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginTop: 16,
+    elevation: 2,
+  },
+  emptyImportText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

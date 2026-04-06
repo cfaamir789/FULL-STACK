@@ -187,3 +187,25 @@ export const getDashboardStats = async () => {
     pendingSync: pendingRow?.count ?? 0,
   };
 };
+
+// ─── Admin: Clear / Reset ─────────────────────────────────────────────────────
+
+export const clearSyncedTransactions = async () => {
+  const result = await db.runAsync('DELETE FROM transactions WHERE synced = 1');
+  return result.changes;
+};
+
+export const clearAllTransactions = async () => {
+  const result = await db.runAsync('DELETE FROM transactions');
+  return result.changes;
+};
+
+export const clearAllItems = async () => {
+  const result = await db.runAsync('DELETE FROM items');
+  return result.changes;
+};
+
+export const getPendingCount = async () => {
+  const row = await db.getFirstAsync('SELECT COUNT(*) as count FROM transactions WHERE synced = 0');
+  return row?.count ?? 0;
+};

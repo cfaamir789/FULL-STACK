@@ -9,7 +9,7 @@ let DocumentPicker = null;
 let FileSystem = null;
 if (!IS_WEB) {
   DocumentPicker = require('expo-document-picker');
-  FileSystem = require('expo-file-system');
+  FileSystem = require('expo-file-system/legacy');
 }
 import Papa from 'papaparse';
 import { MaterialCommunityIcons } from '@expo/vector-icons';

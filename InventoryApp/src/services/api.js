@@ -106,3 +106,32 @@ export const importItemsToBackend = async (itemsArray) => {
   return res.data;
 };
 
+// ─── Admin ────────────────────────────────────────────────────────────────────
+
+export const getTransactionStats = async () => {
+  const res = await apiClient.get('/transactions/stats');
+  return res.data;
+};
+
+export const getServerTransactions = async (page = 1, limit = 50) => {
+  const res = await apiClient.get(`/transactions?page=${page}&limit=${limit}`);
+  return res.data;
+};
+
+export const getExportUrl = () => `${currentBaseUrl}/transactions/export`;
+
+export const clearServerTransactions = async () => {
+  const res = await apiClient.delete('/transactions/all');
+  return res.data;
+};
+
+export const clearServerItems = async () => {
+  const res = await apiClient.delete('/items/all');
+  return res.data;
+};
+
+export const replaceServerItems = async (itemsArray) => {
+  const res = await apiClient.post('/items/replace', { items: itemsArray });
+  return res.data;
+};
+

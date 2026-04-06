@@ -7,11 +7,17 @@ const JWT_SECRET = process.env.JWT_SECRET || 'warehouse_inv_super_secret_key_202
  * Returns 401 if missing/invalid, 403 if expired.
  */
 const requireAuth = (req, res, next) => {
+  let token = null;
   const authHeader = req.headers['authorization'];
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+  } else if (req.query && req.query.token) {
+    // Allow token via query param for file downloads (e.g. CSV export)
+    token = req.query.token;
+  }
+  if (!token) {
     return res.status(401).json({ success: false, error: 'Authentication required.' });
   }
-  const token = authHeader.slice(7);
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = { userId: payload.userId, username: payload.username, role: payload.role };

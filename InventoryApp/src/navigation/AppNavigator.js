@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import DashboardScreen from '../screens/DashboardScreen';
 import ScannerScreen from '../screens/ScannerScreen';
@@ -13,12 +14,14 @@ import ImportScreen from '../screens/ImportScreen';
 import TransactionsScreen from '../screens/TransactionsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import AdminScreen from '../screens/AdminScreen';
+import AdminPanelScreen from '../screens/AdminPanelScreen';
 import Colors from '../theme/colors';
 import { loadServerUrl } from '../services/api';
 import { attemptSync } from '../services/syncService';
 
 const Tab = createBottomTabNavigator();
 const ItemsStack = createStackNavigator();
+const AdminStack = createStackNavigator();
 
 const ItemsStackNavigator = ({ role }) => (
   <ItemsStack.Navigator
@@ -31,6 +34,23 @@ const ItemsStackNavigator = ({ role }) => (
     <ItemsStack.Screen name="ItemsList" component={ItemsScreen} initialParams={{ role }} options={{ title: 'Items' }} />
     <ItemsStack.Screen name="Import" component={ImportScreen} options={{ title: 'Import CSV' }} />
   </ItemsStack.Navigator>
+);
+
+const AdminStackNavigator = ({ username }) => (
+  <AdminStack.Navigator
+    screenOptions={{
+      headerStyle: { backgroundColor: Colors.primary },
+      headerTintColor: '#fff',
+      headerTitleStyle: { fontWeight: 'bold' },
+    }}
+  >
+    <AdminStack.Screen name="AdminDashboard" component={AdminPanelScreen} options={{ title: 'Admin Panel' }} />
+    <AdminStack.Screen name="AdminUsers" component={AdminScreen} options={{ title: 'Manage Users' }} />
+    <AdminStack.Screen name="Import" component={ImportScreen} options={{ title: 'Import CSV' }} />
+    <AdminStack.Screen name="AdminTransactions" options={{ title: 'All Transactions' }}>
+      {() => <TransactionsScreen username={username} role="admin" />}
+    </AdminStack.Screen>
+  </AdminStack.Navigator>
 );
 
 export default function AppNavigator() {
@@ -70,6 +90,7 @@ export default function AppNavigator() {
   const { username: workerName, role } = session;
 
   return (
+    <SafeAreaProvider>
     <NavigationContainer>
       <Tab.Navigator
         screenOptions={({ route }) => ({
@@ -128,11 +149,13 @@ export default function AppNavigator() {
         {role === 'admin' && (
           <Tab.Screen
             name="Admin"
-            component={AdminScreen}
-            options={{ title: 'Users' }}
-          />
+            options={{ headerShown: false, title: 'Admin' }}
+          >
+            {() => <AdminStackNavigator username={workerName} />}
+          </Tab.Screen>
         )}
       </Tab.Navigator>
     </NavigationContainer>
+    </SafeAreaProvider>
   );
 }

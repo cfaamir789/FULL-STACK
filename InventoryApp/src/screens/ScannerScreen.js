@@ -4,6 +4,7 @@ import {
   StyleSheet, Alert, KeyboardAvoidingView, Platform,
   ActivityIndicator, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const IS_WEB = Platform.OS === 'web';
 let CameraView, useCameraPermissions;
@@ -376,7 +377,8 @@ export default function ScannerScreen() {
 
   // ─── Native ───────────────────────────────────────────────────────────────
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.primary }} edges={['top']}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.container}>
         {renderTabs()}
 
@@ -394,7 +396,7 @@ export default function ScannerScreen() {
           </View>
         )}
 
-        <ScrollView style={styles.form} contentContainerStyle={{ paddingBottom: 32 }}>
+        <ScrollView style={styles.form} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
           {!showCamera && mode === 'barcode' && (
             <TouchableOpacity style={styles.rescanBtn} onPress={resetForm}>
               <MaterialCommunityIcons name="barcode-scan" size={18} color={Colors.primary} />
@@ -407,6 +409,7 @@ export default function ScannerScreen() {
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -428,9 +431,9 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: Colors.primary },
   tabText: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary },
   tabTextActive: { color: '#fff' },
-  cameraWrap: { height: 240 },
+  cameraWrap: { height: 200, overflow: 'hidden', backgroundColor: '#000' },
   overlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  scanFrame: { width: 220, height: 120, borderWidth: 2, borderColor: '#fff', borderRadius: 12 },
+  scanFrame: { width: 200, height: 100, borderWidth: 2, borderColor: '#fff', borderRadius: 12 },
   scanHint: { color: '#fff', marginTop: 10, fontWeight: '600', fontSize: 13 },
   form: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
   rescanBtn: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },

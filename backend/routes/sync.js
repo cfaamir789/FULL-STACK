@@ -93,4 +93,67 @@ router.delete('/:id', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/transactions/stats — admin dashboard stats per worker
+router.get('/stats', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const allTx = await Transaction.findAsync({}).execAsync();
+    const workerMap = {};
+    for (const tx of allTx) {
+      const w = tx.Worker_Name || 'unknown';
+      if (!workerMap[w]) {
+        workerMap[w] = { worker: w, count: 0, lastTransaction: null };
+      }
+      workerMap[w].count++;
+      const ts = tx.Timestamp ? new Date(tx.Timestamp) : null;
+      if (ts && (!workerMap[w].lastTransaction || ts > new Date(workerMap[w].lastTransaction))) {
+        workerMap[w].lastTransaction = ts.toISOString();
+      }
+    }
+    const workers = Object.values(workerMap).sort((a, b) => b.count - a.count);
+    const total = allTx.length;
+    res.json({ success: true, total, workers });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/transactions/export — export all transactions as CSV (admin only)
+router.get('/export', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { worker } = req.query;
+    const query = worker ? { Worker_Name: worker } : {};
+    const transactions = await Transaction.findAsync(query).sort({ Timestamp: -1 }).execAsync();
+    const header = 'Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Timestamp\n';
+    const rows = transactions.map(tx => {
+      const escape = (v) => `"${String(v || '').replace(/"/g, '""')}"`;
+      return [
+        escape(tx.Item_Barcode),
+        escape(tx.Item_Code),
+        escape(tx.Item_Name),
+        escape(tx.Frombin),
+        escape(tx.Tobin),
+        tx.Qty,
+        escape(tx.Worker_Name),
+        escape(tx.Timestamp ? new Date(tx.Timestamp).toISOString() : ''),
+      ].join(',');
+    }).join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=transactions_export.csv');
+    res.send(header + rows);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/transactions/all — admin: clear ALL transactions from server after export
+router.delete('/all', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const count = await Transaction.countAsync({});
+    await Transaction.removeAsync({}, { multi: true });
+    res.json({ success: true, deleted: count });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

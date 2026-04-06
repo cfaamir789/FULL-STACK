@@ -30,6 +30,7 @@ export default function LoginScreen({ onLogin }) {
   const [confirmPin, setConfirmPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [offlineName, setOfflineName] = useState('');
+  const [offlineRole, setOfflineRole] = useState('worker');
   const [showServerModal, setShowServerModal] = useState(false);
   const [serverIpInput, setServerIpInput] = useState('');
   const [currentIp, setCurrentIp] = useState(DEFAULT_SERVER_IP);
@@ -125,9 +126,9 @@ export default function LoginScreen({ onLogin }) {
 
     await AsyncStorage.multiSet([
       ['workerName', normalizedName],
-      ['workerRole', 'worker'],
+      ['workerRole', offlineRole],
     ]);
-    onLogin({ username: normalizedName, role: 'worker' });
+    onLogin({ username: normalizedName, role: offlineRole });
   };
 
   const ServerModal = () => (
@@ -190,7 +191,7 @@ export default function LoginScreen({ onLogin }) {
             <View style={styles.divider} />
           </View>
 
-          <Text style={styles.label}>Your Name (offline only)</Text>
+          <Text style={styles.label}>Your Name</Text>
           <TextInput
             style={styles.input}
             placeholder="e.g. AHMED"
@@ -199,13 +200,32 @@ export default function LoginScreen({ onLogin }) {
             onChangeText={setOfflineName}
             autoCapitalize="characters"
           />
+
+          <Text style={styles.label}>Role</Text>
+          <View style={styles.roleToggleRow}>
+            <TouchableOpacity
+              style={[styles.roleToggle, offlineRole === 'worker' && styles.roleToggleActive]}
+              onPress={() => setOfflineRole('worker')}
+            >
+              <MaterialCommunityIcons name="account-hard-hat" size={16} color={offlineRole === 'worker' ? '#fff' : Colors.textSecondary} />
+              <Text style={[styles.roleToggleText, offlineRole === 'worker' && styles.roleToggleTextActive]}>Worker</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.roleToggle, offlineRole === 'admin' && styles.roleToggleActive]}
+              onPress={() => setOfflineRole('admin')}
+            >
+              <MaterialCommunityIcons name="shield-account" size={16} color={offlineRole === 'admin' ? '#fff' : Colors.textSecondary} />
+              <Text style={[styles.roleToggleText, offlineRole === 'admin' && styles.roleToggleTextActive]}>Admin</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
             style={[styles.button, !offlineName.trim() && styles.buttonDisabled]}
             onPress={handleOfflineLogin}
             disabled={!offlineName.trim()}
           >
             <MaterialCommunityIcons name="login" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Continue Offline (Worker only)</Text>
+            <Text style={styles.buttonText}>Continue Offline</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -463,5 +483,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     marginBottom: 16,
+  },
+  roleToggleRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    gap: 8,
+  },
+  roleToggle: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
+  roleToggleActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  roleToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  roleToggleTextActive: {
+    color: '#fff',
   },
 });

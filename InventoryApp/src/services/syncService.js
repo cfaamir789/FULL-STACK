@@ -5,6 +5,8 @@ import {
   getPendingTransactions,
   markTransactionsSynced,
   upsertItems,
+  clearSyncedTransactions,
+  clearAllItems,
 } from '../database/db';
 
 let _onStatusChange = null;
@@ -58,6 +60,7 @@ export const attemptSync = async () => {
   // Map SQLite rows to the shape the backend expects
   const payload = pending.map((tx) => ({
     Item_Barcode: tx.item_barcode,
+    Item_Code: tx.item_code || '',
     Item_Name: tx.item_name,
     Frombin: tx.frombin,
     Tobin: tx.tobin,
@@ -80,7 +83,8 @@ export const attemptSync = async () => {
   try {
     const latestItems = await fetchItems();
     if (latestItems && latestItems.length > 0) {
-      // fetchItems returns { ItemCode, Barcode, Item_Name } objects
+      // Replace local items with server items (handles admin re-import)
+      await clearAllItems();
       await upsertItems(latestItems.map((i) => ({
         ItemCode: i.ItemCode,
         Barcode: i.Barcode,
@@ -90,6 +94,11 @@ export const attemptSync = async () => {
   } catch (_) {
     // Item pull failure must not break transaction sync
   }
+
+  // Clean up: remove synced transactions from phone to keep it lean
+  try {
+    await clearSyncedTransactions();
+  } catch (_) {}
 
   const lastSync = new Date().toISOString();
   notifyStatus({ online: true, lastSync, pendingCount: 0 });
