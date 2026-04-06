@@ -8,13 +8,13 @@ export const DEFAULT_SERVER_IP = "192.168.2.56";
 // or full URL ("https://myapp.onrender.com")
 const buildBaseUrl = (addr) => {
   const s = (addr || DEFAULT_SERVER_IP).trim();
-  if (s.startsWith('http://') || s.startsWith('https://')) {
+  if (s.startsWith("http://") || s.startsWith("https://")) {
     // Full URL — strip trailing slash, append /api if missing
-    const clean = s.replace(/\/+$/, '');
-    return clean.endsWith('/api') ? clean : `${clean}/api`;
+    const clean = s.replace(/\/+$/, "");
+    return clean.endsWith("/api") ? clean : `${clean}/api`;
   }
   // Bare IP or IP:port
-  return s.includes(':') ? `http://${s}/api` : `http://${s}:5000/api`;
+  return s.includes(":") ? `http://${s}/api` : `http://${s}:5000/api`;
 };
 
 let currentBaseUrl = buildBaseUrl(DEFAULT_SERVER_IP);
