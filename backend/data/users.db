@@ -1,4 +1,0 @@
-{"username":"SHOAIB","pin_hash":"$2b$10$uM7WImNCXO1xyFDokh7oauopCudpVfm1Y9dMRe1fVx8gxoDRsnNRO","role":"worker","createdAt":{"$$date":1775389081329},"_id":"AkHRbgM1JFfnzK1k"}
-{"username":"AAMIR","pin_hash":"$2b$10$eksWp834wHL77OaRGjXON.jxrUW0EE95b9ztjJWQspJu5s8rxL3s.","role":"admin","createdAt":{"$$date":1775380576800},"_id":"PGJzFBxFOA0Qcay5"}
-{"$$indexCreated":{"fieldName":"username","unique":true,"sparse":false}}
-{"$$indexCreated":{"fieldName":"username","unique":true}}
