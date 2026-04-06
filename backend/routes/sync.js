@@ -66,6 +66,7 @@ router.post("/", requireAuth, async (req, res) => {
       Tobin: tx.Tobin,
       Qty: Number(tx.Qty),
       Timestamp: new Date(tx.Timestamp),
+      Notes: tx.Notes || "",
       deviceId: tx.deviceId || "unknown",
       Worker_Name: workerName,
       createdAt: new Date(),
@@ -189,7 +190,7 @@ router.get("/export", requireAuth, requireAdmin, async (req, res) => {
       .sort({ Timestamp: -1 })
       .execAsync();
     const header =
-      "Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Timestamp\n";
+      "Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Notes,Timestamp\n";
     const rows = transactions
       .map((tx) => {
         const escape = (v) => `"${String(v || "").replace(/"/g, '""')}"`;
@@ -201,6 +202,7 @@ router.get("/export", requireAuth, requireAdmin, async (req, res) => {
           escape(tx.Tobin),
           tx.Qty,
           escape(tx.Worker_Name),
+          escape(tx.Notes),
           escape(tx.Timestamp ? new Date(tx.Timestamp).toISOString() : ""),
         ].join(",");
       })

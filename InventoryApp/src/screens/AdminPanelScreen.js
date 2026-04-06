@@ -232,16 +232,16 @@ export default function AdminPanelScreen({ navigation }) {
             <Text style={styles.statValue}>{localStats.totalItems}</Text>
             <Text style={styles.statLabel}>Total Items</Text>
           </View>
-          <View style={styles.statCard}>
+          <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate('AdminTransactions')}>
             <MaterialCommunityIcons name="swap-horizontal" size={28} color={Colors.success} />
             <Text style={styles.statValue}>{online ? serverStats.total : localStats.totalTransactions}</Text>
             <Text style={styles.statLabel}>All Transactions</Text>
-          </View>
-          <View style={styles.statCard}>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate('AdminUsers')}>
             <MaterialCommunityIcons name="account-group" size={28} color={Colors.primaryLight} />
             <Text style={styles.statValue}>{online ? serverStats.workers.length : '-'}</Text>
             <Text style={styles.statLabel}>Workers</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Quick Actions */}

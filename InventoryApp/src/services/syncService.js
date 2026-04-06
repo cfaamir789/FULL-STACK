@@ -112,6 +112,7 @@ export const attemptSync = async () => {
     Tobin: tx.tobin,
     Qty: tx.qty,
     Timestamp: tx.timestamp,
+    Notes: tx.notes || "",
     deviceId: workerName,
   }));
 

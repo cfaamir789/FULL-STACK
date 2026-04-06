@@ -1,9 +1,9 @@
-import * as SQLite from 'expo-sqlite';
+import * as SQLite from "expo-sqlite";
 
 let db;
 
 export const initDB = async () => {
-  db = await SQLite.openDatabaseAsync('inventory.db');
+  db = await SQLite.openDatabaseAsync("inventory.db");
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
 
@@ -33,14 +33,27 @@ export const initDB = async () => {
 
   // Migration 1: add item_code column if it doesn't exist yet (for existing DBs)
   try {
-    await db.execAsync(`ALTER TABLE transactions ADD COLUMN item_code TEXT NOT NULL DEFAULT ''`);
+    await db.execAsync(
+      `ALTER TABLE transactions ADD COLUMN item_code TEXT NOT NULL DEFAULT ''`,
+    );
   } catch (_) {
     // Column already exists — safe to ignore
   }
 
   // Migration 3: add worker_name column to tag which worker did each transaction
   try {
-    await db.execAsync(`ALTER TABLE transactions ADD COLUMN worker_name TEXT NOT NULL DEFAULT 'unknown'`);
+    await db.execAsync(
+      `ALTER TABLE transactions ADD COLUMN worker_name TEXT NOT NULL DEFAULT 'unknown'`,
+    );
+  } catch (_) {
+    // Column already exists — safe to ignore
+  }
+
+  // Migration 4: add notes column for optional notes (damage, expiry, etc.)
+  try {
+    await db.execAsync(
+      `ALTER TABLE transactions ADD COLUMN notes TEXT NOT NULL DEFAULT ''`,
+    );
   } catch (_) {
     // Column already exists — safe to ignore
   }
@@ -70,14 +83,18 @@ export const upsertItems = async (itemsArray) => {
   await db.withTransactionAsync(async () => {
     for (let i = 0; i < itemsArray.length; i += CHUNK_SIZE) {
       const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
-      const placeholders = chunk.map(() => '(?,?,?)').join(',');
-      const params = chunk.flatMap((item) => [item.ItemCode, item.Barcode, item.Item_Name]);
+      const placeholders = chunk.map(() => "(?,?,?)").join(",");
+      const params = chunk.flatMap((item) => [
+        item.ItemCode,
+        item.Barcode,
+        item.Item_Name,
+      ]);
       await db.runAsync(
         `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
          ON CONFLICT(barcode) DO UPDATE SET
            item_code = excluded.item_code,
            item_name = excluded.item_name`,
-        params
+        params,
       );
     }
   });
@@ -85,16 +102,16 @@ export const upsertItems = async (itemsArray) => {
 
 export const getItemByBarcode = async (barcode) => {
   const row = await db.getFirstAsync(
-    'SELECT * FROM items WHERE barcode = ? LIMIT 1',
-    [barcode]
+    "SELECT * FROM items WHERE barcode = ? LIMIT 1",
+    [barcode],
   );
   return row || null;
 };
 
 export const getItemByItemCode = async (itemCode) => {
   const row = await db.getFirstAsync(
-    'SELECT * FROM items WHERE item_code = ? LIMIT 1',
-    [itemCode.trim()]
+    "SELECT * FROM items WHERE item_code = ? LIMIT 1",
+    [itemCode.trim()],
   );
   return row || null;
 };
@@ -106,80 +123,112 @@ export const searchItems = async (query) => {
      WHERE item_name LIKE ? OR barcode LIKE ? OR item_code LIKE ?
      ORDER BY item_name ASC
      LIMIT 200`,
-    [q, q, q]
+    [q, q, q],
   );
 };
 
 export const getAllItems = async () => {
   return await db.getAllAsync(
-    'SELECT * FROM items ORDER BY item_name ASC LIMIT 1000'
+    "SELECT * FROM items ORDER BY item_name ASC LIMIT 1000",
   );
 };
 
 // ─── Transactions ─────────────────────────────────────────────────────────────
 
-export const insertTransaction = async ({ item_barcode, item_code = '', item_name, frombin, tobin, qty, worker_name = 'unknown' }) => {
+export const insertTransaction = async ({
+  item_barcode,
+  item_code = "",
+  item_name,
+  frombin,
+  tobin,
+  qty,
+  worker_name = "unknown",
+  notes = "",
+}) => {
   const timestamp = new Date().toISOString();
   const result = await db.runAsync(
-    `INSERT INTO transactions (item_barcode, item_code, item_name, frombin, tobin, qty, timestamp, synced, worker_name)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-    [item_barcode, item_code, item_name, frombin, tobin, qty, timestamp, worker_name]
+    `INSERT INTO transactions (item_barcode, item_code, item_name, frombin, tobin, qty, timestamp, synced, worker_name, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    [
+      item_barcode,
+      item_code,
+      item_name,
+      frombin,
+      tobin,
+      qty,
+      timestamp,
+      worker_name,
+      notes,
+    ],
   );
   return result.lastInsertRowId;
 };
 
 export const getPendingTransactions = async () => {
   return await db.getAllAsync(
-    'SELECT * FROM transactions WHERE synced = 0 ORDER BY timestamp ASC'
+    "SELECT * FROM transactions WHERE synced = 0 ORDER BY timestamp ASC",
   );
 };
 
 export const markTransactionsSynced = async (ids) => {
   if (!ids || ids.length === 0) return;
-  const placeholders = ids.map(() => '?').join(',');
+  const placeholders = ids.map(() => "?").join(",");
   await db.runAsync(
     `UPDATE transactions SET synced = 1 WHERE id IN (${placeholders})`,
-    ids
+    ids,
   );
 };
 
 export const getRecentTransactions = async (limit = 20) => {
   return await db.getAllAsync(
-    'SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?',
-    [limit]
+    "SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?",
+    [limit],
   );
 };
 
-export const updateTransaction = async (id, { frombin, tobin, qty }, username, role) => {
-  if (role !== 'admin') {
-    const tx = await db.getFirstAsync('SELECT worker_name FROM transactions WHERE id = ?', [id]);
+export const updateTransaction = async (
+  id,
+  { frombin, tobin, qty },
+  username,
+  role,
+) => {
+  if (role !== "admin") {
+    const tx = await db.getFirstAsync(
+      "SELECT worker_name FROM transactions WHERE id = ?",
+      [id],
+    );
     if (tx && tx.worker_name !== username) {
-      throw new Error('You can only edit your own transactions.');
+      throw new Error("You can only edit your own transactions.");
     }
   }
   await db.runAsync(
     `UPDATE transactions SET frombin = ?, tobin = ?, qty = ?, synced = 0 WHERE id = ?`,
-    [frombin.trim(), tobin.trim(), Number(qty), id]
+    [frombin.trim(), tobin.trim(), Number(qty), id],
   );
 };
 
 export const deleteTransaction = async (id, username, role) => {
-  if (role !== 'admin') {
-    const tx = await db.getFirstAsync('SELECT worker_name FROM transactions WHERE id = ?', [id]);
+  if (role !== "admin") {
+    const tx = await db.getFirstAsync(
+      "SELECT worker_name FROM transactions WHERE id = ?",
+      [id],
+    );
     if (tx && tx.worker_name !== username) {
-      throw new Error('You can only delete your own transactions.');
+      throw new Error("You can only delete your own transactions.");
     }
   }
-  await db.runAsync('DELETE FROM transactions WHERE id = ?', [id]);
+  await db.runAsync("DELETE FROM transactions WHERE id = ?", [id]);
 };
 
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────
 
 export const getDashboardStats = async () => {
   const [itemsRow, txRow, pendingRow] = await Promise.all([
-    db.getFirstAsync('SELECT COUNT(*) as count FROM items'),
-    db.getFirstAsync('SELECT COUNT(*) as count FROM transactions'),
-    db.getFirstAsync('SELECT COUNT(*) as count FROM transactions WHERE synced = 0'),
+    db.getFirstAsync("SELECT COUNT(*) as count FROM items"),
+    db.getFirstAsync("SELECT COUNT(*) as count FROM transactions"),
+    db.getFirstAsync(
+      "SELECT COUNT(*) as count FROM transactions WHERE synced = 0",
+    ),
   ]);
   return {
     totalItems: itemsRow?.count ?? 0,
@@ -191,21 +240,23 @@ export const getDashboardStats = async () => {
 // ─── Admin: Clear / Reset ─────────────────────────────────────────────────────
 
 export const clearSyncedTransactions = async () => {
-  const result = await db.runAsync('DELETE FROM transactions WHERE synced = 1');
+  const result = await db.runAsync("DELETE FROM transactions WHERE synced = 1");
   return result.changes;
 };
 
 export const clearAllTransactions = async () => {
-  const result = await db.runAsync('DELETE FROM transactions');
+  const result = await db.runAsync("DELETE FROM transactions");
   return result.changes;
 };
 
 export const clearAllItems = async () => {
-  const result = await db.runAsync('DELETE FROM items');
+  const result = await db.runAsync("DELETE FROM items");
   return result.changes;
 };
 
 export const getPendingCount = async () => {
-  const row = await db.getFirstAsync('SELECT COUNT(*) as count FROM transactions WHERE synced = 0');
+  const row = await db.getFirstAsync(
+    "SELECT COUNT(*) as count FROM transactions WHERE synced = 0",
+  );
   return row?.count ?? 0;
 };

@@ -1,20 +1,40 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
-  View, Text, TextInput, FlatList,
-  TouchableOpacity, StyleSheet, ActivityIndicator,
-} from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { getAllItems } from '../database/db';
-import ItemCard from '../components/ItemCard';
-import Colors from '../theme/colors';
+  View,
+  Text,
+  TextInput,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { getAllItems, searchItems } from "../database/db";
+import ItemCard from "../components/ItemCard";
+import Colors from "../theme/colors";
+
+const IS_WEB = Platform.OS === "web";
+let CameraView, useCameraPermissions;
+if (!IS_WEB) {
+  const cam = require("expo-camera");
+  CameraView = cam.CameraView;
+  useCameraPermissions = cam.useCameraPermissions;
+} else {
+  useCameraPermissions = () => [{ granted: false }, async () => {}];
+}
 
 export default function ItemsScreen({ navigation, route }) {
-  const role = route?.params?.role || 'worker';
+  const role = route?.params?.role || "worker";
   const [allItems, setAllItems] = useState([]);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const searchTimer = useRef(null);
 
+  // Load default items (limited) when no query
   const loadItems = useCallback(async () => {
     setLoading(true);
     const results = await getAllItems();
@@ -24,9 +44,27 @@ export default function ItemsScreen({ navigation, route }) {
 
   useFocusEffect(
     useCallback(() => {
-      loadItems();
-    }, [loadItems])
+      if (!query.trim()) loadItems();
+    }, [loadItems, query]),
   );
+
+  // Debounced DB search when query changes
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (!query.trim()) {
+      loadItems();
+      return;
+    }
+    searchTimer.current = setTimeout(async () => {
+      setLoading(true);
+      const results = await searchItems(query.trim());
+      setAllItems(results);
+      setLoading(false);
+    }, 300);
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, [query]);
 
   // Group raw items by trimmed item_code — one card per unique product
   const grouped = (() => {
@@ -36,67 +74,137 @@ export default function ItemsScreen({ navigation, route }) {
       if (map.has(key)) {
         map.get(key).barcodes.push(i.barcode);
       } else {
-        map.set(key, { item_code: (i.item_code || '').trim(), item_name: i.item_name, barcodes: [i.barcode] });
+        map.set(key, {
+          item_code: (i.item_code || "").trim(),
+          item_name: i.item_name,
+          barcodes: [i.barcode],
+        });
       }
     }
     return Array.from(map.values());
   })();
 
-  // Filter grouped list
-  const items = query.trim()
-    ? (() => {
-        const q = query.trim().toLowerCase();
-        return grouped.filter(
-          (i) =>
-            i.item_name.toLowerCase().includes(q) ||
-            i.item_code.toLowerCase().includes(q) ||
-            i.barcodes.some((b) => b.toLowerCase().includes(q))
-        );
-      })()
-    : grouped;
+  const items = grouped;
 
-  const handleQueryChange = (text) => {
-    setQuery(text);
+  const handleBarCodeScanned = ({ data }) => {
+    setShowScanner(false);
+    setQuery(data.trim());
+  };
+
+  const openScanner = async () => {
+    if (IS_WEB) return;
+    if (!permission?.granted) {
+      const p = await requestPermission();
+      if (!p.granted) return;
+    }
+    setShowScanner(true);
   };
 
   return (
     <View style={styles.container}>
+      {/* Barcode scanner overlay */}
+      {showScanner && !IS_WEB && CameraView && (
+        <View style={styles.scannerOverlay}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            barcodeScannerSettings={{
+              barcodeTypes: [
+                "ean13",
+                "ean8",
+                "code128",
+                "code39",
+                "upc_a",
+                "qr",
+              ],
+            }}
+            onBarcodeScanned={handleBarCodeScanned}
+          />
+          <TouchableOpacity
+            style={styles.scannerCloseBtn}
+            onPress={() => setShowScanner(false)}
+          >
+            <MaterialCommunityIcons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.scannerHint}>Scan a barcode to search</Text>
+        </View>
+      )}
+
       <View style={styles.searchRow}>
         <View style={styles.searchWrap}>
-          <MaterialCommunityIcons name="magnify" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
+          <MaterialCommunityIcons
+            name="magnify"
+            size={20}
+            color={Colors.textSecondary}
+            style={styles.searchIcon}
+          />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by name or barcode..."
+            placeholder="Search by name, item code or barcode..."
             value={query}
-            onChangeText={handleQueryChange}
+            onChangeText={setQuery}
             autoCapitalize="none"
             clearButtonMode="while-editing"
+            returnKeyType="search"
           />
+          {query.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setQuery("")}
+              style={{ padding: 4 }}
+            >
+              <MaterialCommunityIcons
+                name="close-circle"
+                size={18}
+                color={Colors.textLight}
+              />
+            </TouchableOpacity>
+          )}
         </View>
+        {!IS_WEB && (
+          <TouchableOpacity style={styles.scanBtn} onPress={openScanner}>
+            <MaterialCommunityIcons
+              name="barcode-scan"
+              size={20}
+              color="#fff"
+            />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={styles.importBtn}
-          onPress={() => navigation.navigate('Import')}
+          onPress={() => navigation.navigate("Import")}
         >
           <MaterialCommunityIcons name="file-import" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.countText}>{items.length} item{items.length !== 1 ? 's' : ''}</Text>
+      <Text style={styles.countText}>
+        {items.length} item{items.length !== 1 ? "s" : ""}
+        {query.trim() ? ' matching "' + query.trim() + '"' : ""}
+      </Text>
 
       {loading ? (
         <ActivityIndicator color={Colors.primary} style={{ marginTop: 32 }} />
       ) : items.length === 0 ? (
         <View style={styles.empty}>
-          <MaterialCommunityIcons name="package-variant-closed" size={48} color={Colors.textLight} />
+          <MaterialCommunityIcons
+            name="package-variant-closed"
+            size={48}
+            color={Colors.textLight}
+          />
           <Text style={styles.emptyText}>
-            {query ? 'No items found' : 'No items yet. Import a CSV to get started.'}
+            {query
+              ? "No items found"
+              : "No items yet. Import a CSV to get started."}
           </Text>
           {!query && (
             <TouchableOpacity
               style={styles.emptyImportBtn}
-              onPress={() => navigation.navigate('Import')}
+              onPress={() => navigation.navigate("Import")}
             >
-              <MaterialCommunityIcons name="file-import" size={20} color="#fff" />
+              <MaterialCommunityIcons
+                name="file-import"
+                size={20}
+                color="#fff"
+              />
               <Text style={styles.emptyImportText}>Import CSV</Text>
             </TouchableOpacity>
           )}
@@ -118,8 +226,8 @@ export default function ItemsScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: Colors.card,
@@ -127,8 +235,8 @@ const styles = StyleSheet.create({
   },
   searchWrap: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.background,
     borderRadius: 8,
     borderWidth: 1,
@@ -150,11 +258,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
   },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyText: { color: Colors.textSecondary, textAlign: 'center', marginTop: 12 },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+  },
+  emptyText: {
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginTop: 12,
+  },
   emptyImportBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     backgroundColor: Colors.primary,
     borderRadius: 10,
@@ -163,5 +280,37 @@ const styles = StyleSheet.create({
     marginTop: 16,
     elevation: 2,
   },
-  emptyImportText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  emptyImportText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  scanBtn: {
+    backgroundColor: Colors.success,
+    borderRadius: 8,
+    padding: 10,
+    marginRight: 8,
+  },
+  scannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    backgroundColor: '#000',
+  },
+  scannerCloseBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 101,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    padding: 6,
+  },
+  scannerHint: {
+    position: 'absolute',
+    bottom: 100,
+    alignSelf: 'center',
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
 });
