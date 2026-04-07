@@ -187,16 +187,17 @@ export default function ScannerScreen() {
         worker_name: workerName,
         notes: notes.trim().toUpperCase(),
       });
-      await attemptSync();
+      // Reset form immediately — sync in background (don't block UI)
       resetForm();
+      setSaving(false);
+      attemptSync().catch(() => {});
       setTimeout(() => {
         if (mode === "barcode") barcodeRef.current?.focus();
         else if (mode === "itemcode") itemCodeRef.current?.focus();
         else if (mode === "itemname") itemNameRef.current?.focus();
-      }, 150);
+      }, 50);
     } catch (err) {
       Alert.alert("Error", err.message);
-    } finally {
       setSaving(false);
     }
   };
