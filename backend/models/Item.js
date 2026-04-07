@@ -6,4 +6,7 @@ const itemSchema = new mongoose.Schema({
   Item_Name: String,
 });
 
+itemSchema.index({ Item_Name: 1 });
+itemSchema.index({ ItemCode: 1 });
+
 module.exports = mongoose.model('Item', itemSchema);

@@ -21,8 +21,18 @@ app.use(express.json({ limit: "10mb" }));
 app.use("/admin", express.static(path.join(__dirname, "public"), {
   maxAge: "1h",
   etag: true,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith(".html")) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    }
+  },
 }));
 app.get("/admin", (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 // Root URL → redirect to admin panel
@@ -32,7 +42,12 @@ app.get("/", (req, res) => {
 
 // Health check — phone pings this to detect if backend is reachable
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "local",
+    node: process.version,
+  });
 });
 
 // Routes

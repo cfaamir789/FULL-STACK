@@ -160,6 +160,11 @@ export const fetchItems = async () => {
   return res.data.items;
 };
 
+export const fetchItemsPage = async (page = 1, limit = 2000) => {
+  const res = await apiClient.get(`/items?paginated=1&page=${page}&limit=${limit}`);
+  return res.data; // { items, total, page, limit }
+};
+
 export const fetchItemsVersion = async () => {
   const res = await healthClient.get("/items/version");
   return res.data; // { version: <number> }

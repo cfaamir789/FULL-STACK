@@ -56,7 +56,7 @@ router.get("/", async (req, res) => {
     const { q } = req.query;
     const paginated = String(req.query.paginated || "0") === "1";
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const limit = Math.min(5000, Math.max(1, parseInt(req.query.limit, 10) || 50));
     const skip = (page - 1) * limit;
     let query = {};
     if (q) {
@@ -71,13 +71,14 @@ router.get("/", async (req, res) => {
         Item.find(query)
           .sort({ Item_Name: 1 })
           .skip(skip)
-          .limit(limit),
+          .limit(limit)
+          .lean(),
         Item.countDocuments(query),
       ]);
       return res.json({ success: true, count: items.length, total, page, limit, items });
     }
 
-    const items = await Item.find(query).sort({ Item_Name: 1 });
+    const items = await Item.find(query).sort({ Item_Name: 1 }).lean();
     res.json({ success: true, count: items.length, items });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

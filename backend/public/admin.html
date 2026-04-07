@@ -957,7 +957,15 @@
               body: formData,
             },
           );
-          const data = await res.json();
+          const raw = await res.text();
+          let data = {};
+          try {
+            data = raw ? JSON.parse(raw) : {};
+          } catch {
+            throw new Error(
+              "Server returned invalid response. Hard refresh browser (Ctrl+F5), login again, and retry.",
+            );
+          }
           if (!res.ok) throw new Error(data.error || "Upload failed");
           resultDiv.innerHTML =
             '<div class="alert alert-success">&#10004; Uploaded! ' +

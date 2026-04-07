@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   checkHealth,
   syncTransactions,
-  fetchItems,
+  fetchItemsPage,
   fetchItemsVersion,
 } from "./api";
 import {
@@ -43,16 +43,25 @@ const pullItemsIfNeeded = async () => {
     const localVer = await AsyncStorage.getItem("itemsVersion");
     if (localVer === String(serverVer.version)) return; // already up-to-date
 
-    const latestItems = await fetchItems();
-    if (latestItems && latestItems.length > 0) {
-      await clearAllItems();
-      await upsertItems(
-        latestItems.map((i) => ({
-          ItemCode: i.ItemCode,
-          Barcode: i.Barcode,
-          Item_Name: i.Item_Name,
-        })),
-      );
+    await clearAllItems();
+    let page = 1;
+    const limit = 2000;
+    while (true) {
+      const chunk = await fetchItemsPage(page, limit);
+      const items = chunk.items || [];
+      if (items.length > 0) {
+        await upsertItems(
+          items.map((i) => ({
+            ItemCode: i.ItemCode,
+            Barcode: i.Barcode,
+            Item_Name: i.Item_Name,
+          })),
+        );
+      }
+      const total = chunk.total || 0;
+      const loaded = page * limit;
+      if (loaded >= total || items.length === 0) break;
+      page++;
     }
     await AsyncStorage.setItem("itemsVersion", String(serverVer.version));
   } catch (_) {
