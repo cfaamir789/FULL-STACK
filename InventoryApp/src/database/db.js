@@ -204,7 +204,7 @@ export const updateTransaction = async (
   }
   await db.runAsync(
     `UPDATE transactions SET frombin = ?, tobin = ?, qty = ?, notes = ?, synced = 0 WHERE id = ?`,
-    [frombin.trim(), tobin.trim(), Number(qty), (notes || '').trim(), id],
+    [frombin.trim(), tobin.trim(), Number(qty), (notes || "").trim(), id],
   );
 };
 
@@ -253,7 +253,9 @@ export const clearAllTransactions = async () => {
 export const clearAllItems = async () => {
   const result = await db.runAsync("DELETE FROM items");
   // Reset items version so next sync re-downloads everything
-  try { await AsyncStorage.removeItem("itemsVersion"); } catch (_) {}
+  try {
+    await AsyncStorage.removeItem("itemsVersion");
+  } catch (_) {}
   return result.changes;
 };
 

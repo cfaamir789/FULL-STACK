@@ -219,7 +219,7 @@ export const updateTransaction = async (id, { frombin, tobin, qty, notes }) => {
             frombin: frombin.trim(),
             tobin: tobin.trim(),
             qty: Number(qty),
-            notes: (notes || '').trim(),
+            notes: (notes || "").trim(),
             synced: 0,
           }
         : t,

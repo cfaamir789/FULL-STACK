@@ -1,41 +1,64 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback } from "react";
 import {
-  View, FlatList, StyleSheet, ActivityIndicator, Text, Alert,
-  Modal, TextInput, TouchableOpacity, KeyboardAvoidingView,
-  Platform, ScrollView,
-} from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { getRecentTransactions, updateTransaction, deleteTransaction } from '../database/db';
-import { getServerTransactions, checkHealth } from '../services/api';
-import TransactionRow from '../components/TransactionRow';
-import Colors from '../theme/colors';
+  View,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  Text,
+  Alert,
+  Modal,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+  getRecentTransactions,
+  updateTransaction,
+  deleteTransaction,
+} from "../database/db";
+import { getServerTransactions, checkHealth } from "../services/api";
+import TransactionRow from "../components/TransactionRow";
+import Colors from "../theme/colors";
 
 export default function TransactionsScreen({ username, role }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [query, setQuery] = useState('');
-  const [workerFilter, setWorkerFilter] = useState('all');
+  const [query, setQuery] = useState("");
+  const [workerFilter, setWorkerFilter] = useState("all");
 
   // Get unique worker names for filter chips
-  const workerNames = role === 'admin'
-    ? [...new Set(transactions.map(tx => tx.worker_name || 'unknown').filter(Boolean))]
-    : [];
+  const workerNames =
+    role === "admin"
+      ? [
+          ...new Set(
+            transactions
+              .map((tx) => tx.worker_name || "unknown")
+              .filter(Boolean),
+          ),
+        ]
+      : [];
 
   const filtered = (() => {
     let result = transactions;
     // Worker filter (admin only)
-    if (workerFilter !== 'all') {
-      result = result.filter(tx => (tx.worker_name || 'unknown') === workerFilter);
+    if (workerFilter !== "all") {
+      result = result.filter(
+        (tx) => (tx.worker_name || "unknown") === workerFilter,
+      );
     }
     // Text search
     if (query.trim()) {
       const q = query.trim().toLowerCase();
-      result = result.filter((tx) =>
-        (tx.item_code && tx.item_code.toLowerCase().includes(q)) ||
-        (tx.item_barcode && tx.item_barcode.toLowerCase().includes(q)) ||
-        (tx.item_name && tx.item_name.toLowerCase().includes(q)) ||
-        (tx.worker_name && tx.worker_name.toLowerCase().includes(q))
+      result = result.filter(
+        (tx) =>
+          (tx.item_code && tx.item_code.toLowerCase().includes(q)) ||
+          (tx.item_barcode && tx.item_barcode.toLowerCase().includes(q)) ||
+          (tx.item_name && tx.item_name.toLowerCase().includes(q)) ||
+          (tx.worker_name && tx.worker_name.toLowerCase().includes(q)),
       );
     }
     return result;
@@ -43,12 +66,12 @@ export default function TransactionsScreen({ username, role }) {
 
   // Edit modal state
   const [editItem, setEditItem] = useState(null);
-  const [editFrombin, setEditFrombin] = useState('');
-  const [editTobin, setEditTobin] = useState('');
-  const [editQty, setEditQty] = useState('');
-  const [editNotes, setEditNotes] = useState('');
+  const [editFrombin, setEditFrombin] = useState("");
+  const [editTobin, setEditTobin] = useState("");
+  const [editQty, setEditQty] = useState("");
+  const [editNotes, setEditNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const [validationMsg, setValidationMsg] = useState('');
+  const [validationMsg, setValidationMsg] = useState("");
 
   // Delete modal state
   const [deleteItem, setDeleteItem] = useState(null);
@@ -62,11 +85,11 @@ export default function TransactionsScreen({ username, role }) {
       const localData = await getRecentTransactions(200);
 
       // If admin, also try fetching from server and merge
-      if (role === 'admin') {
+      if (role === "admin") {
         try {
           await checkHealth();
           const serverRes = await getServerTransactions(1, 500);
-          const serverTxs = (serverRes.transactions || []).map(tx => ({
+          const serverTxs = (serverRes.transactions || []).map((tx) => ({
             id: tx._id,
             item_barcode: tx.Item_Barcode,
             item_code: tx.Item_Code,
@@ -75,17 +98,19 @@ export default function TransactionsScreen({ username, role }) {
             tobin: tx.Tobin,
             qty: tx.Qty,
             worker_name: tx.Worker_Name,
-            notes: tx.Notes || '',
+            notes: tx.Notes || "",
             timestamp: tx.Timestamp,
             synced: 1,
-            _source: 'server',
+            _source: "server",
           }));
 
           // Merge: use local for unsynced, server for everything else
           const localUnsyncedIds = new Set(
-            localData.filter(t => t.synced === 0).map(t => `${t.item_barcode}-${t.timestamp}`)
+            localData
+              .filter((t) => t.synced === 0)
+              .map((t) => `${t.item_barcode}-${t.timestamp}`),
           );
-          const merged = [...localData.filter(t => t.synced === 0)];
+          const merged = [...localData.filter((t) => t.synced === 0)];
           for (const stx of serverTxs) {
             const key = `${stx.item_barcode}-${stx.timestamp}`;
             if (!localUnsyncedIds.has(key)) {
@@ -110,7 +135,7 @@ export default function TransactionsScreen({ username, role }) {
   useFocusEffect(
     useCallback(() => {
       loadTransactions();
-    }, [loadTransactions])
+    }, [loadTransactions]),
   );
 
   const openEdit = (item) => {
@@ -118,31 +143,41 @@ export default function TransactionsScreen({ username, role }) {
     setEditFrombin(item.frombin);
     setEditTobin(item.tobin);
     setEditQty(String(item.qty));
-    setEditNotes(item.notes || '');
+    setEditNotes(item.notes || "");
   };
 
   const closeEdit = () => {
     setEditItem(null);
-    setEditFrombin('');
-    setEditTobin('');
-    setEditQty('');
-    setEditNotes('');
+    setEditFrombin("");
+    setEditTobin("");
+    setEditQty("");
+    setEditNotes("");
   };
 
   const handleSave = async () => {
     if (!editFrombin.trim() || !editTobin.trim() || !editQty.trim()) {
-      setValidationMsg('All fields are required.');
+      setValidationMsg("All fields are required.");
       return;
     }
     const qty = parseInt(editQty, 10);
     if (isNaN(qty) || qty <= 0) {
-      setValidationMsg('Qty must be a positive number.');
+      setValidationMsg("Qty must be a positive number.");
       return;
     }
-    setValidationMsg('');
+    setValidationMsg("");
     setSaving(true);
     try {
-      await updateTransaction(editItem.id, { frombin: editFrombin, tobin: editTobin, qty, notes: editNotes.trim() }, username, role);
+      await updateTransaction(
+        editItem.id,
+        {
+          frombin: editFrombin,
+          tobin: editTobin,
+          qty,
+          notes: editNotes.trim(),
+        },
+        username,
+        role,
+      );
       await loadTransactions();
       closeEdit();
     } catch (err) {
@@ -169,7 +204,7 @@ export default function TransactionsScreen({ username, role }) {
       await deleteTransaction(deleteItem.id, username, role);
       await loadTransactions();
     } catch (err) {
-      Alert.alert('Error', err.message);
+      Alert.alert("Error", err.message);
     } finally {
       setDeleting(false);
       closeDelete();
@@ -188,7 +223,12 @@ export default function TransactionsScreen({ username, role }) {
     <View style={styles.container}>
       {/* Search bar */}
       <View style={styles.searchBar}>
-        <MaterialCommunityIcons name="magnify" size={20} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+        <MaterialCommunityIcons
+          name="magnify"
+          size={20}
+          color={Colors.textSecondary}
+          style={{ marginRight: 8 }}
+        />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by item code, barcode or name..."
@@ -199,29 +239,64 @@ export default function TransactionsScreen({ username, role }) {
           returnKeyType="search"
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery('')}>
-            <MaterialCommunityIcons name="close-circle" size={18} color={Colors.textLight} />
+          <TouchableOpacity onPress={() => setQuery("")}>
+            <MaterialCommunityIcons
+              name="close-circle"
+              size={18}
+              color={Colors.textLight}
+            />
           </TouchableOpacity>
         )}
       </View>
 
       {/* Worker filter chips (admin only) */}
-      {role === 'admin' && workerNames.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.workerFilterBar} contentContainerStyle={styles.workerFilterContent}>
+      {role === "admin" && workerNames.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.workerFilterBar}
+          contentContainerStyle={styles.workerFilterContent}
+        >
           <TouchableOpacity
-            style={[styles.workerChip, workerFilter === 'all' && styles.workerChipActive]}
-            onPress={() => setWorkerFilter('all')}
+            style={[
+              styles.workerChip,
+              workerFilter === "all" && styles.workerChipActive,
+            ]}
+            onPress={() => setWorkerFilter("all")}
           >
-            <Text style={[styles.workerChipText, workerFilter === 'all' && styles.workerChipTextActive]}>All Workers</Text>
+            <Text
+              style={[
+                styles.workerChipText,
+                workerFilter === "all" && styles.workerChipTextActive,
+              ]}
+            >
+              All Workers
+            </Text>
           </TouchableOpacity>
-          {workerNames.map(name => (
+          {workerNames.map((name) => (
             <TouchableOpacity
               key={name}
-              style={[styles.workerChip, workerFilter === name && styles.workerChipActive]}
-              onPress={() => setWorkerFilter(workerFilter === name ? 'all' : name)}
+              style={[
+                styles.workerChip,
+                workerFilter === name && styles.workerChipActive,
+              ]}
+              onPress={() =>
+                setWorkerFilter(workerFilter === name ? "all" : name)
+              }
             >
-              <MaterialCommunityIcons name="account" size={14} color={workerFilter === name ? '#fff' : Colors.textSecondary} />
-              <Text style={[styles.workerChipText, workerFilter === name && styles.workerChipTextActive]}>{name}</Text>
+              <MaterialCommunityIcons
+                name="account"
+                size={14}
+                color={workerFilter === name ? "#fff" : Colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.workerChipText,
+                  workerFilter === name && styles.workerChipTextActive,
+                ]}
+              >
+                {name}
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -229,9 +304,15 @@ export default function TransactionsScreen({ username, role }) {
 
       {transactions.length === 0 ? (
         <View style={styles.empty}>
-          <MaterialCommunityIcons name="history" size={48} color={Colors.textLight} />
+          <MaterialCommunityIcons
+            name="history"
+            size={48}
+            color={Colors.textLight}
+          />
           <Text style={styles.emptyText}>No transactions yet.</Text>
-          <Text style={styles.emptySubText}>Scan a barcode on the Scanner tab to create one.</Text>
+          <Text style={styles.emptySubText}>
+            Scan a barcode on the Scanner tab to create one.
+          </Text>
         </View>
       ) : (
         <>
@@ -239,12 +320,16 @@ export default function TransactionsScreen({ username, role }) {
             <Text style={styles.countText}>
               {query.trim()
                 ? `${filtered.length} of ${transactions.length} transactions`
-                : `${transactions.length} transaction${transactions.length !== 1 ? 's' : ''}`}
+                : `${transactions.length} transaction${transactions.length !== 1 ? "s" : ""}`}
             </Text>
           </View>
           {filtered.length === 0 ? (
             <View style={styles.empty}>
-              <MaterialCommunityIcons name="magnify-close" size={40} color={Colors.textLight} />
+              <MaterialCommunityIcons
+                name="magnify-close"
+                size={40}
+                color={Colors.textLight}
+              />
               <Text style={styles.emptyText}>No matches found</Text>
             </View>
           ) : (
@@ -256,8 +341,8 @@ export default function TransactionsScreen({ username, role }) {
                   item={item}
                   onEdit={openEdit}
                   onDelete={openDelete}
-                  canEdit={role === 'admin' || item.worker_name === username}
-                  canDelete={role === 'admin' || item.worker_name === username}
+                  canEdit={role === "admin" || item.worker_name === username}
+                  canDelete={role === "admin" || item.worker_name === username}
                 />
               )}
               contentContainerStyle={{ paddingVertical: 8, paddingBottom: 24 }}
@@ -269,37 +354,62 @@ export default function TransactionsScreen({ username, role }) {
       )}
 
       {/* ── Edit Modal ── */}
-      <Modal visible={!!editItem} transparent animationType="slide" onRequestClose={closeEdit}>
+      <Modal
+        visible={!!editItem}
+        transparent
+        animationType="slide"
+        onRequestClose={closeEdit}
+      >
         <KeyboardAvoidingView
-          style={[styles.modalOverlay, { justifyContent: 'flex-end' }]}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={[styles.modalOverlay, { justifyContent: "flex-end" }]}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
           <View style={styles.modalCard}>
             {/* Header */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Transaction</Text>
               <TouchableOpacity onPress={closeEdit}>
-                <MaterialCommunityIcons name="close" size={22} color={Colors.textSecondary} />
+                <MaterialCommunityIcons
+                  name="close"
+                  size={22}
+                  color={Colors.textSecondary}
+                />
               </TouchableOpacity>
             </View>
 
             <ScrollView keyboardShouldPersistTaps="handled">
               {/* Read-only item info */}
-              {editItem?.item_code && editItem.item_code.trim() !== '' ? (
+              {editItem?.item_code && editItem.item_code.trim() !== "" ? (
                 <View style={styles.readonlyBox}>
-                  <MaterialCommunityIcons name="identifier" size={16} color={Colors.textSecondary} />
-                  <Text style={styles.readonlyText}>Item Code: {editItem.item_code}</Text>
+                  <MaterialCommunityIcons
+                    name="identifier"
+                    size={16}
+                    color={Colors.textSecondary}
+                  />
+                  <Text style={styles.readonlyText}>
+                    Item Code: {editItem.item_code}
+                  </Text>
                 </View>
               ) : null}
               <View style={[styles.readonlyBox, { marginTop: 4 }]}>
-                <MaterialCommunityIcons name="package-variant" size={16} color={Colors.textSecondary} />
+                <MaterialCommunityIcons
+                  name="package-variant"
+                  size={16}
+                  color={Colors.textSecondary}
+                />
                 <Text style={styles.readonlyText} numberOfLines={2}>
                   {editItem?.item_name}
                 </Text>
               </View>
               <View style={[styles.readonlyBox, { marginTop: 4 }]}>
-                <MaterialCommunityIcons name="barcode" size={16} color={Colors.textSecondary} />
-                <Text style={styles.readonlyText}>{editItem?.item_barcode}</Text>
+                <MaterialCommunityIcons
+                  name="barcode"
+                  size={16}
+                  color={Colors.textSecondary}
+                />
+                <Text style={styles.readonlyText}>
+                  {editItem?.item_barcode}
+                </Text>
               </View>
 
               <Text style={styles.label}>From Bin</Text>
@@ -329,7 +439,12 @@ export default function TransactionsScreen({ username, role }) {
                 placeholder="e.g. 10"
               />
 
-              <Text style={styles.label}>Notes <Text style={{ fontWeight: '400', color: Colors.textLight }}>(optional)</Text></Text>
+              <Text style={styles.label}>
+                Notes{" "}
+                <Text style={{ fontWeight: "400", color: Colors.textLight }}>
+                  (optional)
+                </Text>
+              </Text>
               <TextInput
                 style={styles.input}
                 value={editNotes}
@@ -338,7 +453,7 @@ export default function TransactionsScreen({ username, role }) {
                 autoCapitalize="characters"
               />
 
-              {validationMsg !== '' && (
+              {validationMsg !== "" && (
                 <Text style={styles.validationMsg}>{validationMsg}</Text>
               )}
             </ScrollView>
@@ -353,10 +468,11 @@ export default function TransactionsScreen({ username, role }) {
                 onPress={handleSave}
                 disabled={saving}
               >
-                {saving
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.saveBtnText}>Save Changes</Text>
-                }
+                {saving ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save Changes</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -364,26 +480,54 @@ export default function TransactionsScreen({ username, role }) {
       </Modal>
 
       {/* ── Delete Confirmation Modal ── */}
-      <Modal visible={!!deleteItem} transparent animationType="fade" onRequestClose={closeDelete}>
+      <Modal
+        visible={!!deleteItem}
+        transparent
+        animationType="fade"
+        onRequestClose={closeDelete}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.deleteCard}>
             {/* Header */}
             <View style={styles.modalHeader}>
-              <MaterialCommunityIcons name="trash-can-outline" size={22} color={Colors.error} />
-              <Text style={[styles.modalTitle, { color: Colors.error, marginLeft: 8 }]}>Delete Transaction</Text>
-              <TouchableOpacity onPress={closeDelete} style={{ marginLeft: 'auto' }}>
-                <MaterialCommunityIcons name="close" size={22} color={Colors.textSecondary} />
+              <MaterialCommunityIcons
+                name="trash-can-outline"
+                size={22}
+                color={Colors.error}
+              />
+              <Text
+                style={[
+                  styles.modalTitle,
+                  { color: Colors.error, marginLeft: 8 },
+                ]}
+              >
+                Delete Transaction
+              </Text>
+              <TouchableOpacity
+                onPress={closeDelete}
+                style={{ marginLeft: "auto" }}
+              >
+                <MaterialCommunityIcons
+                  name="close"
+                  size={22}
+                  color={Colors.textSecondary}
+                />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.deleteQuestion}>Are you sure you want to delete this transaction?</Text>
+            <Text style={styles.deleteQuestion}>
+              Are you sure you want to delete this transaction?
+            </Text>
 
             {/* Item info */}
             <View style={styles.deleteInfoBox}>
               <Text style={styles.deleteInfoCode}>{deleteItem?.item_code}</Text>
-              <Text style={styles.deleteInfoName} numberOfLines={2}>{deleteItem?.item_name}</Text>
+              <Text style={styles.deleteInfoName} numberOfLines={2}>
+                {deleteItem?.item_name}
+              </Text>
               <Text style={styles.deleteInfoMeta}>
-                {deleteItem?.frombin} → {deleteItem?.tobin}  •  Qty: {deleteItem?.qty}
+                {deleteItem?.frombin} → {deleteItem?.tobin} • Qty:{" "}
+                {deleteItem?.qty}
               </Text>
             </View>
 
@@ -393,12 +537,19 @@ export default function TransactionsScreen({ username, role }) {
               onPress={() => setDeleteConfirmed(!deleteConfirmed)}
               activeOpacity={0.7}
             >
-              <View style={[styles.checkbox, deleteConfirmed && styles.checkboxChecked]}>
+              <View
+                style={[
+                  styles.checkbox,
+                  deleteConfirmed && styles.checkboxChecked,
+                ]}
+              >
                 {deleteConfirmed && (
                   <MaterialCommunityIcons name="check" size={14} color="#fff" />
                 )}
               </View>
-              <Text style={styles.checkboxLabel}>I confirm I want to permanently delete this record</Text>
+              <Text style={styles.checkboxLabel}>
+                I confirm I want to permanently delete this record
+              </Text>
             </TouchableOpacity>
 
             {/* Buttons */}
@@ -407,14 +558,18 @@ export default function TransactionsScreen({ username, role }) {
                 <Text style={styles.cancelBtnText}>No, Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.deleteBtn, (!deleteConfirmed || deleting) && styles.deleteBtnDisabled]}
+                style={[
+                  styles.deleteBtn,
+                  (!deleteConfirmed || deleting) && styles.deleteBtnDisabled,
+                ]}
                 onPress={handleDelete}
                 disabled={!deleteConfirmed || deleting}
               >
-                {deleting
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.deleteBtnText}>Yes, Delete</Text>
-                }
+                {deleting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.deleteBtnText}>Yes, Delete</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -426,10 +581,10 @@ export default function TransactionsScreen({ username, role }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.card,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -450,12 +605,12 @@ const styles = StyleSheet.create({
   workerFilterContent: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   workerChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -471,11 +626,11 @@ const styles = StyleSheet.create({
   },
   workerChipText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.textSecondary,
   },
   workerChipTextActive: {
-    color: '#fff',
+    color: "#fff",
   },
   countBar: {
     backgroundColor: Colors.card,
@@ -484,26 +639,50 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  countText: { fontSize: 13, color: Colors.textSecondary, fontWeight: '600' },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyText: { fontSize: 16, color: Colors.textSecondary, marginTop: 12, fontWeight: '600' },
-  emptySubText: { fontSize: 13, color: Colors.textLight, marginTop: 6, textAlign: 'center' },
+  countText: { fontSize: 13, color: Colors.textSecondary, fontWeight: "600" },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    marginTop: 12,
+    fontWeight: "600",
+  },
+  emptySubText: {
+    fontSize: 13,
+    color: Colors.textLight,
+    marginTop: 6,
+    textAlign: "center",
+  },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+  },
   modalCard: {
     backgroundColor: Colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
     paddingBottom: 34,
-    maxHeight: '90%',
+    maxHeight: "90%",
   },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle: { fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalTitle: { fontSize: 17, fontWeight: "700", color: Colors.textPrimary },
   readonlyBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.background,
     borderRadius: 8,
     paddingHorizontal: 10,
@@ -512,7 +691,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   readonlyText: { fontSize: 13, color: Colors.textSecondary, flex: 1 },
-  label: { fontSize: 13, fontWeight: '600', color: Colors.textPrimary, marginTop: 14, marginBottom: 4 },
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+    marginTop: 14,
+    marginBottom: 4,
+  },
   input: {
     borderWidth: 1,
     borderColor: Colors.border,
@@ -523,18 +708,34 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     color: Colors.textPrimary,
   },
-  modalBtns: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  modalBtns: { flexDirection: "row", gap: 10, marginTop: 20 },
   cancelBtn: {
-    flex: 1, borderWidth: 1, borderColor: Colors.border,
-    borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
   },
-  cancelBtnText: { fontSize: 15, color: Colors.textSecondary, fontWeight: '600' },
+  cancelBtnText: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    fontWeight: "600",
+  },
   saveBtn: {
-    flex: 2, backgroundColor: Colors.primary,
-    borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+    flex: 2,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
   },
-  saveBtnText: { fontSize: 15, color: '#fff', fontWeight: '700' },
-  validationMsg: { fontSize: 13, color: Colors.error, marginTop: 10, textAlign: 'center' },
+  saveBtnText: { fontSize: 15, color: "#fff", fontWeight: "700" },
+  validationMsg: {
+    fontSize: 13,
+    color: Colors.error,
+    marginTop: 10,
+    textAlign: "center",
+  },
 
   // Delete Modal
   deleteCard: {
@@ -543,7 +744,7 @@ const styles = StyleSheet.create({
     padding: 20,
     marginHorizontal: 24,
     elevation: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -551,7 +752,7 @@ const styles = StyleSheet.create({
   deleteQuestion: {
     fontSize: 15,
     color: Colors.textPrimary,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 12,
     marginBottom: 12,
   },
@@ -561,12 +762,21 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
   },
-  deleteInfoCode: { fontSize: 12, fontWeight: '700', color: Colors.primary, marginBottom: 2 },
-  deleteInfoName: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
+  deleteInfoCode: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Colors.primary,
+    marginBottom: 2,
+  },
+  deleteInfoName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+  },
   deleteInfoMeta: { fontSize: 12, color: Colors.textSecondary, marginTop: 4 },
   checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 20,
     gap: 10,
   },
@@ -576,16 +786,19 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 2,
     borderColor: Colors.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
   },
   checkboxChecked: { backgroundColor: Colors.error, borderColor: Colors.error },
   checkboxLabel: { flex: 1, fontSize: 13, color: Colors.textSecondary },
   deleteBtn: {
-    flex: 2, backgroundColor: Colors.error,
-    borderRadius: 10, paddingVertical: 12, alignItems: 'center',
+    flex: 2,
+    backgroundColor: Colors.error,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
   },
   deleteBtnDisabled: { opacity: 0.4 },
-  deleteBtnText: { fontSize: 15, color: '#fff', fontWeight: '700' },
+  deleteBtnText: { fontSize: 15, color: "#fff", fontWeight: "700" },
 });

@@ -4,14 +4,15 @@ on:
   push:
     branches: [main]
     paths:
-      - 'InventoryApp/**'
+      - "InventoryApp/**"
+      - ".github/workflows/ota-update.yml"
 
   workflow_dispatch:
     inputs:
       message:
-        description: 'Update message'
+        description: "Update message"
         required: false
-        default: 'Bug fixes and improvements'
+        default: "Bug fixes and improvements"
 
 jobs:
   ota-update:
@@ -39,7 +40,7 @@ jobs:
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+          token: ${{ secrets.FULLSTACK }}
 
       - name: Push OTA update to preview channel
         run: |

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-gesture-handler';
+import * as Updates from 'expo-updates';
 import { initDB } from './src/database/db';
 import { startAutoSync } from './src/services/syncService';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -12,8 +13,26 @@ export default function App() {
 
   useEffect(() => {
     let stopSync;
+
+    const applyOtaUpdateIfAvailable = async () => {
+      if (Platform.OS === 'web' || __DEV__ || !Updates.isEnabled) {
+        return;
+      }
+
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+        }
+      } catch (e) {
+        console.warn('ota update check failed:', e);
+      }
+    };
+
     const bootstrap = async () => {
       try {
+        await applyOtaUpdateIfAvailable();
         await initDB();
         stopSync = startAutoSync(30000);
       } catch (e) {
