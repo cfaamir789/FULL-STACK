@@ -209,12 +209,18 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// GET /api/transactions/export — export all transactions as CSV (admin only)
+// GET /api/transactions/export — export all transactions as CSV or JSON (admin only)
 router.get("/export", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { worker } = req.query;
+    const { worker, json } = req.query;
     const query = worker ? { Worker_Name: worker } : {};
-    const transactions = await Transaction.find(query).sort({ Timestamp: -1 });
+    const transactions = await Transaction.find(query).sort({ Timestamp: -1 }).lean();
+
+    // JSON format for XLSX generation in the browser
+    if (json === "1") {
+      return res.json(transactions);
+    }
+
     const header =
       "Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Notes,Timestamp\n";
     const rows = transactions

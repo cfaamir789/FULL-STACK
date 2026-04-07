@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Modal,
   RefreshControl,
   Platform,
 } from "react-native";
@@ -26,6 +27,7 @@ import {
   clearAllTransactions,
   clearAllItems,
   getPendingCount,
+  getAllTransactions,
 } from "../database/db";
 import { attemptSync } from "../services/syncService";
 import Colors from "../theme/colors";
@@ -33,10 +35,15 @@ import Colors from "../theme/colors";
 const IS_WEB = Platform.OS === "web";
 let Sharing = null;
 let FileSystem = null;
+let backupSvc = null;
 if (!IS_WEB) {
   Sharing = require("expo-sharing");
   FileSystem = require("expo-file-system");
+  backupSvc = require("../services/backupService");
 }
+
+// ─── Auto-backup every 30 minutes (ms)
+const AUTO_BACKUP_INTERVAL_MS = 30 * 60 * 1000;
 
 export default function AdminPanelScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
@@ -51,6 +58,12 @@ export default function AdminPanelScreen({ navigation }) {
   const [userCount, setUserCount] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
+  const [lastAutoBackup, setLastAutoBackup] = useState(null);
+  const [formatPickerVisible, setFormatPickerVisible] = useState(false);
+  const [formatPickerMode, setFormatPickerMode] = useState("export"); // "export" | "backup"
+  const autoBackupRef = useRef(null);
+  const loggedUserRef = useRef(null);
 
   const loadData = useCallback(async () => {
     const local = await getDashboardStats();
@@ -78,39 +91,61 @@ export default function AdminPanelScreen({ navigation }) {
     }, [loadData]),
   );
 
+  // ─── Load logged-in username ────────────────────────────────────────────────
+  useEffect(() => {
+    AsyncStorage.getItem("username").then((u) => {
+      loggedUserRef.current = u || "backup";
+    });
+  }, []);
+
+  // ─── 30-minute auto-backup ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (IS_WEB) return;
+    const run = async () => {
+      try {
+        const txns = await getAllTransactions();
+        if (!txns || txns.length === 0) return;
+        const username = loggedUserRef.current || "backup";
+        const result = await backupSvc.silentAutoBackup(txns, username);
+        if (result) {
+          setLastAutoBackup(new Date().toLocaleTimeString());
+        }
+      } catch (e) {
+        console.warn("Auto-backup error:", e.message);
+      }
+    };
+    autoBackupRef.current = setInterval(run, AUTO_BACKUP_INTERVAL_MS);
+    return () => clearInterval(autoBackupRef.current);
+  }, []);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
   };
 
-  const handleExportAll = async () => {
+  // ─── Export All (works online AND offline) ─────────────────────────────────
+  const handleExportAll = () => {
+    if (IS_WEB) {
+      // Web: download from server as before
+      doWebExport();
+      return;
+    }
+    // Mobile: show format picker
+    setFormatPickerMode("export");
+    setFormatPickerVisible(true);
+  };
+
+  const doWebExport = async () => {
     if (!online) {
-      Alert.alert("Offline", "Connect to server to export transactions.");
+      Alert.alert("Offline", "Connect to server to export from the web view.");
       return;
     }
     setExporting(true);
     try {
       const token = await AsyncStorage.getItem("authToken");
       const url = `${getExportUrl()}?token=${encodeURIComponent(token)}`;
-
-      if (IS_WEB) {
-        window.open(url, "_blank");
-      } else {
-        const fileUri =
-          FileSystem.documentDirectory + "transactions_export.csv";
-        const download = await FileSystem.downloadAsync(url, fileUri, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(download.uri, {
-            mimeType: "text/csv",
-            dialogTitle: "Export Transactions",
-          });
-        } else {
-          Alert.alert("Exported", `File saved to ${download.uri}`);
-        }
-      }
+      window.open(url, "_blank");
     } catch (err) {
       Alert.alert("Export Failed", err.message);
     } finally {
@@ -118,32 +153,84 @@ export default function AdminPanelScreen({ navigation }) {
     }
   };
 
+  const doMobileExport = async (format) => {
+    setFormatPickerVisible(false);
+    setExporting(true);
+    try {
+      const username = loggedUserRef.current || "backup";
+      const txns = await getAllTransactions();
+      if (!txns || txns.length === 0) {
+        Alert.alert("No Data", "No transactions found to export.");
+        return;
+      }
+      const { filename } = await backupSvc.saveAndShareBackup(txns, username, format, false);
+      Alert.alert(
+        "Export Saved",
+        `${txns.length} transactions saved as:\n${filename}\n\nIn InventoryManager folder.`,
+      );
+    } catch (err) {
+      Alert.alert("Export Failed", err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ─── Entire Day Backup ──────────────────────────────────────────────────────
+  const handleEntireDayBackup = () => {
+    if (IS_WEB) {
+      Alert.alert("Not Available", "Entire Day Backup is available on the mobile app.");
+      return;
+    }
+    setFormatPickerMode("backup");
+    setFormatPickerVisible(true);
+  };
+
+  const doEntireDayBackup = async (format) => {
+    setFormatPickerVisible(false);
+    setBackingUp(true);
+    try {
+      const username = loggedUserRef.current || "backup";
+      const txns = await getAllTransactions();
+      if (!txns || txns.length === 0) {
+        Alert.alert("No Data", "No transactions found to back up.");
+        return;
+      }
+      const { filename } = await backupSvc.saveAndShareBackup(txns, username, format, true);
+      Alert.alert(
+        "Entire Day Backup Saved",
+        `${txns.length} transactions backed up as:\n${filename}\n\nIn InventoryManager folder on this phone.`,
+      );
+    } catch (err) {
+      Alert.alert("Backup Failed", err.message);
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
   const handleExportWorker = async (workerName) => {
     if (!online) {
-      Alert.alert("Offline", "Connect to server to export transactions.");
+      Alert.alert("Offline", "Connect to server to export per-worker data.");
       return;
     }
     try {
       const token = await AsyncStorage.getItem("authToken");
-      const url = `${getExportUrl()}?worker=${encodeURIComponent(workerName)}&token=${encodeURIComponent(token)}`;
-
       if (IS_WEB) {
+        const url = `${getExportUrl()}?worker=${encodeURIComponent(workerName)}&token=${encodeURIComponent(token)}`;
         window.open(url, "_blank");
-      } else {
-        const safeWorker = workerName.replace(/[^a-zA-Z0-9]/g, "_");
-        const fileUri =
-          FileSystem.documentDirectory + `transactions_${safeWorker}.csv`;
-        const download = await FileSystem.downloadAsync(url, fileUri, {
-          headers: { Authorization: `Bearer ${token}` },
+        return;
+      }
+      const safeWorker = workerName.replace(/[^a-zA-Z0-9]/g, "_");
+      const fileUri = FileSystem.documentDirectory + `transactions_${safeWorker}.csv`;
+      const download = await FileSystem.downloadAsync(
+        `${getExportUrl()}?worker=${encodeURIComponent(workerName)}`,
+        fileUri,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(download.uri, {
+          mimeType: "text/csv",
+          dialogTitle: `${workerName}'s Transactions`,
         });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(download.uri, {
-            mimeType: "text/csv",
-            dialogTitle: `${workerName}'s Transactions`,
-          });
-        } else {
-          Alert.alert("Exported", `File saved to ${download.uri}`);
-        }
       }
     } catch (err) {
       Alert.alert("Export Failed", err.message);
@@ -393,7 +480,32 @@ export default function AdminPanelScreen({ navigation }) {
               )}
             </View>
             <Text style={styles.actionTitle}>Export All Data</Text>
-            <Text style={styles.actionSub}>Download transactions CSV</Text>
+            <Text style={styles.actionSub}>CSV / XLSX · works offline</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={handleEntireDayBackup}
+            disabled={backingUp}
+          >
+            <View
+              style={[
+                styles.actionIcon,
+                { backgroundColor: "#00BCD4" + "15" },
+              ]}
+            >
+              {backingUp ? (
+                <ActivityIndicator size="small" color="#00BCD4" />
+              ) : (
+                <MaterialCommunityIcons
+                  name="calendar-check"
+                  size={24}
+                  color="#00BCD4"
+                />
+              )}
+            </View>
+            <Text style={styles.actionTitle}>Entire Day Backup</Text>
+            <Text style={styles.actionSub}>Save today's full records</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -505,11 +617,77 @@ export default function AdminPanelScreen({ navigation }) {
               color={Colors.textSecondary}
             />
             <Text style={styles.offlineHintText}>
-              Connect to the server to see worker stats and export data.
+              Server offline — worker stats unavailable. You can still export
+              local transactions as CSV / XLSX using "Export All Data".
             </Text>
           </View>
         )}
+
+        {/* Auto-backup status */}
+        {!IS_WEB && lastAutoBackup && (
+          <View style={styles.autoBackupBanner}>
+            <MaterialCommunityIcons
+              name="shield-check"
+              size={16}
+              color={Colors.success}
+            />
+            <Text style={styles.autoBackupText}>
+              Auto-backup at {lastAutoBackup} · saved in InventoryManager
+            </Text>
+          </View>
+        )}
+
       </ScrollView>
+
+      {/* Format Picker Modal */}
+      <Modal
+        visible={formatPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFormatPickerVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setFormatPickerVisible(false)}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              {formatPickerMode === "backup" ? "Entire Day Backup" : "Export Transactions"}
+            </Text>
+            <Text style={styles.modalSub}>Choose file format</Text>
+            <TouchableOpacity
+              style={styles.modalBtn}
+              onPress={() =>
+                formatPickerMode === "backup"
+                  ? doEntireDayBackup("csv")
+                  : doMobileExport("csv")
+              }
+            >
+              <MaterialCommunityIcons name="file-delimited" size={22} color={Colors.primary} />
+              <Text style={styles.modalBtnText}>CSV (.csv)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalBtn}
+              onPress={() =>
+                formatPickerMode === "backup"
+                  ? doEntireDayBackup("xlsx")
+                  : doMobileExport("xlsx")
+              }
+            >
+              <MaterialCommunityIcons name="microsoft-excel" size={22} color="#217346" />
+              <Text style={styles.modalBtnText}>Excel (.xlsx)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalCancelBtn}
+              onPress={() => setFormatPickerVisible(false)}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
     </View>
   );
 }
@@ -677,4 +855,47 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   clearPhoneBtnText: { color: Colors.error, fontSize: 13, fontWeight: "600" },
+  autoBackupBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: Colors.success + "12",
+    borderRadius: 8,
+  },
+  autoBackupText: { flex: 1, fontSize: 12, color: Colors.success, fontWeight: "500" },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalCard: {
+    width: "80%",
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 24,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  modalTitle: { fontSize: 17, fontWeight: "800", color: Colors.textPrimary, marginBottom: 4 },
+  modalSub: { fontSize: 13, color: Colors.textSecondary, marginBottom: 16 },
+  modalBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: Colors.background,
+    marginBottom: 10,
+  },
+  modalBtnText: { fontSize: 15, fontWeight: "600", color: Colors.textPrimary },
+  modalCancelBtn: { alignItems: "center", paddingVertical: 10, marginTop: 4 },
+  modalCancelText: { fontSize: 14, color: Colors.textSecondary, fontWeight: "500" },
 });

@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Inventory Admin Panel</title>
+    <!-- SheetJS for XLSX export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <style>
       * {
         box-sizing: border-box;
@@ -670,7 +672,7 @@
               </button>
               <button
                 class="copy-icon-btn"
-                onclick="downloadTransactionsCSV()"
+                onclick="downloadTransactionsCSV('csv')"
                 title="Download CSV for Excel / NAV ERP"
               >
                 <svg
@@ -686,6 +688,19 @@
                   <line x1="12" y1="15" x2="12" y2="3"></line>
                 </svg>
                 CSV
+              </button>
+              <button
+                class="copy-icon-btn"
+                onclick="downloadTransactionsCSV('xlsx')"
+                title="Download Excel XLSX"
+                style="color:#217346"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                XLSX
               </button>
               <button
                 class="copy-icon-btn tx-danger-btn"
@@ -811,6 +826,7 @@
     <script>
       const API = window.location.origin + "/api";
       let authToken = localStorage.getItem("adminToken") || "";
+      let adminUsername = localStorage.getItem("adminUsername") || "admin";
       let uploadMode = "replace";
       let selectedFile = null;
       let pageLoaded = {
@@ -870,6 +886,8 @@
           }
           authToken = data.token;
           localStorage.setItem("adminToken", authToken);
+          adminUsername = username;
+          localStorage.setItem("adminUsername", username);
           showPanel();
         } catch (err) {
           errEl.textContent = err.message;
@@ -899,6 +917,8 @@
           });
           authToken = data.token;
           localStorage.setItem("adminToken", authToken);
+          adminUsername = username;
+          localStorage.setItem("adminUsername", username);
           showPanel();
         } catch (err) {
           errEl.textContent = err.message;
@@ -908,7 +928,9 @@
 
       function doLogout() {
         authToken = "";
+        adminUsername = "admin";
         localStorage.removeItem("adminToken");
+        localStorage.removeItem("adminUsername");
         document.getElementById("mainPanel").classList.add("hidden");
         document.getElementById("loginSection").classList.remove("hidden");
       }
@@ -1507,28 +1529,73 @@
         flashCopyBtn(document.getElementById("copyAllBtn"));
       }
 
-      function downloadTransactionsCSV() {
+      // ─── Smart export filename ─────────────────────────────────────────────────
+      function todayStr() {
+        const d = new Date();
+        const dd = String(d.getDate()).padStart(2, "0");
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        return `${dd}-${mm}-${d.getFullYear()}`;
+      }
+
+      function nextExportFilename(workerFilter) {
+        const date = todayStr();
+        const safe = (adminUsername || "admin").replace(/[^a-zA-Z0-9_-]/g, "_");
+        const base = workerFilter
+          ? `${safe}_${date}_${workerFilter.replace(/[^a-zA-Z0-9_-]/g, "_")}`
+          : `${safe}_${date}`;
+        const key = `exportCount_${base}`;
+        const n = parseInt(localStorage.getItem(key) || "0", 10);
+        localStorage.setItem(key, String(n + 1));
+        return n === 0 ? base : `${base}_${n}`;
+      }
+
+      function downloadTransactionsCSV(format = "csv") {
         const workerFilter = document.getElementById("txWorkerFilter").value;
         let url = API + "/transactions/export";
         if (workerFilter) url += "?worker=" + encodeURIComponent(workerFilter);
-        // Add auth token as query param for direct download
-        const a = document.createElement("a");
-        a.href = url;
-        // Use fetch to get CSV with auth header
-        fetch(url, { headers: { Authorization: "Bearer " + authToken } })
-          .then((r) => r.blob())
-          .then((blob) => {
-            const blobUrl = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = blobUrl;
-            a.download =
-              "transactions_export" +
-              (workerFilter ? "_" + workerFilter : "") +
-              ".csv";
-            a.click();
-            URL.revokeObjectURL(blobUrl);
-          })
-          .catch((err) => alert("Export failed: " + err.message));
+        const filename = nextExportFilename(workerFilter) + "." + format;
+
+        if (format === "xlsx" && typeof XLSX !== "undefined") {
+          // Fetch JSON rows then build XLSX in the browser
+          fetch(url + (workerFilter ? "&json=1" : "?json=1"),
+            { headers: { Authorization: "Bearer " + authToken } })
+            .then((r) => r.json())
+            .then((data) => {
+              // data may be [{...}] or {transactions:[...]}
+              const rows = Array.isArray(data) ? data : (data.transactions || []);
+              if (!rows.length) { alert("No transactions to export."); return; }
+              const headers = ["Worker","Date","Barcode","ItemCode","ItemName","From","To","Qty","Notes"];
+              const aoa = [headers, ...rows.map(r => [
+                r.Worker_Name || r.worker_name || "",
+                r.Timestamp ? new Date(r.Timestamp).toLocaleString() : (r.timestamp ? new Date(r.timestamp).toLocaleString() : ""),
+                r.Item_Barcode || r.item_barcode || "",
+                r.Item_Code || r.item_code || "",
+                r.Item_Name || r.item_name || "",
+                r.Frombin || r.frombin || "",
+                r.Tobin || r.tobin || "",
+                r.Qty ?? r.qty ?? "",
+                r.Notes || r.notes || "",
+              ])];
+              const ws = XLSX.utils.aoa_to_sheet(aoa);
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+              XLSX.writeFile(wb, filename);
+            })
+            .catch((err) => alert("XLSX export failed: " + err.message));
+        } else {
+          // Standard CSV download
+          fetch(url, { headers: { Authorization: "Bearer " + authToken } })
+            .then((r) => r.blob())
+            .then((blob) => {
+              const blobUrl = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = blobUrl;
+              a.download = filename;
+              a.click();
+              URL.revokeObjectURL(blobUrl);
+            })
+            .catch((err) => alert("Export failed: " + err.message));
+        }
       }
 
       // ─── Users ────────────────────────────────────────────────────────────────────

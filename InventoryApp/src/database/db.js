@@ -187,6 +187,12 @@ export const getRecentTransactions = async (limit = 20) => {
   );
 };
 
+export const getAllTransactions = async () => {
+  return await db.getAllAsync(
+    "SELECT * FROM transactions ORDER BY timestamp DESC",
+  );
+};
+
 export const updateTransaction = async (
   id,
   { frombin, tobin, qty, notes },
