@@ -6,6 +6,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { getDashboardStats, getRecentTransactions } from '../database/db';
+import { getDisplayUrl } from '../services/api';
 import { attemptSync, setSyncStatusListener } from '../services/syncService';
 import StatsCard from '../components/StatsCard';
 import SyncStatusBanner from '../components/SyncStatusBanner';
@@ -68,6 +69,7 @@ export default function DashboardScreen() {
         online={syncStatus.online}
         lastSync={syncStatus.lastSync}
         pendingCount={stats.pendingSync}
+        serverLabel={getDisplayUrl()}
       />
 
       <ScrollView

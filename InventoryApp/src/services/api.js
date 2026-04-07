@@ -1,13 +1,53 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
-export const DEFAULT_SERVER_IP = "localhost";
+export const CLOUD_SERVER_URL = "https://inventory-backend-fdex.onrender.com";
+export const DEFAULT_SERVER_IP = CLOUD_SERVER_URL;
+
+const isPrivateHost = (host) => {
+  const h = String(host || "").toLowerCase();
+  return (
+    h === "localhost" ||
+    h === "127.0.0.1" ||
+    /^10\./.test(h) ||
+    /^192\.168\./.test(h) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(h)
+  );
+};
+
+const normalizeServerAddress = (addr) => {
+  let value = (addr || DEFAULT_SERVER_IP).trim();
+  if (!value) {
+    return DEFAULT_SERVER_IP;
+  }
+
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    value = value.replace(/\/+$/, "");
+    value = value.replace(/\/admin$/i, "");
+    value = value.replace(/\/api$/i, "");
+    const host = value.replace(/^https?:\/\//i, "").split("/")[0].split(":")[0];
+    if (Platform.OS !== "web" && !__DEV__ && isPrivateHost(host)) {
+      return CLOUD_SERVER_URL;
+    }
+    return value;
+  }
+
+  value = value.replace(/\/+$/, "");
+  value = value.replace(/\/admin$/i, "");
+  value = value.replace(/\/api$/i, "");
+  const host = value.split(":")[0];
+  if (Platform.OS !== "web" && !__DEV__ && isPrivateHost(host)) {
+    return CLOUD_SERVER_URL;
+  }
+  return value;
+};
 
 // Builds the API base URL from a server address.
 // Supports: bare IP ("192.168.1.5"), IP:port ("192.168.1.5:5000"),
 // or full URL ("https://myapp.onrender.com")
 const buildBaseUrl = (addr) => {
-  const s = (addr || DEFAULT_SERVER_IP).trim();
+  const s = normalizeServerAddress(addr);
   if (s.startsWith("http://") || s.startsWith("https://")) {
     // Full URL — strip trailing slash, append /api if missing
     const clean = s.replace(/\/+$/, "");
@@ -43,8 +83,12 @@ const healthClient = axios.create({
 // Call on app start — loads saved server address from storage
 export const loadServerUrl = async () => {
   try {
-    const saved = await AsyncStorage.getItem("serverIp");
+    const savedRaw = await AsyncStorage.getItem("serverIp");
+    const saved = normalizeServerAddress(savedRaw || DEFAULT_SERVER_IP);
     if (saved && saved.trim()) {
+      if (savedRaw !== saved) {
+        await AsyncStorage.setItem("serverIp", saved);
+      }
       currentBaseUrl = buildBaseUrl(saved);
       apiClient.defaults.baseURL = currentBaseUrl;
       healthClient.defaults.baseURL = currentBaseUrl;
@@ -56,7 +100,7 @@ export const loadServerUrl = async () => {
 
 // Update server address and persist it (accepts IP, IP:port, or full URL)
 export const setServerIp = async (ip) => {
-  const trimmed = ip.trim();
+  const trimmed = normalizeServerAddress(ip);
   currentBaseUrl = buildBaseUrl(trimmed);
   apiClient.defaults.baseURL = currentBaseUrl;
   healthClient.defaults.baseURL = currentBaseUrl;
