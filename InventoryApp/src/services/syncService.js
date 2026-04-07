@@ -10,7 +10,6 @@ import {
   getPendingTransactions,
   markTransactionsSynced,
   upsertItems,
-  clearSyncedTransactions,
   clearAllItems,
 } from "../database/db";
 
@@ -124,11 +123,6 @@ export const attemptSync = async () => {
   } catch (err) {
     return { synced: 0, reason: "sync_failed", error: err.message };
   }
-
-  // Clean up: remove synced transactions from phone to keep it lean
-  try {
-    await clearSyncedTransactions();
-  } catch (_) {}
 
   const lastSync = new Date().toISOString();
   notifyStatus({ online: true, lastSync, pendingCount: 0 });

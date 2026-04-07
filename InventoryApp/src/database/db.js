@@ -1,4 +1,5 @@
 import * as SQLite from "expo-sqlite";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 let db;
 
@@ -251,6 +252,8 @@ export const clearAllTransactions = async () => {
 
 export const clearAllItems = async () => {
   const result = await db.runAsync("DELETE FROM items");
+  // Reset items version so next sync re-downloads everything
+  try { await AsyncStorage.removeItem("itemsVersion"); } catch (_) {}
   return result.changes;
 };
 

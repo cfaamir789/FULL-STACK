@@ -7,6 +7,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getRecentTransactions, updateTransaction, deleteTransaction } from '../database/db';
+import { getServerTransactions, checkHealth } from '../services/api';
 import TransactionRow from '../components/TransactionRow';
 import Colors from '../theme/colors';
 
@@ -56,10 +57,55 @@ export default function TransactionsScreen({ username, role }) {
 
   const loadTransactions = useCallback(async () => {
     setLoading(true);
-    const data = await getRecentTransactions(200);
-    setTransactions(data);
+    try {
+      // Always load local transactions
+      const localData = await getRecentTransactions(200);
+
+      // If admin, also try fetching from server and merge
+      if (role === 'admin') {
+        try {
+          await checkHealth();
+          const serverRes = await getServerTransactions(1, 500);
+          const serverTxs = (serverRes.transactions || []).map(tx => ({
+            id: tx._id,
+            item_barcode: tx.Item_Barcode,
+            item_code: tx.Item_Code,
+            item_name: tx.Item_Name,
+            frombin: tx.Frombin,
+            tobin: tx.Tobin,
+            qty: tx.Qty,
+            worker_name: tx.Worker_Name,
+            notes: tx.Notes || '',
+            timestamp: tx.Timestamp,
+            synced: 1,
+            _source: 'server',
+          }));
+
+          // Merge: use local for unsynced, server for everything else
+          const localUnsyncedIds = new Set(
+            localData.filter(t => t.synced === 0).map(t => `${t.item_barcode}-${t.timestamp}`)
+          );
+          const merged = [...localData.filter(t => t.synced === 0)];
+          for (const stx of serverTxs) {
+            const key = `${stx.item_barcode}-${stx.timestamp}`;
+            if (!localUnsyncedIds.has(key)) {
+              merged.push(stx);
+            }
+          }
+          merged.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+          setTransactions(merged);
+        } catch {
+          // Server unreachable, just show local
+          setTransactions(localData);
+        }
+      } else {
+        setTransactions(localData);
+      }
+    } catch {
+      setTransactions([]);
+    }
     setLoading(false);
-  }, []);
+  }, [role]);
 
   useFocusEffect(
     useCallback(() => {
