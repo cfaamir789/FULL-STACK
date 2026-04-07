@@ -8,7 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getTransactionStats, getExportUrl, checkHealth,
-  clearServerTransactions, clearServerItems,
+  clearServerTransactions, clearServerItems, getUsers,
 } from '../services/api';
 import { getDashboardStats, clearAllTransactions, clearAllItems, getPendingCount } from '../database/db';
 import { attemptSync } from '../services/syncService';
@@ -28,6 +28,7 @@ export default function AdminPanelScreen({ navigation }) {
   const [online, setOnline] = useState(false);
   const [localStats, setLocalStats] = useState({ totalItems: 0, totalTransactions: 0, pendingSync: 0 });
   const [serverStats, setServerStats] = useState({ total: 0, workers: [] });
+  const [userCount, setUserCount] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [resetting, setResetting] = useState(false);
 
@@ -38,8 +39,12 @@ export default function AdminPanelScreen({ navigation }) {
     try {
       await checkHealth();
       setOnline(true);
-      const stats = await getTransactionStats();
+      const [stats, usersData] = await Promise.all([
+        getTransactionStats(),
+        getUsers().catch(() => []),
+      ]);
       setServerStats(stats);
+      setUserCount(usersData.length || 0);
     } catch {
       setOnline(false);
     }
@@ -234,12 +239,12 @@ export default function AdminPanelScreen({ navigation }) {
           </View>
           <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate('AdminTransactions')}>
             <MaterialCommunityIcons name="swap-horizontal" size={28} color={Colors.success} />
-            <Text style={styles.statValue}>{online ? serverStats.total : localStats.totalTransactions}</Text>
+            <Text style={styles.statValue}>{online ? Math.max(serverStats.total, localStats.totalTransactions) : localStats.totalTransactions}</Text>
             <Text style={styles.statLabel}>All Transactions</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.statCard} onPress={() => navigation.navigate('AdminUsers')}>
             <MaterialCommunityIcons name="account-group" size={28} color={Colors.primaryLight} />
-            <Text style={styles.statValue}>{online ? serverStats.workers.length : '-'}</Text>
+            <Text style={styles.statValue}>{online ? userCount : '-'}</Text>
             <Text style={styles.statLabel}>Workers</Text>
           </TouchableOpacity>
         </View>
