@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const transactionSchema = new mongoose.Schema({
   Item_Barcode: String,
@@ -11,7 +11,7 @@ const transactionSchema = new mongoose.Schema({
   Notes: String,
   deviceId: String,
   Worker_Name: String,
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model('Transaction', transactionSchema);
+module.exports = mongoose.model("Transaction", transactionSchema);

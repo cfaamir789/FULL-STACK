@@ -35,7 +35,8 @@ function parseCsvItems(csvText) {
   }
 
   const hasNewFormat = "Barcode" in firstRow && "Item_Name" in firstRow;
-  const hasOldFormat = "Barcode No." in firstRow && "Item Description" in firstRow;
+  const hasOldFormat =
+    "Barcode No." in firstRow && "Item Description" in firstRow;
 
   if (!hasNewFormat && !hasOldFormat) {
     throw new Error(
@@ -45,12 +46,18 @@ function parseCsvItems(csvText) {
 
   const rawItems = parsed.data
     .filter((r) =>
-      hasOldFormat ? r["Barcode No."] && r["Item Description"] : r.Barcode && r.Item_Name,
+      hasOldFormat
+        ? r["Barcode No."] && r["Item Description"]
+        : r.Barcode && r.Item_Name,
     )
     .map((r) => ({
-      ItemCode: hasOldFormat ? r["Item No."] || r["Barcode No."] : r.ItemCode || r.Barcode,
+      ItemCode: hasOldFormat
+        ? r["Item No."] || r["Barcode No."]
+        : r.ItemCode || r.Barcode,
       Barcode: String(hasOldFormat ? r["Barcode No."] : r.Barcode).trim(),
-      Item_Name: String(hasOldFormat ? r["Item Description"] : r.Item_Name).trim(),
+      Item_Name: String(
+        hasOldFormat ? r["Item Description"] : r.Item_Name,
+      ).trim(),
     }));
 
   const dedup = new Map();
@@ -76,10 +83,21 @@ async function applyCsvItems(items, mode, onProgress) {
   const total = items.length;
 
   if (mode === "replace") {
-    const chunks = chunkArray(items, 2000);
+    const chunks = chunkArray(items, 3000);
     for (const chunk of chunks) {
-      await Item.insertMany(chunk, { ordered: false });
-      inserted += chunk.length;
+      try {
+        const result = await Item.insertMany(chunk, { ordered: false });
+        inserted += result.length;
+      } catch (err) {
+        // BulkWriteError — some inserted, some skipped as duplicates
+        if (err.insertedDocs !== undefined) {
+          inserted += err.insertedDocs.length || 0;
+        } else if (err.result?.nInserted !== undefined) {
+          inserted += err.result.nInserted;
+        } else {
+          inserted += chunk.length - (err.writeErrors?.length || 0);
+        }
+      }
       processed += chunk.length;
       onProgress?.({ processed, total, inserted, modified });
     }
@@ -128,7 +146,7 @@ async function bumpItemsVersion() {
   await Meta.findOneAndUpdate(
     { key: "itemsVersion" },
     { $set: { version: _itemsVersion } },
-    { upsert: true, new: true }
+    { upsert: true, new: true },
   );
   return _itemsVersion;
 }
@@ -154,7 +172,10 @@ router.get("/", async (req, res) => {
     const { q } = req.query;
     const paginated = String(req.query.paginated || "0") === "1";
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(5000, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const limit = Math.min(
+      5000,
+      Math.max(1, parseInt(req.query.limit, 10) || 50),
+    );
     const skip = (page - 1) * limit;
     let query = {};
     if (q) {
@@ -166,14 +187,17 @@ router.get("/", async (req, res) => {
 
     if (paginated) {
       const [items, total] = await Promise.all([
-        Item.find(query)
-          .sort({ Item_Name: 1 })
-          .skip(skip)
-          .limit(limit)
-          .lean(),
+        Item.find(query).sort({ Item_Name: 1 }).skip(skip).limit(limit).lean(),
         Item.countDocuments(query),
       ]);
-      return res.json({ success: true, count: items.length, total, page, limit, items });
+      return res.json({
+        success: true,
+        count: items.length,
+        total,
+        page,
+        limit,
+        items,
+      });
     }
 
     const items = await Item.find(query).sort({ Item_Name: 1 }).lean();
@@ -188,17 +212,15 @@ router.post("/", async (req, res) => {
   try {
     const { ItemCode, Barcode, Item_Name } = req.body;
     if (!ItemCode || !Barcode || !Item_Name) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "ItemCode, Barcode, and Item_Name are required",
-        });
+      return res.status(400).json({
+        success: false,
+        error: "ItemCode, Barcode, and Item_Name are required",
+      });
     }
     const item = await Item.findOneAndUpdate(
       { Barcode },
       { $set: { ItemCode, Barcode, Item_Name } },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
     await bumpItemsVersion();
     res.status(201).json({ success: true, item });
@@ -222,8 +244,14 @@ router.post("/import", requireAuth, requireAdmin, async (req, res) => {
       items.map(async (item) => {
         const result = await Item.updateOne(
           { Barcode: item.Barcode },
-          { $set: { ItemCode: item.ItemCode, Barcode: item.Barcode, Item_Name: item.Item_Name } },
-          { upsert: true }
+          {
+            $set: {
+              ItemCode: item.ItemCode,
+              Barcode: item.Barcode,
+              Item_Name: item.Item_Name,
+            },
+          },
+          { upsert: true },
         );
         if (result.upsertedId) inserted++;
         else modified++;
@@ -283,180 +311,202 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
 });
-router.post("/upload-csv", requireAuth, requireAdmin, upload.single("file"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res
-        .status(400)
-        .json({ success: false, error: "No file uploaded" });
-    }
-    const csvText = req.file.buffer.toString("utf8");
-    const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+router.post(
+  "/upload-csv",
+  requireAuth,
+  requireAdmin,
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ success: false, error: "No file uploaded" });
+      }
+      const csvText = req.file.buffer.toString("utf8");
+      const parsed = Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true,
+      });
 
-    if (parsed.errors.length > 0 && parsed.data.length === 0) {
-      return res
-        .status(400)
-        .json({
+      if (parsed.errors.length > 0 && parsed.data.length === 0) {
+        return res.status(400).json({
           success: false,
           error: "CSV parsing failed: " + parsed.errors[0].message,
         });
-    }
-
-    const firstRow = parsed.data[0];
-    if (!firstRow) {
-      return res.status(400).json({ success: false, error: "CSV is empty" });
-    }
-
-    const hasNewFormat = "Barcode" in firstRow && "Item_Name" in firstRow;
-    const hasOldFormat =
-      "Barcode No." in firstRow && "Item Description" in firstRow;
-
-    if (!hasNewFormat && !hasOldFormat) {
-      return res.status(400).json({
-        success: false,
-        error:
-          "CSV must have headers: ItemCode, Barcode, Item_Name (or Item No., Barcode No., Item Description)",
-        foundHeaders: Object.keys(firstRow),
-      });
-    }
-
-    const rawItems = parsed.data
-      .filter((r) =>
-        hasOldFormat
-          ? r["Barcode No."] && r["Item Description"]
-          : r.Barcode && r.Item_Name,
-      )
-      .map((r) => ({
-        ItemCode: hasOldFormat
-          ? r["Item No."] || r["Barcode No."]
-          : r.ItemCode || r.Barcode,
-        Barcode: String(hasOldFormat ? r["Barcode No."] : r.Barcode).trim(),
-        Item_Name: String(
-          hasOldFormat ? r["Item Description"] : r.Item_Name,
-        ).trim(),
-      }));
-
-    // Keep only the latest row per barcode to avoid duplicate writes.
-    const dedup = new Map();
-    for (const item of rawItems) {
-      dedup.set(item.Barcode, item);
-    }
-    const items = Array.from(dedup.values());
-
-    if (items.length === 0) {
-      return res
-        .status(400)
-        .json({ success: false, error: "No valid rows found in CSV" });
-    }
-
-    const mode = req.query.mode || "replace"; // 'replace' or 'merge'
-
-    if (mode === "replace") {
-      await Item.deleteMany({});
-    }
-
-    let inserted = 0;
-    let modified = 0;
-
-    if (mode === "replace") {
-      const chunks = chunkArray(items, 2000);
-      for (const chunk of chunks) {
-        await Item.insertMany(chunk, { ordered: false });
       }
-      inserted = items.length;
-    } else {
-      const chunks = chunkArray(items, 1000);
-      for (const chunk of chunks) {
-        const ops = chunk.map((item) => ({
-          updateOne: {
-            filter: { Barcode: item.Barcode },
-            update: {
-              $set: {
-                ItemCode: item.ItemCode,
-                Barcode: item.Barcode,
-                Item_Name: item.Item_Name,
-              },
-            },
-            upsert: true,
-          },
+
+      const firstRow = parsed.data[0];
+      if (!firstRow) {
+        return res.status(400).json({ success: false, error: "CSV is empty" });
+      }
+
+      const hasNewFormat = "Barcode" in firstRow && "Item_Name" in firstRow;
+      const hasOldFormat =
+        "Barcode No." in firstRow && "Item Description" in firstRow;
+
+      if (!hasNewFormat && !hasOldFormat) {
+        return res.status(400).json({
+          success: false,
+          error:
+            "CSV must have headers: ItemCode, Barcode, Item_Name (or Item No., Barcode No., Item Description)",
+          foundHeaders: Object.keys(firstRow),
+        });
+      }
+
+      const rawItems = parsed.data
+        .filter((r) =>
+          hasOldFormat
+            ? r["Barcode No."] && r["Item Description"]
+            : r.Barcode && r.Item_Name,
+        )
+        .map((r) => ({
+          ItemCode: hasOldFormat
+            ? r["Item No."] || r["Barcode No."]
+            : r.ItemCode || r.Barcode,
+          Barcode: String(hasOldFormat ? r["Barcode No."] : r.Barcode).trim(),
+          Item_Name: String(
+            hasOldFormat ? r["Item Description"] : r.Item_Name,
+          ).trim(),
         }));
-        const result = await Item.bulkWrite(ops, { ordered: false });
-        inserted += result.upsertedCount || 0;
-        modified += result.modifiedCount || 0;
-      }
-    }
 
-    const totalItems = await Item.countDocuments({});
-    await bumpItemsVersion();
-    res.json({ success: true, inserted, modified, totalItems });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+      // Keep only the latest row per barcode to avoid duplicate writes.
+      const dedup = new Map();
+      for (const item of rawItems) {
+        dedup.set(item.Barcode, item);
+      }
+      const items = Array.from(dedup.values());
+
+      if (items.length === 0) {
+        return res
+          .status(400)
+          .json({ success: false, error: "No valid rows found in CSV" });
+      }
+
+      const mode = req.query.mode || "replace"; // 'replace' or 'merge'
+
+      if (mode === "replace") {
+        await Item.deleteMany({});
+      }
+
+      let inserted = 0;
+      let modified = 0;
+
+      if (mode === "replace") {
+        const chunks = chunkArray(items, 2000);
+        for (const chunk of chunks) {
+          await Item.insertMany(chunk, { ordered: false });
+        }
+        inserted = items.length;
+      } else {
+        const chunks = chunkArray(items, 1000);
+        for (const chunk of chunks) {
+          const ops = chunk.map((item) => ({
+            updateOne: {
+              filter: { Barcode: item.Barcode },
+              update: {
+                $set: {
+                  ItemCode: item.ItemCode,
+                  Barcode: item.Barcode,
+                  Item_Name: item.Item_Name,
+                },
+              },
+              upsert: true,
+            },
+          }));
+          const result = await Item.bulkWrite(ops, { ordered: false });
+          inserted += result.upsertedCount || 0;
+          modified += result.modifiedCount || 0;
+        }
+      }
+
+      const totalItems = await Item.countDocuments({});
+      await bumpItemsVersion();
+      res.json({ success: true, inserted, modified, totalItems });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
 
 // POST /api/items/upload-csv-async — admin web panel: async CSV upload with status polling
-router.post("/upload-csv-async", requireAuth, requireAdmin, upload.single("file"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: "No file uploaded" });
-    }
+router.post(
+  "/upload-csv-async",
+  requireAuth,
+  requireAdmin,
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res
+          .status(400)
+          .json({ success: false, error: "No file uploaded" });
+      }
 
-    const mode = req.query.mode === "merge" ? "merge" : "replace";
-    const csvText = req.file.buffer.toString("utf8");
-    const jobId = randomUUID();
+      const mode = req.query.mode === "merge" ? "merge" : "replace";
+      const csvText = req.file.buffer.toString("utf8");
+      const jobId = randomUUID();
 
-    setUploadJob(jobId, {
-      status: "queued",
-      mode,
-      processed: 0,
-      total: 0,
-      inserted: 0,
-      modified: 0,
-      error: null,
-      totalItems: 0,
-    });
+      setUploadJob(jobId, {
+        status: "queued",
+        mode,
+        processed: 0,
+        total: 0,
+        inserted: 0,
+        modified: 0,
+        error: null,
+        totalItems: 0,
+      });
 
-    setImmediate(async () => {
-      try {
-        const items = parseCsvItems(csvText);
-        setUploadJob(jobId, {
-          status: "processing",
-          total: items.length,
-          processed: 0,
-        });
-
-        const result = await applyCsvItems(items, mode, (progress) => {
+      setImmediate(async () => {
+        try {
+          const items = parseCsvItems(csvText);
           setUploadJob(jobId, {
             status: "processing",
-            ...progress,
+            total: items.length,
+            processed: 0,
           });
-        });
 
-        setUploadJob(jobId, {
-          status: "done",
-          ...result,
-        });
-      } catch (err) {
-        setUploadJob(jobId, {
-          status: "error",
-          error: err.message,
-        });
-      }
-    });
+          const result = await applyCsvItems(items, mode, (progress) => {
+            setUploadJob(jobId, {
+              status: "processing",
+              ...progress,
+            });
+          });
 
-    return res.json({ success: true, jobId });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
-});
+          setUploadJob(jobId, {
+            status: "done",
+            ...result,
+          });
+        } catch (err) {
+          setUploadJob(jobId, {
+            status: "error",
+            error: err.message,
+          });
+        }
+      });
+
+      return res.json({ success: true, jobId });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
 
 // GET /api/items/upload-csv-status/:jobId — admin polling endpoint for async upload
-router.get("/upload-csv-status/:jobId", requireAuth, requireAdmin, async (req, res) => {
-  const job = uploadJobs.get(req.params.jobId);
-  if (!job) {
-    return res.status(404).json({ success: false, error: "Upload job not found" });
-  }
-  return res.json({ success: true, ...job });
-});
+router.get(
+  "/upload-csv-status/:jobId",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    const job = uploadJobs.get(req.params.jobId);
+    if (!job) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Upload job not found" });
+    }
+    return res.json({ success: true, ...job });
+  },
+);
 
 module.exports = router;

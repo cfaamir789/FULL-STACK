@@ -477,11 +477,19 @@
     <!-- MAIN PANEL -->
     <div id="mainPanel" class="container hidden">
       <div class="tab-bar" style="border-bottom: 0; margin-bottom: 20px">
-        <button id="navDashboard" class="active" onclick="switchPage('dashboard')">
+        <button
+          id="navDashboard"
+          class="active"
+          onclick="switchPage('dashboard')"
+        >
           Dashboard
         </button>
-        <button id="navMaster" onclick="switchPage('master')">Master Data</button>
-        <button id="navWorkers" onclick="switchPage('workers')">Worker Ops</button>
+        <button id="navMaster" onclick="switchPage('master')">
+          Master Data
+        </button>
+        <button id="navWorkers" onclick="switchPage('workers')">
+          Worker Ops
+        </button>
         <button id="navUsers" onclick="switchPage('users')">Users</button>
       </div>
 
@@ -508,13 +516,34 @@
           <h2>&#128161; What Each Action Means</h2>
           <table>
             <thead>
-              <tr><th>Action</th><th>What It Does</th></tr>
+              <tr>
+                <th>Action</th>
+                <th>What It Does</th>
+              </tr>
             </thead>
             <tbody>
-              <tr><td>Replace All Items</td><td>Deletes old master items, then inserts CSV as a fresh master list.</td></tr>
-              <tr><td>Merge (Add/Update)</td><td>Keeps existing items and only adds new barcodes or updates changed rows.</td></tr>
-              <tr><td>Delete All Items</td><td>Clears complete item master data from server.</td></tr>
-              <tr><td>Delete All Transactions</td><td>Clears all worker movement history from server.</td></tr>
+              <tr>
+                <td>Replace All Items</td>
+                <td>
+                  Deletes old master items, then inserts CSV as a fresh master
+                  list.
+                </td>
+              </tr>
+              <tr>
+                <td>Merge (Add/Update)</td>
+                <td>
+                  Keeps existing items and only adds new barcodes or updates
+                  changed rows.
+                </td>
+              </tr>
+              <tr>
+                <td>Delete All Items</td>
+                <td>Clears complete item master data from server.</td>
+              </tr>
+              <tr>
+                <td>Delete All Transactions</td>
+                <td>Clears all worker movement history from server.</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -539,7 +568,11 @@
           </div>
 
           <div class="mode-toggle">
-            <button id="modeReplace" class="active" onclick="setMode('replace')">
+            <button
+              id="modeReplace"
+              class="active"
+              onclick="setMode('replace')"
+            >
               &#128260; Replace All Items
             </button>
             <button id="modeMerge" onclick="setMode('merge')">
@@ -574,7 +607,9 @@
 
         <div class="card" style="border: 1px solid #ffcdd2">
           <h2 style="color: #e53935">&#9888;&#65039; Danger Zone</h2>
-          <button class="btn btn-danger" onclick="clearAllItems()">Delete All Items</button>
+          <button class="btn btn-danger" onclick="clearAllItems()">
+            Delete All Items
+          </button>
         </div>
       </div>
 
@@ -597,102 +632,110 @@
         </div>
 
         <div class="card">
-        <div class="tx-header">
-          <h2>&#128196; Transactions (Worker Data)</h2>
-          <div class="tx-actions">
-            <button
-              class="copy-icon-btn"
-              id="copyAllBtn"
-              onclick="copyTransactionsToClipboard()"
-              title="Copy all to clipboard"
-            >
-              <svg
-                class="copy-svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+          <div class="tx-header">
+            <h2>&#128196; Transactions (Worker Data)</h2>
+            <div class="tx-actions">
+              <button
+                class="copy-icon-btn"
+                id="copyAllBtn"
+                onclick="copyTransactionsToClipboard()"
+                title="Copy all to clipboard"
               >
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path
-                  d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
-                ></path>
-              </svg>
-              <svg
-                class="check-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+                <svg
+                  class="copy-svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path
+                    d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                  ></path>
+                </svg>
+                <svg
+                  class="check-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span class="copy-label">Copy</span>
+              </button>
+              <button
+                class="copy-icon-btn"
+                onclick="downloadTransactionsCSV()"
+                title="Download CSV for Excel / NAV ERP"
               >
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-              <span class="copy-label">Copy</span>
-            </button>
-            <button
-              class="copy-icon-btn"
-              onclick="downloadTransactionsCSV()"
-              title="Download CSV for Excel / NAV ERP"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                CSV
+              </button>
+              <button
+                class="copy-icon-btn tx-danger-btn"
+                onclick="deleteWorkerTransactions()"
+                title="Delete all transactions for the selected worker"
               >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              CSV
-            </button>
-            <button
-              class="copy-icon-btn tx-danger-btn"
-              onclick="deleteWorkerTransactions()"
-              title="Delete all transactions for the selected worker"
-            >
-              Delete Worker
-            </button>
-            <button
-              class="copy-icon-btn tx-danger-btn"
-              onclick="deleteFilteredTransactions()"
-              title="Delete only the currently filtered transactions"
-            >
-              Delete Filtered
-            </button>
-            <button
-              class="copy-icon-btn tx-danger-btn"
-              onclick="clearAllTransactions()"
-              title="Delete all transactions from the server"
-            >
-              Delete All
+                Delete Worker
+              </button>
+              <button
+                class="copy-icon-btn tx-danger-btn"
+                onclick="deleteFilteredTransactions()"
+                title="Delete only the currently filtered transactions"
+              >
+                Delete Filtered
+              </button>
+              <button
+                class="copy-icon-btn tx-danger-btn"
+                onclick="clearAllTransactions()"
+                title="Delete all transactions from the server"
+              >
+                Delete All
+              </button>
+            </div>
+          </div>
+          <p style="color: #888; margin-bottom: 12px; font-size: 13px">
+            Copy &rarr; paste into Excel &rarr; NAV ERP. All worker movements
+            with bin &amp; qty details.
+          </p>
+          <div class="tx-filters">
+            <select id="txWorkerFilter" onchange="filterTransactions()">
+              <option value="">All Workers</option>
+            </select>
+            <input
+              type="text"
+              id="txSearch"
+              placeholder="Search item code, barcode, name..."
+              oninput="filterTransactions()"
+              style="flex: 1; min-width: 180px"
+            />
+            <button class="copy-icon-btn" onclick="toggleColConfig()" title="Configure columns">
+              &#9881; Columns
             </button>
           </div>
+          <div id="colConfigPanel" style="display:none;background:#f5f7fa;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:13px">
+            <p style="margin-bottom:8px;font-weight:600;color:#555">Drag to reorder columns &mdash; toggle to show/hide</p>
+            <div id="colConfigList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+            <button class="btn-sm" style="margin-top:10px;background:#1565c0;color:#fff;border-radius:6px;border:none" onclick="resetColConfig()">Reset to Default</button>
+          </div>
+          <div id="txContainer"><div class="loading">Loading...</div></div>
         </div>
-        <p style="color: #888; margin-bottom: 12px; font-size: 13px">
-          Copy &rarr; paste into Excel &rarr; NAV ERP. All worker movements with
-          bin &amp; qty details.
-        </p>
-        <div class="tx-filters">
-          <select id="txWorkerFilter" onchange="filterTransactions()">
-            <option value="">All Workers</option>
-          </select>
-          <input
-            type="text"
-            id="txSearch"
-            placeholder="Search item code, barcode, name..."
-            oninput="filterTransactions()"
-            style="flex: 1; min-width: 180px"
-          />
-        </div>
-        <div id="txContainer"><div class="loading">Loading...</div></div>
-      </div>
 
         <div class="card" style="border: 1px solid #ffcdd2">
           <h2 style="color: #e53935">&#9888;&#65039; Danger Zone</h2>
@@ -706,13 +749,34 @@
         <div class="card">
           <h2>&#10133; Create User</h2>
           <div style="display: flex; gap: 8px; flex-wrap: wrap">
-            <input id="newUserName" class="search-box" style="margin:0; flex:2; min-width:160px" placeholder="USERNAME" />
-            <input id="newUserPin" class="search-box" style="margin:0; flex:1; min-width:140px" placeholder="PIN (min 4)" type="password" />
-            <select id="newUserRole" class="search-box" style="margin:0; flex:1; min-width:120px">
+            <input
+              id="newUserName"
+              class="search-box"
+              style="margin: 0; flex: 2; min-width: 160px"
+              placeholder="USERNAME"
+            />
+            <input
+              id="newUserPin"
+              class="search-box"
+              style="margin: 0; flex: 1; min-width: 140px"
+              placeholder="PIN (min 4)"
+              type="password"
+            />
+            <select
+              id="newUserRole"
+              class="search-box"
+              style="margin: 0; flex: 1; min-width: 120px"
+            >
               <option value="worker">Worker</option>
               <option value="admin">Admin</option>
             </select>
-            <button class="btn btn-primary" style="max-width:220px" onclick="createUser()">Create User</button>
+            <button
+              class="btn btn-primary"
+              style="max-width: 220px"
+              onclick="createUser()"
+            >
+              Create User
+            </button>
           </div>
           <div id="userCreateResult"></div>
         </div>
@@ -724,9 +788,11 @@
 
         <div class="card">
           <h2>&#128274; Account Recovery</h2>
-          <p style="color:#666; line-height:1.7">
-            If a worker or admin forgets their PIN, another logged-in admin can use Reset PIN from the Users list.
-            If all admins are lost, you must reset directly in the database (MongoDB Atlas) or deploy a temporary recovery script.
+          <p style="color: #666; line-height: 1.7">
+            If a worker or admin forgets their PIN, another logged-in admin can
+            use Reset PIN from the Users list. If all admins are lost, you must
+            reset directly in the database (MongoDB Atlas) or deploy a temporary
+            recovery script.
           </p>
         </div>
       </div>
@@ -873,7 +939,11 @@
           pageLoaded.master = true;
         }
         if (page === "workers" && !pageLoaded.workers) {
-          await Promise.allSettled([loadStats(), loadWorkerStatus(), loadTransactions()]);
+          await Promise.allSettled([
+            loadStats(),
+            loadWorkerStatus(),
+            loadTransactions(),
+          ]);
           pageLoaded.workers = true;
         }
         if (page === "users" && !pageLoaded.users) {
@@ -888,14 +958,16 @@
         const [itemsRes, usersRes, statsRes] = await Promise.allSettled([
           apiFetch("/items/count"),
           apiFetch("/auth/users"),
-          apiFetch("/transactions/stats")
+          apiFetch("/transactions/stats"),
         ]);
         document.getElementById("statItems").textContent =
-          itemsRes.status === "fulfilled" ? (itemsRes.value.count || 0) : "?";
+          itemsRes.status === "fulfilled" ? itemsRes.value.count || 0 : "?";
         document.getElementById("statUsers").textContent =
-          usersRes.status === "fulfilled" ? (usersRes.value.users?.length || 0) : "?";
+          usersRes.status === "fulfilled"
+            ? usersRes.value.users?.length || 0
+            : "?";
         document.getElementById("statTx").textContent =
-          statsRes.status === "fulfilled" ? (statsRes.value.total || 0) : "?";
+          statsRes.status === "fulfilled" ? statsRes.value.total || 0 : "?";
       }
 
       // ─── File Upload ─────────────────────────────────────────────────────────────
@@ -972,9 +1044,14 @@
           if (!jobId) throw new Error("Upload job was not created");
 
           while (true) {
-            const status = await apiFetch("/items/upload-csv-status/" + encodeURIComponent(jobId));
+            const status = await apiFetch(
+              "/items/upload-csv-status/" + encodeURIComponent(jobId),
+            );
             if (status.status === "processing") {
-              const pct = status.total > 0 ? Math.round((status.processed / status.total) * 100) : 0;
+              const pct =
+                status.total > 0
+                  ? Math.round((status.processed / status.total) * 100)
+                  : 0;
               btn.textContent = "Processing... " + pct + "%";
             }
             if (status.status === "done") {
@@ -1048,6 +1125,84 @@
           container.innerHTML =
             '<div class="alert alert-error">' + err.message + "</div>";
         }
+      }
+
+      // ─── Column Config ────────────────────────────────────────────────────────────
+      const DEFAULT_TX_COLS = [
+        { key: 'Item_Code',    label: 'Item Code',  vis: true },
+        { key: 'Item_Barcode', label: 'Barcode',    vis: true },
+        { key: 'Item_Name',    label: 'Item Name',  vis: true },
+        { key: 'Frombin',      label: 'From Bin',   vis: true },
+        { key: 'Tobin',        label: 'To Bin',     vis: true },
+        { key: 'Qty',          label: 'Qty',        vis: true },
+        { key: 'Worker_Name',  label: 'Worker',     vis: true },
+        { key: 'Notes',        label: 'Notes',      vis: true },
+        { key: 'Timestamp',    label: 'Date/Time',  vis: true },
+      ];
+
+      let txCols = (() => {
+        try {
+          const saved = localStorage.getItem('txColConfig');
+          if (saved) return JSON.parse(saved);
+        } catch {}
+        return DEFAULT_TX_COLS.map(c => ({...c}));
+      })();
+
+      function saveTxCols() {
+        localStorage.setItem('txColConfig', JSON.stringify(txCols));
+      }
+
+      let colConfigOpen = false;
+      function toggleColConfig() {
+        colConfigOpen = !colConfigOpen;
+        const panel = document.getElementById('colConfigPanel');
+        panel.style.display = colConfigOpen ? 'block' : 'none';
+        if (colConfigOpen) renderColConfig();
+      }
+
+      function renderColConfig() {
+        const list = document.getElementById('colConfigList');
+        list.innerHTML = '';
+        txCols.forEach((col, idx) => {
+          const item = document.createElement('div');
+          item.draggable = true;
+          item.dataset.idx = idx;
+          item.style = 'display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px 10px;cursor:grab;user-select:none';
+          item.innerHTML =
+            '<span style="color:#aaa;font-size:16px;cursor:grab">&#8801;</span>' +
+            '<input type="checkbox" id="col_' + idx + '" ' + (col.vis ? 'checked' : '') + ' onchange="toggleColVis(' + idx + ')">' +
+            '<label for="col_' + idx + '" style="cursor:pointer;font-weight:600">' + esc(col.label) + '</label>';
+          item.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', idx); item.style.opacity='0.4'; });
+          item.addEventListener('dragend', () => { item.style.opacity='1'; });
+          item.addEventListener('dragover', (e) => { e.preventDefault(); item.style.borderColor='#1565c0'; });
+          item.addEventListener('dragleave', () => { item.style.borderColor='#ddd'; });
+          item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            item.style.borderColor='#ddd';
+            const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+            const toIdx = parseInt(item.dataset.idx);
+            if (fromIdx === toIdx) return;
+            const moved = txCols.splice(fromIdx, 1)[0];
+            txCols.splice(toIdx, 0, moved);
+            saveTxCols();
+            renderColConfig();
+            filterTransactions();
+          });
+          list.appendChild(item);
+        });
+      }
+
+      function toggleColVis(idx) {
+        txCols[idx].vis = !txCols[idx].vis;
+        saveTxCols();
+        filterTransactions();
+      }
+
+      function resetColConfig() {
+        txCols = DEFAULT_TX_COLS.map(c => ({...c}));
+        saveTxCols();
+        renderColConfig();
+        filterTransactions();
       }
 
       // ─── Transactions ────────────────────────────────────────────────────────────
@@ -1133,6 +1288,14 @@
         renderTransactions(filteredTransactions);
       }
 
+      function txCellValue(tx, key) {
+        if (key === 'Timestamp') {
+          return tx.Timestamp ? '<td style="white-space:nowrap">' + esc(new Date(tx.Timestamp).toLocaleString()) + '</td>' : '<td></td>';
+        }
+        if (key === 'Qty') return '<td>' + (tx.Qty !== undefined ? tx.Qty : '') + '</td>';
+        return '<td>' + esc(tx[key] || '') + '</td>';
+      }
+
       function renderTransactions(txs) {
         const container = document.getElementById("txContainer");
         if (txs.length === 0) {
@@ -1140,6 +1303,7 @@
             '<div class="loading">No transactions found.</div>';
           return;
         }
+        const visibleCols = txCols.filter(c => c.vis);
         const pageSize = 50;
         const pages = Math.ceil(txs.length / pageSize);
         let page = 1;
@@ -1149,28 +1313,18 @@
           let html =
             '<div class="preview-count" style="display:flex;justify-content:space-between;align-items:center">Showing ' +
             (start + 1) +
-            "–" +
+            '–' +
             (start + slice.length) +
-            " of " +
+            ' of ' +
             txs.length +
-            " transactions</div>";
-          html +=
-            '<div style="overflow-x:auto"><table id="txTable"><thead><tr><th>Item Code</th><th>Barcode</th><th>Item Name</th><th>From Bin</th><th>To Bin</th><th>Qty</th><th>Worker</th><th>Notes</th><th>Date/Time</th><th>Copy</th><th>Delete</th></tr></thead><tbody>';
+            ' transactions</div>';
+          html += '<div style="overflow-x:auto"><table id="txTable"><thead><tr>';
+          visibleCols.forEach(c => { html += '<th>' + esc(c.label) + '</th>'; });
+          html += '<th>Copy</th><th>Delete</th></tr></thead><tbody>';
           slice.forEach((tx, i) => {
             const idx = start + i;
-            const dt = tx.Timestamp
-              ? new Date(tx.Timestamp).toLocaleString()
-              : "";
-            html += "<tr>";
-            html += "<td>" + esc(tx.Item_Code) + "</td>";
-            html += "<td>" + esc(tx.Item_Barcode) + "</td>";
-            html += "<td>" + esc(tx.Item_Name) + "</td>";
-            html += "<td>" + esc(tx.Frombin) + "</td>";
-            html += "<td>" + esc(tx.Tobin) + "</td>";
-            html += "<td>" + (tx.Qty || "") + "</td>";
-            html += "<td>" + esc(tx.Worker_Name) + "</td>";
-            html += "<td>" + esc(tx.Notes || "") + "</td>";
-            html += '<td style="white-space:nowrap">' + esc(dt) + "</td>";
+            html += '<tr>';
+            visibleCols.forEach(c => { html += txCellValue(tx, c.key); });
             html +=
               '<td><button class="copy-icon-btn" onclick="copyRow(' +
               idx +
@@ -1179,26 +1333,26 @@
               '<td><button class="copy-icon-btn" style="color:#d32f2f;border-color:#f3c1c1" onclick="deleteTxRow(' +
               idx +
               ', this)" title="Delete this row">Delete</button></td>';
-            html += "</tr>";
+            html += '</tr>';
           });
-          html += "</tbody></table></div>";
+          html += '</tbody></table></div>';
           if (pages > 1) {
             html += '<div class="pagination">';
             html +=
-              "<button " +
-              (page <= 1 ? "disabled" : "") +
+              '<button ' +
+              (page <= 1 ? 'disabled' : '') +
               ' onclick="txPage(' +
               (page - 1) +
               ')">Prev</button>';
             html +=
-              '<span style="padding:6px;">' + page + " / " + pages + "</span>";
+              '<span style="padding:6px;">' + page + ' / ' + pages + '</span>';
             html +=
-              "<button " +
-              (page >= pages ? "disabled" : "") +
+              '<button ' +
+              (page >= pages ? 'disabled' : '') +
               ' onclick="txPage(' +
               (page + 1) +
               ')">Next</button>';
-            html += "</div>";
+            html += '</div>';
           }
           container.innerHTML = html;
         }
@@ -1212,18 +1366,11 @@
       function copyRow(idx, btnEl) {
         const tx = filteredTransactions[idx];
         if (!tx) return;
-        const dt = tx.Timestamp ? new Date(tx.Timestamp).toLocaleString() : "";
-        const text = [
-          tx.Item_Code || "",
-          tx.Item_Barcode || "",
-          tx.Item_Name || "",
-          tx.Frombin || "",
-          tx.Tobin || "",
-          tx.Qty || "",
-          tx.Worker_Name || "",
-          tx.Notes || "",
-          dt,
-        ].join("\t");
+        const visibleCols = txCols.filter(c => c.vis);
+        const text = visibleCols.map(c => {
+          if (c.key === 'Timestamp') return tx.Timestamp ? new Date(tx.Timestamp).toLocaleString() : '';
+          return String(tx[c.key] !== undefined ? tx[c.key] : '');
+        }).join('\t');
         copyToClip(text);
         flashCopyBtn(btnEl);
       }
@@ -1277,7 +1424,11 @@
           await apiFetch("/transactions/" + encodeURIComponent(tx._id), {
             method: "DELETE",
           });
-          await Promise.all([loadTransactions(), loadStats(), loadWorkerStatus()]);
+          await Promise.all([
+            loadTransactions(),
+            loadStats(),
+            loadWorkerStatus(),
+          ]);
         } catch (err) {
           alert("Delete failed: " + err.message);
           btnEl.disabled = false;
@@ -1308,7 +1459,11 @@
             method: "POST",
             body: JSON.stringify(body),
           });
-          await Promise.all([loadTransactions(), loadStats(), loadWorkerStatus()]);
+          await Promise.all([
+            loadTransactions(),
+            loadStats(),
+            loadWorkerStatus(),
+          ]);
           alert((data.deleted || 0) + " transaction(s) deleted.");
         } catch (err) {
           alert("Bulk delete failed: " + err.message);
@@ -1340,24 +1495,13 @@
           alert("No transactions to copy.");
           return;
         }
-        let text =
-          "Item_Code\tBarcode\tItem_Name\tFrom_Bin\tTo_Bin\tQty\tWorker\tNotes\tTimestamp\n";
+        const visibleCols = txCols.filter(c => c.vis);
+        let text = visibleCols.map(c => c.label).join('\t') + '\n';
         txs.forEach((tx) => {
-          const dt = tx.Timestamp
-            ? new Date(tx.Timestamp).toLocaleString()
-            : "";
-          text +=
-            [
-              tx.Item_Code || "",
-              tx.Item_Barcode || "",
-              tx.Item_Name || "",
-              tx.Frombin || "",
-              tx.Tobin || "",
-              tx.Qty || "",
-              tx.Worker_Name || "",
-              tx.Notes || "",
-              dt,
-            ].join("\t") + "\n";
+          text += visibleCols.map(c => {
+            if (c.key === 'Timestamp') return tx.Timestamp ? new Date(tx.Timestamp).toLocaleString() : '';
+            return String(tx[c.key] !== undefined ? tx[c.key] : '');
+          }).join('\t') + '\n';
         });
         copyToClip(text);
         flashCopyBtn(document.getElementById("copyAllBtn"));
@@ -1446,11 +1590,13 @@
         const result = document.getElementById("userCreateResult");
         result.innerHTML = "";
         if (!username || !pin) {
-          result.innerHTML = '<div class="alert alert-error">Username and PIN are required.</div>';
+          result.innerHTML =
+            '<div class="alert alert-error">Username and PIN are required.</div>';
           return;
         }
         if (pin.length < 4) {
-          result.innerHTML = '<div class="alert alert-error">PIN must be at least 4 digits.</div>';
+          result.innerHTML =
+            '<div class="alert alert-error">PIN must be at least 4 digits.</div>';
           return;
         }
         try {
@@ -1468,22 +1614,28 @@
           document.getElementById("newUserPin").value = "";
           await Promise.allSettled([loadUsers(), loadStats()]);
         } catch (err) {
-          result.innerHTML = '<div class="alert alert-error">' + esc(err.message) + "</div>";
+          result.innerHTML =
+            '<div class="alert alert-error">' + esc(err.message) + "</div>";
         }
       }
 
       async function resetUserPin(username) {
-        const pin = prompt("Enter new PIN for " + username + " (min 4 digits):");
+        const pin = prompt(
+          "Enter new PIN for " + username + " (min 4 digits):",
+        );
         if (!pin) return;
         if (String(pin).trim().length < 4) {
           alert("PIN must be at least 4 digits.");
           return;
         }
         try {
-          await apiFetch("/auth/users/" + encodeURIComponent(username) + "/reset-pin", {
-            method: "POST",
-            body: JSON.stringify({ pin: String(pin).trim() }),
-          });
+          await apiFetch(
+            "/auth/users/" + encodeURIComponent(username) + "/reset-pin",
+            {
+              method: "POST",
+              body: JSON.stringify({ pin: String(pin).trim() }),
+            },
+          );
           alert("PIN reset successfully for " + username + ".");
         } catch (err) {
           alert("PIN reset failed: " + err.message);
@@ -1511,15 +1663,26 @@
             method: "POST",
             body: JSON.stringify({ worker: username }),
           });
-          await Promise.all([loadTransactions(), loadStats(), loadWorkerStatus()]);
-          alert((data.deleted || 0) + " transaction(s) deleted for " + username + ".");
+          await Promise.all([
+            loadTransactions(),
+            loadStats(),
+            loadWorkerStatus(),
+          ]);
+          alert(
+            (data.deleted || 0) +
+              " transaction(s) deleted for " +
+              username +
+              ".",
+          );
         } catch (err) {
           alert("Delete user data failed: " + err.message);
         }
       }
 
       async function deleteUserAndData(username) {
-        if (!confirm("Delete user '" + username + "' and all their transactions?"))
+        if (
+          !confirm("Delete user '" + username + "' and all their transactions?")
+        )
           return;
         try {
           await apiFetch("/transactions/bulk-delete", {
@@ -1529,7 +1692,12 @@
           await apiFetch("/auth/users/" + encodeURIComponent(username), {
             method: "DELETE",
           });
-          await Promise.all([loadUsers(), loadTransactions(), loadStats(), loadWorkerStatus()]);
+          await Promise.all([
+            loadUsers(),
+            loadTransactions(),
+            loadStats(),
+            loadWorkerStatus(),
+          ]);
           alert("User and their data deleted.");
         } catch (err) {
           alert("Delete user + data failed: " + err.message);
@@ -1541,7 +1709,9 @@
         const container = document.getElementById("itemsContainer");
         container.innerHTML = '<div class="loading">Loading items...</div>';
         try {
-          const q = (document.getElementById("itemsSearch")?.value || "").trim();
+          const q = (
+            document.getElementById("itemsSearch")?.value || ""
+          ).trim();
           const data = await apiFetch(
             "/items?paginated=1&page=" +
               page +
@@ -1549,7 +1719,10 @@
               (q ? "&q=" + encodeURIComponent(q) : ""),
           );
           currentItemsPage = data.page || 1;
-          currentItemsPages = Math.max(1, Math.ceil((data.total || 0) / (data.limit || 50)));
+          currentItemsPages = Math.max(
+            1,
+            Math.ceil((data.total || 0) / (data.limit || 50)),
+          );
           renderItems(data.items || [], data.total || 0);
         } catch (err) {
           container.innerHTML =
@@ -1645,7 +1818,11 @@
           return;
         try {
           await apiFetch("/transactions/all", { method: "DELETE" });
-          await Promise.all([loadTransactions(), loadStats(), loadWorkerStatus()]);
+          await Promise.all([
+            loadTransactions(),
+            loadStats(),
+            loadWorkerStatus(),
+          ]);
           alert("All transactions deleted.");
         } catch (err) {
           alert("Error: " + err.message);

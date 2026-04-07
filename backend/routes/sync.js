@@ -89,11 +89,7 @@ router.get("/", async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
     const skip = (page - 1) * limit;
     const [transactions, total] = await Promise.all([
-      Transaction.find({})
-        .sort({ Timestamp: -1 })
-        .skip(skip)
-        .limit(limit)
-        ,
+      Transaction.find({}).sort({ Timestamp: -1 }).skip(skip).limit(limit),
       Transaction.countDocuments({}),
     ]);
     res.json({ success: true, total, page, limit, transactions });
@@ -144,18 +140,16 @@ router.put("/:id", requireAuth, async (req, res) => {
         .status(404)
         .json({ success: false, error: "Transaction not found." });
     if (req.user.role !== "admin" && tx.Worker_Name !== req.user.username) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          error: "You can only edit your own transactions.",
-        });
+      return res.status(403).json({
+        success: false,
+        error: "You can only edit your own transactions.",
+      });
     }
     const { Frombin, Tobin, Qty } = req.body;
     const updated = await Transaction.findByIdAndUpdate(
       req.params.id,
       { $set: { Frombin, Tobin, Qty: Number(Qty) } },
-      { new: true }
+      { new: true },
     );
     res.json({ success: true, transaction: updated });
   } catch (err) {
@@ -175,12 +169,10 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
         .status(404)
         .json({ success: false, error: "Transaction not found." });
     if (req.user.role !== "admin" && tx.Worker_Name !== req.user.username) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          error: "You can only delete your own transactions.",
-        });
+      return res.status(403).json({
+        success: false,
+        error: "You can only delete your own transactions.",
+      });
     }
     await Transaction.findByIdAndDelete(req.params.id);
     res.json({ success: true });
@@ -222,9 +214,7 @@ router.get("/export", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { worker } = req.query;
     const query = worker ? { Worker_Name: worker } : {};
-    const transactions = await Transaction.find(query)
-      .sort({ Timestamp: -1 })
-      ;
+    const transactions = await Transaction.find(query).sort({ Timestamp: -1 });
     const header =
       "Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Notes,Timestamp\n";
     const rows = transactions

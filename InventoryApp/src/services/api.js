@@ -26,7 +26,10 @@ const normalizeServerAddress = (addr) => {
     value = value.replace(/\/+$/, "");
     value = value.replace(/\/admin$/i, "");
     value = value.replace(/\/api$/i, "");
-    const host = value.replace(/^https?:\/\//i, "").split("/")[0].split(":")[0];
+    const host = value
+      .replace(/^https?:\/\//i, "")
+      .split("/")[0]
+      .split(":")[0];
     if (Platform.OS !== "web" && !__DEV__ && isPrivateHost(host)) {
       return CLOUD_SERVER_URL;
     }
@@ -161,7 +164,9 @@ export const fetchItems = async () => {
 };
 
 export const fetchItemsPage = async (page = 1, limit = 2000) => {
-  const res = await apiClient.get(`/items?paginated=1&page=${page}&limit=${limit}`);
+  const res = await apiClient.get(
+    `/items?paginated=1&page=${page}&limit=${limit}`,
+  );
   return res.data; // { items, total, page, limit }
 };
 

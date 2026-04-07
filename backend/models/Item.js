@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const itemSchema = new mongoose.Schema({
   ItemCode: String,
@@ -9,4 +9,4 @@ const itemSchema = new mongoose.Schema({
 itemSchema.index({ Item_Name: 1 });
 itemSchema.index({ ItemCode: 1 });
 
-module.exports = mongoose.model('Item', itemSchema);
+module.exports = mongoose.model("Item", itemSchema);

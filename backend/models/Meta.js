@@ -1,8 +1,8 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const metaSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true },
-  version: { type: Number, default: 0 }
+  version: { type: Number, default: 0 },
 });
 
-module.exports = mongoose.model('Meta', metaSchema);
+module.exports = mongoose.model("Meta", metaSchema);
