@@ -3,27 +3,26 @@ const router = express.Router();
 const multer = require("multer");
 const Papa = require("papaparse");
 const Item = require("../models/Item");
+const Meta = require("../models/Meta");
 const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
 
 // ─── Item Version Tracking ──────────────────────────────────────────────────
-// In-memory counter; persisted to NeDB so it survives restarts.
-const db = require("../config/database");
 let _itemsVersion = 0;
 
 // Load persisted version on startup
 (async () => {
   try {
-    const doc = await db.items.findOneAsync({ _meta: "itemsVersion" });
+    const doc = await Meta.findOne({ key: "itemsVersion" });
     if (doc) _itemsVersion = doc.version;
   } catch (_) {}
 })();
 
 async function bumpItemsVersion() {
   _itemsVersion++;
-  await db.items.updateAsync(
-    { _meta: "itemsVersion" },
-    { $set: { _meta: "itemsVersion", version: _itemsVersion } },
-    { upsert: true },
+  await Meta.findOneAndUpdate(
+    { key: "itemsVersion" },
+    { $set: { version: _itemsVersion } },
+    { upsert: true, new: true }
   );
   return _itemsVersion;
 }
@@ -66,13 +65,13 @@ router.post("/", async (req, res) => {
           error: "ItemCode, Barcode, and Item_Name are required",
         });
     }
-    const { affectedDocuments } = await Item.updateAsync(
+    const item = await Item.findOneAndUpdate(
       { Barcode },
       { $set: { ItemCode, Barcode, Item_Name } },
-      { upsert: true, returnUpdatedDocs: true },
+      { upsert: true, new: true }
     );
     await bumpItemsVersion();
-    res.status(201).json({ success: true, item: affectedDocuments });
+    res.status(201).json({ success: true, item });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -91,18 +90,12 @@ router.post("/import", requireAuth, requireAdmin, async (req, res) => {
     let modified = 0;
     await Promise.all(
       items.map(async (item) => {
-        const { upsert } = await Item.updateAsync(
+        const result = await Item.updateOne(
           { Barcode: item.Barcode },
-          {
-            $set: {
-              ItemCode: item.ItemCode,
-              Barcode: item.Barcode,
-              Item_Name: item.Item_Name,
-            },
-          },
-          { upsert: true },
+          { $set: { ItemCode: item.ItemCode, Barcode: item.Barcode, Item_Name: item.Item_Name } },
+          { upsert: true }
         );
-        if (upsert) inserted++;
+        if (result.upsertedId) inserted++;
         else modified++;
       }),
     );
@@ -228,18 +221,12 @@ router.post("/upload-csv", upload.single("file"), async (req, res) => {
     let inserted = 0,
       modified = 0;
     for (const item of items) {
-      const result = await Item.updateAsync(
+      const result = await Item.updateOne(
         { Barcode: item.Barcode },
-        {
-          $set: {
-            ItemCode: item.ItemCode,
-            Barcode: item.Barcode,
-            Item_Name: item.Item_Name,
-          },
-        },
-        { upsert: true },
+        { $set: { ItemCode: item.ItemCode, Barcode: item.Barcode, Item_Name: item.Item_Name } },
+        { upsert: true }
       );
-      if (result.upsert) inserted++;
+      if (result.upsertedId) inserted++;
       else modified++;
     }
 

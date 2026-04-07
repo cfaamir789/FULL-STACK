@@ -115,18 +115,15 @@ router.post("/bulk-delete", requireAuth, requireAdmin, async (req, res) => {
     if (ids.length > 0) {
       let deleted = 0;
       for (const id of ids) {
-        const res = await Transaction.deleteOne({ _id: id });
-        deleted += res.deletedCount;
+        const delResult = await Transaction.deleteOne({ _id: id });
+        deleted += delResult.deletedCount;
       }
       return res.json({ success: true, deleted });
     }
 
     if (worker) {
-      const deleted = await Transaction.removeAsync(
-        { Worker_Name: worker },
-        { multi: true },
-      );
-      return res.json({ success: true, deleted });
+      const delResult = await Transaction.deleteMany({ Worker_Name: worker });
+      return res.json({ success: true, deleted: delResult.deletedCount });
     }
 
     return res.status(400).json({
@@ -155,10 +152,10 @@ router.put("/:id", requireAuth, async (req, res) => {
         });
     }
     const { Frombin, Tobin, Qty } = req.body;
-    const updated = await Transaction.updateAsync(
-      { _id: req.params.id },
+    const updated = await Transaction.findByIdAndUpdate(
+      req.params.id,
       { $set: { Frombin, Tobin, Qty: Number(Qty) } },
-      { returnUpdatedDocs: true },
+      { new: true }
     );
     res.json({ success: true, transaction: updated });
   } catch (err) {
