@@ -188,7 +188,7 @@ export const getRecentTransactions = async (limit = 20) => {
 
 export const updateTransaction = async (
   id,
-  { frombin, tobin, qty },
+  { frombin, tobin, qty, notes },
   username,
   role,
 ) => {
@@ -202,8 +202,8 @@ export const updateTransaction = async (
     }
   }
   await db.runAsync(
-    `UPDATE transactions SET frombin = ?, tobin = ?, qty = ?, synced = 0 WHERE id = ?`,
-    [frombin.trim(), tobin.trim(), Number(qty), id],
+    `UPDATE transactions SET frombin = ?, tobin = ?, qty = ?, notes = ?, synced = 0 WHERE id = ?`,
+    [frombin.trim(), tobin.trim(), Number(qty), (notes || '').trim(), id],
   );
 };
 

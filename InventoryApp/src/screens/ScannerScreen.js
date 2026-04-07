@@ -438,9 +438,9 @@ export default function ScannerScreen() {
         onChangeText={setQty}
         placeholder="Enter quantity"
         keyboardType="numeric"
-        returnKeyType="next"
-        onSubmitEditing={() => notesRef.current?.focus()}
-        blurOnSubmit={false}
+        returnKeyType="done"
+        onSubmitEditing={handleSave}
+        blurOnSubmit={true}
       />
 
       <Text style={styles.label}>
@@ -716,6 +716,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 14,
     marginTop: 20,
+    marginBottom: 30,
     elevation: 2,
   },
   saveBtnDisabled: { backgroundColor: Colors.textLight },

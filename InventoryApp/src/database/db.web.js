@@ -210,7 +210,7 @@ export const getRecentTransactions = async (limit = 20) => {
   return txs;
 };
 
-export const updateTransaction = async (id, { frombin, tobin, qty }) => {
+export const updateTransaction = async (id, { frombin, tobin, qty, notes }) => {
   saveTx(
     loadTx().map((t) =>
       t.id === id
@@ -219,6 +219,7 @@ export const updateTransaction = async (id, { frombin, tobin, qty }) => {
             frombin: frombin.trim(),
             tobin: tobin.trim(),
             qty: Number(qty),
+            notes: (notes || '').trim(),
             synced: 0,
           }
         : t,

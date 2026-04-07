@@ -45,6 +45,7 @@ export default function TransactionsScreen({ username, role }) {
   const [editFrombin, setEditFrombin] = useState('');
   const [editTobin, setEditTobin] = useState('');
   const [editQty, setEditQty] = useState('');
+  const [editNotes, setEditNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [validationMsg, setValidationMsg] = useState('');
 
@@ -71,6 +72,7 @@ export default function TransactionsScreen({ username, role }) {
     setEditFrombin(item.frombin);
     setEditTobin(item.tobin);
     setEditQty(String(item.qty));
+    setEditNotes(item.notes || '');
   };
 
   const closeEdit = () => {
@@ -78,6 +80,7 @@ export default function TransactionsScreen({ username, role }) {
     setEditFrombin('');
     setEditTobin('');
     setEditQty('');
+    setEditNotes('');
   };
 
   const handleSave = async () => {
@@ -93,7 +96,7 @@ export default function TransactionsScreen({ username, role }) {
     setValidationMsg('');
     setSaving(true);
     try {
-      await updateTransaction(editItem.id, { frombin: editFrombin, tobin: editTobin, qty }, username, role);
+      await updateTransaction(editItem.id, { frombin: editFrombin, tobin: editTobin, qty, notes: editNotes.trim() }, username, role);
       await loadTransactions();
       closeEdit();
     } catch (err) {
@@ -280,6 +283,15 @@ export default function TransactionsScreen({ username, role }) {
                 placeholder="e.g. 10"
               />
 
+              <Text style={styles.label}>Notes <Text style={{ fontWeight: '400', color: Colors.textLight }}>(optional)</Text></Text>
+              <TextInput
+                style={styles.input}
+                value={editNotes}
+                onChangeText={(t) => setEditNotes(t.toUpperCase())}
+                placeholder="e.g. DAMAGE, EXPIRY 2026-12"
+                autoCapitalize="characters"
+              />
+
               {validationMsg !== '' && (
                 <Text style={styles.validationMsg}>{validationMsg}</Text>
               )}
@@ -438,7 +450,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
-    maxHeight: '85%',
+    paddingBottom: 34,
+    maxHeight: '90%',
   },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   modalTitle: { fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
