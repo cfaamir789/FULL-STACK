@@ -7,9 +7,6 @@ const syncRouter = require("./routes/sync");
 const authRouter = require("./routes/auth");
 const connectDB = require("./config/database");
 
-// Connect to MongoDB permanently
-connectDB();
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -49,8 +46,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, error: "Internal server error" });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/api/health`);
-  console.log(`Admin panel:  http://localhost:${PORT}/admin`);
+// Connect to MongoDB FIRST, then start listening
+connectDB().then(() => {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
+    console.log(`Admin panel:  http://localhost:${PORT}/admin`);
+  });
 });
