@@ -476,83 +476,127 @@
 
     <!-- MAIN PANEL -->
     <div id="mainPanel" class="container hidden">
-      <!-- Stats -->
-      <div class="card">
-        <h2>&#128202; Overview</h2>
-        <div class="stats-row">
-          <div class="stat">
-            <div class="num" id="statItems">-</div>
-            <div class="label">Total Items</div>
-          </div>
-          <div class="stat">
-            <div class="num" id="statUsers">-</div>
-            <div class="label">Users</div>
-          </div>
-          <div class="stat">
-            <div class="num" id="statTx">-</div>
-            <div class="label">Transactions</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Upload CSV -->
-      <div class="card">
-        <h2>&#128194; Upload Master CSV</h2>
-        <p style="color: #888; margin-bottom: 12px">
-          CSV headers: <code>ItemCode, Barcode, Item_Name</code> &mdash; or
-          &mdash; <code>Item No., Barcode No., Item Description</code>
-        </p>
-        <div
-          class="upload-area"
-          id="dropZone"
-          onclick="document.getElementById('csvFile').click()"
-        >
-          <input type="file" id="csvFile" accept=".csv,text/csv" />
-          <div class="icon">&#128196;</div>
-          <p>Click or drag CSV file here</p>
-          <div class="filename" id="fileName"></div>
-        </div>
-
-        <div class="mode-toggle">
-          <button id="modeReplace" class="active" onclick="setMode('replace')">
-            &#128260; Replace All Items
-          </button>
-          <button id="modeMerge" onclick="setMode('merge')">
-            &#128279; Merge (Add/Update)
-          </button>
-        </div>
-
-        <button
-          class="btn btn-primary"
-          id="uploadBtn"
-          onclick="uploadCSV()"
-          disabled
-        >
-          &#128640; Upload &amp; Push to Server
+      <div class="tab-bar" style="border-bottom: 0; margin-bottom: 20px">
+        <button id="navDashboard" class="active" onclick="switchPage('dashboard')">
+          Dashboard
         </button>
-        <div id="uploadResult"></div>
+        <button id="navMaster" onclick="switchPage('master')">Master Data</button>
+        <button id="navWorkers" onclick="switchPage('workers')">Worker Ops</button>
+        <button id="navUsers" onclick="switchPage('users')">Users</button>
       </div>
 
-      <!-- Worker Sync Status -->
-      <div class="card">
-        <h2>&#128225; Worker Sync Status</h2>
-        <p style="color: #888; margin-bottom: 12px">
-          Live view of when each worker last synced their phone data
-        </p>
-        <div id="workerStatusContainer">
-          <div class="loading">Loading...</div>
+      <div id="pageDashboard" class="panel-page">
+        <div class="card">
+          <h2>&#128202; Overview</h2>
+          <div class="stats-row">
+            <div class="stat">
+              <div class="num" id="statItems">-</div>
+              <div class="label">Total Items</div>
+            </div>
+            <div class="stat">
+              <div class="num" id="statUsers">-</div>
+              <div class="label">Users</div>
+            </div>
+            <div class="stat">
+              <div class="num" id="statTx">-</div>
+              <div class="label">Transactions</div>
+            </div>
+          </div>
         </div>
-        <button
-          class="btn btn-primary"
-          style="margin-top: 12px; max-width: 220px"
-          onclick="loadWorkerStatus()"
-        >
-          &#128260; Refresh
-        </button>
+
+        <div class="card">
+          <h2>&#128161; What Each Action Means</h2>
+          <table>
+            <thead>
+              <tr><th>Action</th><th>What It Does</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Replace All Items</td><td>Deletes old master items, then inserts CSV as a fresh master list.</td></tr>
+              <tr><td>Merge (Add/Update)</td><td>Keeps existing items and only adds new barcodes or updates changed rows.</td></tr>
+              <tr><td>Delete All Items</td><td>Clears complete item master data from server.</td></tr>
+              <tr><td>Delete All Transactions</td><td>Clears all worker movement history from server.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <!-- Transactions -->
-      <div class="card">
+      <div id="pageMaster" class="panel-page hidden">
+        <div class="card">
+          <h2>&#128194; Upload Master CSV</h2>
+          <p style="color: #888; margin-bottom: 12px">
+            CSV headers: <code>ItemCode, Barcode, Item_Name</code> &mdash; or
+            &mdash; <code>Item No., Barcode No., Item Description</code>
+          </p>
+          <div
+            class="upload-area"
+            id="dropZone"
+            onclick="document.getElementById('csvFile').click()"
+          >
+            <input type="file" id="csvFile" accept=".csv,text/csv" />
+            <div class="icon">&#128196;</div>
+            <p>Click or drag CSV file here</p>
+            <div class="filename" id="fileName"></div>
+          </div>
+
+          <div class="mode-toggle">
+            <button id="modeReplace" class="active" onclick="setMode('replace')">
+              &#128260; Replace All Items
+            </button>
+            <button id="modeMerge" onclick="setMode('merge')">
+              &#128279; Merge (Add/Update)
+            </button>
+          </div>
+
+          <button
+            class="btn btn-primary"
+            id="uploadBtn"
+            onclick="uploadCSV()"
+            disabled
+          >
+            &#128640; Upload &amp; Push to Server
+          </button>
+          <div id="uploadResult"></div>
+        </div>
+
+        <div class="card">
+          <h2>&#128230; Current Items</h2>
+          <input
+            type="text"
+            class="search-box"
+            id="itemsSearch"
+            placeholder="Search by item code, barcode, or name..."
+            oninput="loadItems(1)"
+          />
+          <div id="itemsContainer">
+            <div class="loading">Open this page to load items...</div>
+          </div>
+        </div>
+
+        <div class="card" style="border: 1px solid #ffcdd2">
+          <h2 style="color: #e53935">&#9888;&#65039; Danger Zone</h2>
+          <button class="btn btn-danger" onclick="clearAllItems()">Delete All Items</button>
+        </div>
+      </div>
+
+      <div id="pageWorkers" class="panel-page hidden">
+        <div class="card">
+          <h2>&#128225; Worker Sync Status</h2>
+          <p style="color: #888; margin-bottom: 12px">
+            Live view of when each worker last synced their phone data
+          </p>
+          <div id="workerStatusContainer">
+            <div class="loading">Loading...</div>
+          </div>
+          <button
+            class="btn btn-primary"
+            style="margin-top: 12px; max-width: 220px"
+            onclick="loadWorkerStatus()"
+          >
+            &#128260; Refresh
+          </button>
+        </div>
+
+        <div class="card">
         <div class="tx-header">
           <h2>&#128196; Transactions (Worker Data)</h2>
           <div class="tx-actions">
@@ -650,44 +694,40 @@
         <div id="txContainer"><div class="loading">Loading...</div></div>
       </div>
 
-      <!-- Users -->
-      <div class="card">
-        <h2>&#128101; Users</h2>
-        <div id="usersContainer"><div class="loading">Loading...</div></div>
-      </div>
-
-      <!-- Items List -->
-      <div class="card">
-        <h2>&#128230; Current Items</h2>
-        <input
-          type="text"
-          class="search-box"
-          placeholder="Search by item code, barcode, or name..."
-          oninput="searchItems(this.value)"
-        />
-        <div id="itemsContainer">
-          <div class="loading">Loading items...</div>
+        <div class="card" style="border: 1px solid #ffcdd2">
+          <h2 style="color: #e53935">&#9888;&#65039; Danger Zone</h2>
+          <button class="btn btn-danger" onclick="clearAllTransactions()">
+            Delete All Transactions
+          </button>
         </div>
       </div>
 
-      <!-- Danger Zone -->
-      <div class="card" style="border: 1px solid #ffcdd2">
-        <h2 style="color: #e53935">&#9888;&#65039; Danger Zone</h2>
-        <div style="display: flex; gap: 12px; flex-wrap: wrap">
-          <button
-            class="btn btn-danger"
-            style="flex: 1; min-width: 200px"
-            onclick="clearAllItems()"
-          >
-            Delete All Items
-          </button>
-          <button
-            class="btn btn-danger"
-            style="flex: 1; min-width: 200px"
-            onclick="clearAllTransactions()"
-          >
-            Delete All Transactions
-          </button>
+      <div id="pageUsers" class="panel-page hidden">
+        <div class="card">
+          <h2>&#10133; Create User</h2>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <input id="newUserName" class="search-box" style="margin:0; flex:2; min-width:160px" placeholder="USERNAME" />
+            <input id="newUserPin" class="search-box" style="margin:0; flex:1; min-width:140px" placeholder="PIN (min 4)" type="password" />
+            <select id="newUserRole" class="search-box" style="margin:0; flex:1; min-width:120px">
+              <option value="worker">Worker</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button class="btn btn-primary" style="max-width:220px" onclick="createUser()">Create User</button>
+          </div>
+          <div id="userCreateResult"></div>
+        </div>
+
+        <div class="card">
+          <h2>&#128101; Users</h2>
+          <div id="usersContainer"><div class="loading">Loading...</div></div>
+        </div>
+
+        <div class="card">
+          <h2>&#128274; Account Recovery</h2>
+          <p style="color:#666; line-height:1.7">
+            If a worker or admin forgets their PIN, another logged-in admin can use Reset PIN from the Users list.
+            If all admins are lost, you must reset directly in the database (MongoDB Atlas) or deploy a temporary recovery script.
+          </p>
         </div>
       </div>
 
@@ -707,7 +747,14 @@
       let authToken = localStorage.getItem("adminToken") || "";
       let uploadMode = "replace";
       let selectedFile = null;
-      let allItems = [];
+      let pageLoaded = {
+        dashboard: false,
+        master: false,
+        workers: false,
+        users: false,
+      };
+      let currentItemsPage = 1;
+      let currentItemsPages = 1;
 
       // ─── Auth ────────────────────────────────────────────────────────────────────
       async function apiFetch(path, opts = {}) {
@@ -803,14 +850,36 @@
       async function showPanel() {
         document.getElementById("loginSection").classList.add("hidden");
         document.getElementById("mainPanel").classList.remove("hidden");
-        // Fire ALL data loads in parallel for maximum speed
-        await Promise.allSettled([
-          loadStats(),
-          loadItems(),
-          loadWorkerStatus(),
-          loadTransactions(),
-          loadUsers()
-        ]);
+        switchPage("dashboard");
+      }
+
+      async function switchPage(page) {
+        const pages = ["dashboard", "master", "workers", "users"];
+        pages.forEach((p) => {
+          document
+            .getElementById("page" + p.charAt(0).toUpperCase() + p.slice(1))
+            .classList.toggle("hidden", p !== page);
+          document
+            .getElementById("nav" + p.charAt(0).toUpperCase() + p.slice(1))
+            .classList.toggle("active", p === page);
+        });
+
+        if (page === "dashboard" && !pageLoaded.dashboard) {
+          await loadStats();
+          pageLoaded.dashboard = true;
+        }
+        if (page === "master" && !pageLoaded.master) {
+          await Promise.allSettled([loadStats(), loadItems(1)]);
+          pageLoaded.master = true;
+        }
+        if (page === "workers" && !pageLoaded.workers) {
+          await Promise.allSettled([loadStats(), loadWorkerStatus(), loadTransactions()]);
+          pageLoaded.workers = true;
+        }
+        if (page === "users" && !pageLoaded.users) {
+          await Promise.allSettled([loadStats(), loadUsers()]);
+          pageLoaded.users = true;
+        }
       }
 
       // ─── Stats ───────────────────────────────────────────────────────────────────
@@ -899,7 +968,7 @@
             data.modified +
             ")</div>";
           loadStats();
-          loadItems();
+          loadItems(1);
           selectedFile = null;
           document.getElementById("fileName").textContent = "";
         } catch (err) {
@@ -1318,6 +1387,10 @@
               (u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "") +
               '</div></div><div style="display:flex;gap:8px;flex-wrap:wrap">';
             html +=
+              '<button class="btn-sm btn-primary" style="background:#e3f2fd;color:#1565c0" onclick="resetUserPin(' +
+              JSON.stringify(u.username) +
+              ')">Reset PIN</button>';
+            html +=
               '<button class="btn-sm btn-danger" onclick="deleteUserDataOnly(' +
               JSON.stringify(u.username) +
               ')">Delete Data</button>';
@@ -1337,6 +1410,57 @@
         } catch (err) {
           container.innerHTML =
             '<div class="alert alert-error">' + err.message + "</div>";
+        }
+      }
+
+      async function createUser() {
+        const username = document.getElementById("newUserName").value.trim();
+        const pin = document.getElementById("newUserPin").value.trim();
+        const role = document.getElementById("newUserRole").value;
+        const result = document.getElementById("userCreateResult");
+        result.innerHTML = "";
+        if (!username || !pin) {
+          result.innerHTML = '<div class="alert alert-error">Username and PIN are required.</div>';
+          return;
+        }
+        if (pin.length < 4) {
+          result.innerHTML = '<div class="alert alert-error">PIN must be at least 4 digits.</div>';
+          return;
+        }
+        try {
+          const data = await apiFetch("/auth/register", {
+            method: "POST",
+            body: JSON.stringify({ username, pin, role }),
+          });
+          result.innerHTML =
+            '<div class="alert alert-success">User created: ' +
+            esc(data.username) +
+            " (" +
+            esc(data.role) +
+            ")</div>";
+          document.getElementById("newUserName").value = "";
+          document.getElementById("newUserPin").value = "";
+          await Promise.allSettled([loadUsers(), loadStats()]);
+        } catch (err) {
+          result.innerHTML = '<div class="alert alert-error">' + esc(err.message) + "</div>";
+        }
+      }
+
+      async function resetUserPin(username) {
+        const pin = prompt("Enter new PIN for " + username + " (min 4 digits):");
+        if (!pin) return;
+        if (String(pin).trim().length < 4) {
+          alert("PIN must be at least 4 digits.");
+          return;
+        }
+        try {
+          await apiFetch("/auth/users/" + encodeURIComponent(username) + "/reset-pin", {
+            method: "POST",
+            body: JSON.stringify({ pin: String(pin).trim() }),
+          });
+          alert("PIN reset successfully for " + username + ".");
+        } catch (err) {
+          alert("PIN reset failed: " + err.message);
         }
       }
 
@@ -1387,97 +1511,80 @@
       }
 
       // ─── Items List ──────────────────────────────────────────────────────────────
-      async function loadItems() {
+      async function loadItems(page = 1) {
         const container = document.getElementById("itemsContainer");
         container.innerHTML = '<div class="loading">Loading items...</div>';
         try {
-          const data = await apiFetch("/items");
-          allItems = data.items || [];
-          renderItems(allItems);
+          const q = (document.getElementById("itemsSearch")?.value || "").trim();
+          const data = await apiFetch(
+            "/items?paginated=1&page=" +
+              page +
+              "&limit=50" +
+              (q ? "&q=" + encodeURIComponent(q) : ""),
+          );
+          currentItemsPage = data.page || 1;
+          currentItemsPages = Math.max(1, Math.ceil((data.total || 0) / (data.limit || 50)));
+          renderItems(data.items || [], data.total || 0);
         } catch (err) {
           container.innerHTML =
             '<div class="alert alert-error">' + err.message + "</div>";
         }
       }
 
-      function renderItems(items) {
+      function renderItems(items, total) {
         const container = document.getElementById("itemsContainer");
         if (items.length === 0) {
           container.innerHTML =
             '<div class="loading">No items found. Upload a CSV to get started.</div>';
           return;
         }
-        const pageSize = 50;
-        const pages = Math.ceil(items.length / pageSize);
-        let page = 1;
-
-        function render() {
-          const start = (page - 1) * pageSize;
-          const slice = items.slice(start, start + pageSize);
-          let html =
-            '<div class="preview-count">Showing ' +
-            (start + 1) +
-            "–" +
-            (start + slice.length) +
-            " of " +
-            items.length +
-            "</div>";
+        const start = (currentItemsPage - 1) * 50;
+        let html =
+          '<div class="preview-count">Showing ' +
+          (start + 1) +
+          "–" +
+          (start + items.length) +
+          " of " +
+          total +
+          "</div>";
+        html +=
+          "<table><thead><tr><th>#</th><th>ItemCode</th><th>Barcode</th><th>Item Name</th></tr></thead><tbody>";
+        items.forEach((it, i) => {
           html +=
-            "<table><thead><tr><th>#</th><th>ItemCode</th><th>Barcode</th><th>Item Name</th></tr></thead><tbody>";
-          slice.forEach((it, i) => {
-            html +=
-              "<tr><td>" +
-              (start + i + 1) +
-              "</td><td>" +
-              esc(it.ItemCode) +
-              "</td><td>" +
-              esc(it.Barcode) +
-              "</td><td>" +
-              esc(it.Item_Name) +
-              "</td></tr>";
-          });
-          html += "</tbody></table>";
-          if (pages > 1) {
-            html += '<div class="pagination">';
-            html +=
-              "<button " +
-              (page <= 1 ? "disabled" : "") +
-              ' onclick="itemPage(' +
-              (page - 1) +
-              ')">Prev</button>';
-            html +=
-              '<span style="padding:6px;">' + page + " / " + pages + "</span>";
-            html +=
-              "<button " +
-              (page >= pages ? "disabled" : "") +
-              ' onclick="itemPage(' +
-              (page + 1) +
-              ')">Next</button>';
-            html += "</div>";
-          }
-          container.innerHTML = html;
+            "<tr><td>" +
+            (start + i + 1) +
+            "</td><td>" +
+            esc(it.ItemCode) +
+            "</td><td>" +
+            esc(it.Barcode) +
+            "</td><td>" +
+            esc(it.Item_Name) +
+            "</td></tr>";
+        });
+        html += "</tbody></table>";
+        if (currentItemsPages > 1) {
+          html += '<div class="pagination">';
+          html +=
+            "<button " +
+            (currentItemsPage <= 1 ? "disabled" : "") +
+            ' onclick="loadItems(' +
+            (currentItemsPage - 1) +
+            ')">Prev</button>';
+          html +=
+            '<span style="padding:6px;">' +
+            currentItemsPage +
+            " / " +
+            currentItemsPages +
+            "</span>";
+          html +=
+            "<button " +
+            (currentItemsPage >= currentItemsPages ? "disabled" : "") +
+            ' onclick="loadItems(' +
+            (currentItemsPage + 1) +
+            ')">Next</button>';
+          html += "</div>";
         }
-
-        window.itemPage = function (p) {
-          page = p;
-          render();
-        };
-        render();
-      }
-
-      function searchItems(q) {
-        if (!q) {
-          renderItems(allItems);
-          return;
-        }
-        const lower = q.toLowerCase();
-        const filtered = allItems.filter(
-          (it) =>
-            (it.ItemCode || "").toLowerCase().includes(lower) ||
-            (it.Barcode || "").toLowerCase().includes(lower) ||
-            (it.Item_Name || "").toLowerCase().includes(lower),
-        );
-        renderItems(filtered);
+        container.innerHTML = html;
       }
 
       function esc(str) {
@@ -1496,7 +1603,7 @@
         try {
           await apiFetch("/items/all", { method: "DELETE" });
           loadStats();
-          loadItems();
+          loadItems(1);
           alert("All items deleted.");
         } catch (err) {
           alert("Error: " + err.message);

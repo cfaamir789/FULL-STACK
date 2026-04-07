@@ -128,6 +128,28 @@ router.delete('/users/:username', requireAuth, requireAdmin, async (req, res) =>
   }
 });
 
+// ─── POST /api/auth/users/:username/reset-pin ───────────────────────────────
+// Admin-only: reset an existing user's PIN
+router.post('/users/:username/reset-pin', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const username = req.params.username.toUpperCase();
+    const { pin } = req.body;
+    if (!pin || String(pin).length < 4) {
+      return res.status(400).json({ success: false, error: 'PIN must be at least 4 digits.' });
+    }
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found.' });
+    }
+    const hash = await bcrypt.hash(String(pin), 10);
+    user.pin_hash = hash;
+    await user.save();
+    res.json({ success: true, username: user.username });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── GET /api/auth/check-setup ──────────────────────────────────────────────
 // Frontend calls this to decide whether to show the Setup screen or Login screen
 router.get('/check-setup', async (req, res) => {

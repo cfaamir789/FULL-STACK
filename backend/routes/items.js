@@ -6,6 +6,14 @@ const Item = require("../models/Item");
 const Meta = require("../models/Meta");
 const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
 
+function chunkArray(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
 // ─── Item Version Tracking ──────────────────────────────────────────────────
 let _itemsVersion = 0;
 
@@ -46,6 +54,10 @@ router.get("/count", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const { q } = req.query;
+    const paginated = String(req.query.paginated || "0") === "1";
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const skip = (page - 1) * limit;
     let query = {};
     if (q) {
       const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
@@ -53,10 +65,19 @@ router.get("/", async (req, res) => {
         $or: [{ Item_Name: regex }, { Barcode: regex }, { ItemCode: regex }],
       };
     }
-    
-    const items = await Item.find(query)
-      .sort({ Item_Name: 1 })
-      ;
+
+    if (paginated) {
+      const [items, total] = await Promise.all([
+        Item.find(query)
+          .sort({ Item_Name: 1 })
+          .skip(skip)
+          .limit(limit),
+        Item.countDocuments(query),
+      ]);
+      return res.json({ success: true, count: items.length, total, page, limit, items });
+    }
+
+    const items = await Item.find(query).sort({ Item_Name: 1 });
     res.json({ success: true, count: items.length, items });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -163,7 +184,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
 });
-router.post("/upload-csv", upload.single("file"), async (req, res) => {
+router.post("/upload-csv", requireAuth, requireAdmin, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res
@@ -200,7 +221,7 @@ router.post("/upload-csv", upload.single("file"), async (req, res) => {
       });
     }
 
-    const items = parsed.data
+    const rawItems = parsed.data
       .filter((r) =>
         hasOldFormat
           ? r["Barcode No."] && r["Item Description"]
@@ -216,6 +237,13 @@ router.post("/upload-csv", upload.single("file"), async (req, res) => {
         ).trim(),
       }));
 
+    // Keep only the latest row per barcode to avoid duplicate writes.
+    const dedup = new Map();
+    for (const item of rawItems) {
+      dedup.set(item.Barcode, item);
+    }
+    const items = Array.from(dedup.values());
+
     if (items.length === 0) {
       return res
         .status(400)
@@ -228,16 +256,35 @@ router.post("/upload-csv", upload.single("file"), async (req, res) => {
       await Item.deleteMany({});
     }
 
-    let inserted = 0,
-      modified = 0;
-    for (const item of items) {
-      const result = await Item.updateOne(
-        { Barcode: item.Barcode },
-        { $set: { ItemCode: item.ItemCode, Barcode: item.Barcode, Item_Name: item.Item_Name } },
-        { upsert: true }
-      );
-      if (result.upsertedId) inserted++;
-      else modified++;
+    let inserted = 0;
+    let modified = 0;
+
+    if (mode === "replace") {
+      const chunks = chunkArray(items, 2000);
+      for (const chunk of chunks) {
+        await Item.insertMany(chunk, { ordered: false });
+      }
+      inserted = items.length;
+    } else {
+      const chunks = chunkArray(items, 1000);
+      for (const chunk of chunks) {
+        const ops = chunk.map((item) => ({
+          updateOne: {
+            filter: { Barcode: item.Barcode },
+            update: {
+              $set: {
+                ItemCode: item.ItemCode,
+                Barcode: item.Barcode,
+                Item_Name: item.Item_Name,
+              },
+            },
+            upsert: true,
+          },
+        }));
+        const result = await Item.bulkWrite(ops, { ordered: false });
+        inserted += result.upsertedCount || 0;
+        modified += result.modifiedCount || 0;
+      }
     }
 
     const totalItems = await Item.countDocuments({});
