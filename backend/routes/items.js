@@ -32,6 +32,16 @@ router.get("/version", async (req, res) => {
   res.json({ success: true, version: _itemsVersion });
 });
 
+// GET /api/items/count — fast count without fetching all docs
+router.get("/count", async (req, res) => {
+  try {
+    const count = await Item.countDocuments({});
+    res.json({ success: true, count });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/items — return all items
 router.get("/", async (req, res) => {
   try {

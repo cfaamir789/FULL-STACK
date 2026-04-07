@@ -803,35 +803,30 @@
       async function showPanel() {
         document.getElementById("loginSection").classList.add("hidden");
         document.getElementById("mainPanel").classList.remove("hidden");
-        loadStats();
-        loadItems();
-        loadWorkerStatus();
-        loadTransactions();
-        loadUsers();
+        // Fire ALL data loads in parallel for maximum speed
+        await Promise.allSettled([
+          loadStats(),
+          loadItems(),
+          loadWorkerStatus(),
+          loadTransactions(),
+          loadUsers()
+        ]);
       }
 
       // ─── Stats ───────────────────────────────────────────────────────────────────
       async function loadStats() {
-        try {
-          const items = await apiFetch("/items");
-          document.getElementById("statItems").textContent = items.count || 0;
-        } catch {
-          document.getElementById("statItems").textContent = "?";
-        }
-        try {
-          const users = await apiFetch("/auth/users");
-          document.getElementById("statUsers").textContent = users.users
-            ? users.users.length
-            : 0;
-        } catch {
-          document.getElementById("statUsers").textContent = "?";
-        }
-        try {
-          const stats = await apiFetch("/transactions/stats");
-          document.getElementById("statTx").textContent = stats.total || 0;
-        } catch {
-          document.getElementById("statTx").textContent = "?";
-        }
+        // Fire all 3 stats requests in parallel for speed
+        const [itemsRes, usersRes, statsRes] = await Promise.allSettled([
+          apiFetch("/items/count"),
+          apiFetch("/auth/users"),
+          apiFetch("/transactions/stats")
+        ]);
+        document.getElementById("statItems").textContent =
+          itemsRes.status === "fulfilled" ? (itemsRes.value.count || 0) : "?";
+        document.getElementById("statUsers").textContent =
+          usersRes.status === "fulfilled" ? (usersRes.value.users?.length || 0) : "?";
+        document.getElementById("statTx").textContent =
+          statsRes.status === "fulfilled" ? (statsRes.value.total || 0) : "?";
       }
 
       // ─── File Upload ─────────────────────────────────────────────────────────────

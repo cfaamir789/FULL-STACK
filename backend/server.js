@@ -7,15 +7,21 @@ const syncRouter = require("./routes/sync");
 const authRouter = require("./routes/auth");
 const connectDB = require("./config/database");
 
+const compression = require("compression");
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-// Serve admin web panel
-app.use("/admin", express.static(path.join(__dirname, "public")));
+// Serve admin web panel — cached for 1 hour
+app.use("/admin", express.static(path.join(__dirname, "public"), {
+  maxAge: "1h",
+  etag: true,
+}));
 app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
@@ -52,5 +58,14 @@ connectDB().then(() => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/api/health`);
     console.log(`Admin panel:  http://localhost:${PORT}/admin`);
+
+    // Keep-alive self-ping every 14 min to prevent Render free tier sleep
+    if (process.env.NODE_ENV === "production") {
+      const keepAliveUrl = `https://inventory-backend-fdex.onrender.com/api/health`;
+      setInterval(() => {
+        require("https").get(keepAliveUrl, () => {}).on("error", () => {});
+      }, 14 * 60 * 1000);
+      console.log("Keep-alive ping enabled (every 14 min)");
+    }
   });
 });
