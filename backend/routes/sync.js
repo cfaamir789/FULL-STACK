@@ -71,7 +71,7 @@ router.post("/", requireAuth, async (req, res) => {
       Worker_Name: workerName,
       createdAt: new Date(),
     }));
-    await Transaction.insertAsync(docs);
+    await Transaction.insertMany(docs);
     // Track this worker's sync activity
     recordWorkerSync(workerName, docs.length);
     // Append to Google Sheet asynchronously — never blocks the phone response
@@ -89,12 +89,12 @@ router.get("/", async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
     const skip = (page - 1) * limit;
     const [transactions, total] = await Promise.all([
-      Transaction.findAsync({})
+      Transaction.find({})
         .sort({ Timestamp: -1 })
         .skip(skip)
         .limit(limit)
-        .execAsync(),
-      Transaction.countAsync({}),
+        ,
+      Transaction.countDocuments({}),
     ]);
     res.json({ success: true, total, page, limit, transactions });
   } catch (err) {
@@ -115,7 +115,8 @@ router.post("/bulk-delete", requireAuth, requireAdmin, async (req, res) => {
     if (ids.length > 0) {
       let deleted = 0;
       for (const id of ids) {
-        deleted += await Transaction.removeAsync({ _id: id }, {});
+        const res = await Transaction.deleteOne({ _id: id });
+        deleted += res.deletedCount;
       }
       return res.json({ success: true, deleted });
     }
@@ -140,7 +141,7 @@ router.post("/bulk-delete", requireAuth, requireAdmin, async (req, res) => {
 // PUT /api/transactions/:id — edit (owner or admin only)
 router.put("/:id", requireAuth, async (req, res) => {
   try {
-    const tx = await Transaction.findOneAsync({ _id: req.params.id });
+    const tx = await Transaction.findOne({ _id: req.params.id });
     if (!tx)
       return res
         .status(404)
@@ -171,7 +172,7 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
     if (req.params.id === "all") {
       return next();
     }
-    const tx = await Transaction.findOneAsync({ _id: req.params.id });
+    const tx = await Transaction.findOne({ _id: req.params.id });
     if (!tx)
       return res
         .status(404)
@@ -184,7 +185,7 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
           error: "You can only delete your own transactions.",
         });
     }
-    await Transaction.removeAsync({ _id: req.params.id }, {});
+    await Transaction.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -194,7 +195,7 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
 // GET /api/transactions/stats — admin dashboard stats per worker
 router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const allTx = await Transaction.findAsync({}).execAsync();
+    const allTx = await Transaction.find({});
     const workerMap = {};
     for (const tx of allTx) {
       const w = tx.Worker_Name || "unknown";
@@ -224,9 +225,9 @@ router.get("/export", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { worker } = req.query;
     const query = worker ? { Worker_Name: worker } : {};
-    const transactions = await Transaction.findAsync(query)
+    const transactions = await Transaction.find(query)
       .sort({ Timestamp: -1 })
-      .execAsync();
+      ;
     const header =
       "Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Notes,Timestamp\n";
     const rows = transactions
@@ -259,8 +260,8 @@ router.get("/export", requireAuth, requireAdmin, async (req, res) => {
 // DELETE /api/transactions/all — admin: clear ALL transactions from server after export
 router.delete("/all", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const count = await Transaction.countAsync({});
-    await Transaction.removeAsync({}, { multi: true });
+    const count = await Transaction.countDocuments({});
+    await Transaction.deleteMany({});
     res.json({ success: true, deleted: count });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

@@ -44,10 +44,10 @@ router.get("/", async (req, res) => {
         $or: [{ Item_Name: regex }, { Barcode: regex }, { ItemCode: regex }],
       };
     }
-    query._meta = { $exists: false }; // exclude version meta doc
-    const items = await Item.findAsync(query)
+    
+    const items = await Item.find(query)
       .sort({ Item_Name: 1 })
-      .execAsync();
+      ;
     res.json({ success: true, count: items.length, items });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -116,8 +116,8 @@ router.post("/import", requireAuth, requireAdmin, async (req, res) => {
 // DELETE /api/items/all — admin: clear all items before re-import
 router.delete("/all", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const count = await Item.countAsync({});
-    await Item.removeAsync({}, { multi: true });
+    const count = await Item.countDocuments({});
+    await Item.deleteMany({});
     await bumpItemsVersion();
     res.json({ success: true, deleted: count });
   } catch (err) {
@@ -135,12 +135,12 @@ router.post("/replace", requireAuth, requireAdmin, async (req, res) => {
         .json({ success: false, error: "items array is required" });
     }
     // Clear old items
-    await Item.removeAsync({}, { multi: true });
+    await Item.deleteMany({});
     // Insert new
     let inserted = 0;
     await Promise.all(
       items.map(async (item) => {
-        await Item.insertAsync({
+        await Item.create({
           ItemCode: item.ItemCode,
           Barcode: item.Barcode,
           Item_Name: item.Item_Name,
@@ -222,7 +222,7 @@ router.post("/upload-csv", upload.single("file"), async (req, res) => {
     const mode = req.query.mode || "replace"; // 'replace' or 'merge'
 
     if (mode === "replace") {
-      await Item.removeAsync({}, { multi: true });
+      await Item.deleteMany({});
     }
 
     let inserted = 0,
@@ -243,7 +243,7 @@ router.post("/upload-csv", upload.single("file"), async (req, res) => {
       else modified++;
     }
 
-    const totalItems = await Item.countAsync({});
+    const totalItems = await Item.countDocuments({});
     await bumpItemsVersion();
     res.json({ success: true, inserted, modified, totalItems });
   } catch (err) {

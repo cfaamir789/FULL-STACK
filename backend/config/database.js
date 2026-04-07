@@ -1,19 +1,14 @@
-const Datastore = require('@seald-io/nedb');
-const path = require('path');
-const fs = require('fs');
+const mongoose = require('mongoose');
 
-const dataDir = path.join(__dirname, '..', 'data');
-fs.mkdirSync(dataDir, { recursive: true });
-
-const db = {
-  items: new Datastore({ filename: path.join(dataDir, 'items.db'), autoload: true }),
-  transactions: new Datastore({ filename: path.join(dataDir, 'transactions.db'), autoload: true }),
-  users: new Datastore({ filename: path.join(dataDir, 'users.db'), autoload: true }),
+const connectDB = async () => {
+  try {
+    const uri = process.env.MONGODB_URI;
+    if (!uri) throw new Error("MONGODB_URI is not defined in .env");
+    await mongoose.connect(uri);
+    console.log('MongoDB Connected Successfully!');
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+  }
 };
 
-// Unique index on Barcode
-db.items.ensureIndex({ fieldName: 'Barcode', unique: true });
-// Unique index on username (case-insensitive handled at insert time)
-db.users.ensureIndex({ fieldName: 'username', unique: true });
-
-module.exports = db;
+module.exports = connectDB;

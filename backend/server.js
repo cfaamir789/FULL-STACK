@@ -5,6 +5,10 @@ const path = require("path");
 const itemsRouter = require("./routes/items");
 const syncRouter = require("./routes/sync");
 const authRouter = require("./routes/auth");
+const connectDB = require("./config/database");
+
+// Connect to MongoDB permanently
+connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

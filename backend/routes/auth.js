@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../config/database');
+const User = require('../models/User');
 const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'warehouse_inv_super_secret_key_2026';
@@ -12,7 +12,7 @@ const TOKEN_EXPIRY = '30d'; // workers stay logged in for 30 days
 // Creates the first admin account. Blocked once any user exists.
 router.post('/setup', async (req, res) => {
   try {
-    const existing = await db.users.findAsync({});
+    const existing = await User.find({});
     if (existing.length > 0) {
       return res.status(409).json({ success: false, error: 'Setup already complete. Use /login.' });
     }
@@ -24,7 +24,7 @@ router.post('/setup', async (req, res) => {
       return res.status(400).json({ success: false, error: 'PIN must be at least 4 digits.' });
     }
     const hash = await bcrypt.hash(String(pin), 10);
-    const user = await db.users.insertAsync({
+    const user = await User.create({
       username: username.trim().toUpperCase(),
       pin_hash: hash,
       role: 'admin',
@@ -48,7 +48,7 @@ router.post('/login', async (req, res) => {
     if (!username || !pin) {
       return res.status(400).json({ success: false, error: 'username and pin are required.' });
     }
-    const user = await db.users.findOneAsync({ username: username.trim().toUpperCase() });
+    const user = await User.findOne({ username: username.trim().toUpperCase() });
     if (!user) {
       return res.status(401).json({ success: false, error: 'Invalid username or PIN.' });
     }
@@ -82,7 +82,7 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
       return res.status(400).json({ success: false, error: 'role must be admin or worker.' });
     }
     const hash = await bcrypt.hash(String(pin), 10);
-    const user = await db.users.insertAsync({
+    const user = await User.create({
       username: username.trim().toUpperCase(),
       pin_hash: hash,
       role,
@@ -90,7 +90,7 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
     });
     res.status(201).json({ success: true, username: user.username, role: user.role });
   } catch (err) {
-    if (err.errorType === 'uniqueViolated') {
+    if (err.code === 11000) {
       return res.status(409).json({ success: false, error: 'Username already exists.' });
     }
     res.status(500).json({ success: false, error: err.message });
@@ -101,7 +101,7 @@ router.post('/register', requireAuth, requireAdmin, async (req, res) => {
 // Admin-only: list all users (no hashes returned)
 router.get('/users', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const users = await db.users.findAsync({});
+    const users = await User.find({});
     const safe = users.map((u) => ({ id: u._id, username: u.username, role: u.role, createdAt: u.createdAt }));
     res.json({ success: true, users: safe });
   } catch (err) {
@@ -117,7 +117,8 @@ router.delete('/users/:username', requireAuth, requireAdmin, async (req, res) =>
     if (username === req.user.username) {
       return res.status(400).json({ success: false, error: 'Cannot delete your own account.' });
     }
-    const removed = await db.users.removeAsync({ username }, {});
+    const resObj = await User.deleteOne({ username });
+    const removed = resObj.deletedCount;
     if (removed === 0) {
       return res.status(404).json({ success: false, error: 'User not found.' });
     }
@@ -131,7 +132,7 @@ router.delete('/users/:username', requireAuth, requireAdmin, async (req, res) =>
 // Frontend calls this to decide whether to show the Setup screen or Login screen
 router.get('/check-setup', async (req, res) => {
   try {
-    const count = await db.users.countAsync({});
+    const count = await User.countDocuments({});
     res.json({ success: true, needsSetup: count === 0 });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
