@@ -12,7 +12,7 @@ import {
   ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 
 const IS_WEB = Platform.OS === "web";
 let CameraView, useCameraPermissions;
@@ -35,6 +35,7 @@ import { attemptSync } from "../services/syncService";
 import Colors from "../theme/colors";
 
 export default function ScannerScreen() {
+  const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
   const [mode, setMode] = useState("barcode");
   const [scanned, setScanned] = useState(false);
@@ -268,6 +269,7 @@ export default function ScannerScreen() {
             onChangeText={setBarcode}
             placeholder="Scan or type barcode"
             autoCapitalize="none"
+            keyboardType="number-pad"
             returnKeyType="search"
             onSubmitEditing={handleBarcodeSearch}
             blurOnSubmit={false}
@@ -295,6 +297,7 @@ export default function ScannerScreen() {
             onChangeText={setItemCode}
             placeholder="Type item code"
             autoCapitalize="none"
+            keyboardType="number-pad"
             returnKeyType="search"
             onSubmitEditing={handleItemCodeSearch}
             blurOnSubmit={false}
@@ -536,8 +539,8 @@ export default function ScannerScreen() {
         <View style={styles.container}>
           {renderTabs()}
 
-          {/* Camera — only mounted when cameraActive to prevent black screen on other tabs */}
-          {mode === "barcode" && showCamera && cameraActive && (
+          {/* Camera — only mounted when tab is focused, barcode mode, and camera active */}
+          {isFocused && mode === "barcode" && showCamera && cameraActive && (
             <View style={styles.cameraWrap}>
               <CameraView
                 style={StyleSheet.absoluteFillObject}
