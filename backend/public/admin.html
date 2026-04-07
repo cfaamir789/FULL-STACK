@@ -1028,7 +1028,7 @@
             txs.length +
             " transactions</div>";
           html +=
-            '<div style="overflow-x:auto"><table id="txTable"><thead><tr><th>Item Code</th><th>Barcode</th><th>Item Name</th><th>From Bin</th><th>To Bin</th><th>Qty</th><th>Worker</th><th>Notes</th><th>Date/Time</th><th></th></tr></thead><tbody>';
+            '<div style="overflow-x:auto"><table id="txTable"><thead><tr><th>Item Code</th><th>Barcode</th><th>Item Name</th><th>From Bin</th><th>To Bin</th><th>Qty</th><th>Worker</th><th>Notes</th><th>Date/Time</th><th>Copy</th><th>Delete</th></tr></thead><tbody>';
           slice.forEach((tx, i) => {
             const idx = start + i;
             const dt = tx.Timestamp
@@ -1048,6 +1048,10 @@
               '<td><button class="copy-icon-btn" onclick="copyRow(' +
               idx +
               ', this)" title="Copy this row"><svg class="copy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><polyline points="20 6 9 17 4 12"></polyline></svg></button></td>';
+            html +=
+              '<td><button class="copy-icon-btn" style="color:#d32f2f;border-color:#f3c1c1" onclick="deleteTxRow(' +
+              idx +
+              ', this)" title="Delete this row">Delete</button></td>';
             html += "</tr>";
           });
           html += "</tbody></table></div>";
@@ -1119,6 +1123,39 @@
           btnEl.classList.remove("copied");
           if (label) label.textContent = "Copy";
         }, 1500);
+      }
+
+      async function deleteTxRow(idx, btnEl) {
+        const tx = filteredTransactions[idx];
+        if (!tx || !tx._id) return;
+
+        const ok = confirm(
+          "Delete this transaction?\n\n" +
+            (tx.Item_Code || "") +
+            " | " +
+            (tx.Item_Name || "") +
+            "\n" +
+            (tx.Frombin || "") +
+            " -> " +
+            (tx.Tobin || "") +
+            " | Qty: " +
+            (tx.Qty || ""),
+        );
+        if (!ok) return;
+
+        const original = btnEl.textContent;
+        btnEl.disabled = true;
+        btnEl.textContent = "Deleting...";
+        try {
+          await apiFetch("/transactions/" + encodeURIComponent(tx._id), {
+            method: "DELETE",
+          });
+          await Promise.all([loadTransactions(), loadStats()]);
+        } catch (err) {
+          alert("Delete failed: " + err.message);
+          btnEl.disabled = false;
+          btnEl.textContent = original;
+        }
       }
 
       function copyTransactionsToClipboard() {
