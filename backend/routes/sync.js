@@ -102,6 +102,41 @@ router.get("/", async (req, res) => {
   }
 });
 
+// POST /api/transactions/bulk-delete — admin: delete many transactions at once
+router.post("/bulk-delete", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids)
+      ? [...new Set(req.body.ids.map((id) => String(id)).filter(Boolean))]
+      : [];
+    const worker = req.body?.worker
+      ? String(req.body.worker).trim().toUpperCase()
+      : "";
+
+    if (ids.length > 0) {
+      let deleted = 0;
+      for (const id of ids) {
+        deleted += await Transaction.removeAsync({ _id: id }, {});
+      }
+      return res.json({ success: true, deleted });
+    }
+
+    if (worker) {
+      const deleted = await Transaction.removeAsync(
+        { Worker_Name: worker },
+        { multi: true },
+      );
+      return res.json({ success: true, deleted });
+    }
+
+    return res.status(400).json({
+      success: false,
+      error: "Provide transaction ids or a worker name.",
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // PUT /api/transactions/:id — edit (owner or admin only)
 router.put("/:id", requireAuth, async (req, res) => {
   try {

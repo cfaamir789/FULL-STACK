@@ -411,6 +411,16 @@
       .copy-icon-btn.copied .copy-svg {
         display: none;
       }
+      .tx-danger-btn {
+        color: #c62828;
+        border-color: #ef9a9a;
+        background: #fff5f5;
+      }
+      .tx-danger-btn:hover {
+        background: #ffebee;
+        border-color: #e53935;
+        color: #b71c1c;
+      }
       .tx-actions {
         display: flex;
         gap: 6px;
@@ -597,6 +607,27 @@
                 <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
               CSV
+            </button>
+            <button
+              class="copy-icon-btn tx-danger-btn"
+              onclick="deleteWorkerTransactions()"
+              title="Delete all transactions for the selected worker"
+            >
+              Delete Worker
+            </button>
+            <button
+              class="copy-icon-btn tx-danger-btn"
+              onclick="deleteFilteredTransactions()"
+              title="Delete only the currently filtered transactions"
+            >
+              Delete Filtered
+            </button>
+            <button
+              class="copy-icon-btn tx-danger-btn"
+              onclick="clearAllTransactions()"
+              title="Delete all transactions from the server"
+            >
+              Delete All
             </button>
           </div>
         </div>
@@ -1150,12 +1181,61 @@
           await apiFetch("/transactions/" + encodeURIComponent(tx._id), {
             method: "DELETE",
           });
-          await Promise.all([loadTransactions(), loadStats()]);
+          await Promise.all([loadTransactions(), loadStats(), loadWorkerStatus()]);
         } catch (err) {
           alert("Delete failed: " + err.message);
           btnEl.disabled = false;
           btnEl.textContent = original;
         }
+      }
+
+      async function bulkDeleteTransactions(ids, label, workerName) {
+        const safeIds = (ids || []).filter(Boolean);
+        if (safeIds.length === 0) {
+          alert("No matching transactions to delete.");
+          return;
+        }
+
+        const confirmMsg =
+          "Delete " +
+          safeIds.length +
+          " transaction(s)" +
+          (label ? " for " + label : "") +
+          "? This cannot be undone!";
+        if (!confirm(confirmMsg)) return;
+
+        try {
+          const body = workerName
+            ? { worker: workerName, ids: safeIds }
+            : { ids: safeIds };
+          const data = await apiFetch("/transactions/bulk-delete", {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
+          await Promise.all([loadTransactions(), loadStats(), loadWorkerStatus()]);
+          alert((data.deleted || 0) + " transaction(s) deleted.");
+        } catch (err) {
+          alert("Bulk delete failed: " + err.message);
+        }
+      }
+
+      async function deleteFilteredTransactions() {
+        await bulkDeleteTransactions(
+          filteredTransactions.map((tx) => tx._id),
+          "current filter",
+        );
+      }
+
+      async function deleteWorkerTransactions() {
+        const worker = document.getElementById("txWorkerFilter").value;
+        if (!worker) {
+          alert("Select a worker first from the dropdown.");
+          return;
+        }
+        const workerIds = allTransactions
+          .filter((tx) => tx.Worker_Name === worker)
+          .map((tx) => tx._id);
+        await bulkDeleteTransactions(workerIds, worker, worker);
       }
 
       function copyTransactionsToClipboard() {
@@ -1370,7 +1450,7 @@
           return;
         try {
           await apiFetch("/transactions/all", { method: "DELETE" });
-          loadStats();
+          await Promise.all([loadTransactions(), loadStats(), loadWorkerStatus()]);
           alert("All transactions deleted.");
         } catch (err) {
           alert("Error: " + err.message);
