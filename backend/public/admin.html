@@ -950,7 +950,7 @@
           const headers = {};
           if (authToken) headers["Authorization"] = "Bearer " + authToken;
           const res = await fetch(
-            API + "/items/upload-csv?mode=" + uploadMode,
+            API + "/items/upload-csv-async?mode=" + uploadMode,
             {
               method: "POST",
               headers,
@@ -967,18 +967,36 @@
             );
           }
           if (!res.ok) throw new Error(data.error || "Upload failed");
-          resultDiv.innerHTML =
-            '<div class="alert alert-success">&#10004; Uploaded! ' +
-            data.totalItems +
-            " items on server. (Inserted: " +
-            data.inserted +
-            ", Updated: " +
-            data.modified +
-            ")</div>";
-          loadStats();
-          loadItems(1);
-          selectedFile = null;
-          document.getElementById("fileName").textContent = "";
+
+          const jobId = data.jobId;
+          if (!jobId) throw new Error("Upload job was not created");
+
+          while (true) {
+            const status = await apiFetch("/items/upload-csv-status/" + encodeURIComponent(jobId));
+            if (status.status === "processing") {
+              const pct = status.total > 0 ? Math.round((status.processed / status.total) * 100) : 0;
+              btn.textContent = "Processing... " + pct + "%";
+            }
+            if (status.status === "done") {
+              resultDiv.innerHTML =
+                '<div class="alert alert-success">&#10004; Uploaded! ' +
+                status.totalItems +
+                " items on server. (Inserted: " +
+                status.inserted +
+                ", Updated: " +
+                status.modified +
+                ")</div>";
+              loadStats();
+              loadItems(1);
+              selectedFile = null;
+              document.getElementById("fileName").textContent = "";
+              break;
+            }
+            if (status.status === "error") {
+              throw new Error(status.error || "Upload failed");
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
         } catch (err) {
           resultDiv.innerHTML =
             '<div class="alert alert-error">&#10008; ' + err.message + "</div>";

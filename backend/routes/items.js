@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const Papa = require("papaparse");
+const { randomUUID } = require("crypto");
 const Item = require("../models/Item");
 const Meta = require("../models/Meta");
 const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
@@ -12,6 +13,103 @@ function chunkArray(arr, size) {
     out.push(arr.slice(i, i + size));
   }
   return out;
+}
+
+const uploadJobs = new Map();
+
+function setUploadJob(jobId, patch) {
+  const prev = uploadJobs.get(jobId) || {};
+  uploadJobs.set(jobId, { ...prev, ...patch, updatedAt: Date.now() });
+}
+
+function parseCsvItems(csvText) {
+  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+
+  if (parsed.errors.length > 0 && parsed.data.length === 0) {
+    throw new Error("CSV parsing failed: " + parsed.errors[0].message);
+  }
+
+  const firstRow = parsed.data[0];
+  if (!firstRow) {
+    throw new Error("CSV is empty");
+  }
+
+  const hasNewFormat = "Barcode" in firstRow && "Item_Name" in firstRow;
+  const hasOldFormat = "Barcode No." in firstRow && "Item Description" in firstRow;
+
+  if (!hasNewFormat && !hasOldFormat) {
+    throw new Error(
+      "CSV must have headers: ItemCode, Barcode, Item_Name (or Item No., Barcode No., Item Description)",
+    );
+  }
+
+  const rawItems = parsed.data
+    .filter((r) =>
+      hasOldFormat ? r["Barcode No."] && r["Item Description"] : r.Barcode && r.Item_Name,
+    )
+    .map((r) => ({
+      ItemCode: hasOldFormat ? r["Item No."] || r["Barcode No."] : r.ItemCode || r.Barcode,
+      Barcode: String(hasOldFormat ? r["Barcode No."] : r.Barcode).trim(),
+      Item_Name: String(hasOldFormat ? r["Item Description"] : r.Item_Name).trim(),
+    }));
+
+  const dedup = new Map();
+  for (const item of rawItems) {
+    dedup.set(item.Barcode, item);
+  }
+  const items = Array.from(dedup.values());
+
+  if (items.length === 0) {
+    throw new Error("No valid rows found in CSV");
+  }
+  return items;
+}
+
+async function applyCsvItems(items, mode, onProgress) {
+  if (mode === "replace") {
+    await Item.deleteMany({});
+  }
+
+  let inserted = 0;
+  let modified = 0;
+  let processed = 0;
+  const total = items.length;
+
+  if (mode === "replace") {
+    const chunks = chunkArray(items, 2000);
+    for (const chunk of chunks) {
+      await Item.insertMany(chunk, { ordered: false });
+      inserted += chunk.length;
+      processed += chunk.length;
+      onProgress?.({ processed, total, inserted, modified });
+    }
+  } else {
+    const chunks = chunkArray(items, 1000);
+    for (const chunk of chunks) {
+      const ops = chunk.map((item) => ({
+        updateOne: {
+          filter: { Barcode: item.Barcode },
+          update: {
+            $set: {
+              ItemCode: item.ItemCode,
+              Barcode: item.Barcode,
+              Item_Name: item.Item_Name,
+            },
+          },
+          upsert: true,
+        },
+      }));
+      const result = await Item.bulkWrite(ops, { ordered: false });
+      inserted += result.upsertedCount || 0;
+      modified += result.modifiedCount || 0;
+      processed += chunk.length;
+      onProgress?.({ processed, total, inserted, modified });
+    }
+  }
+
+  await bumpItemsVersion();
+  const totalItems = await Item.countDocuments({});
+  return { inserted, modified, totalItems, processed, total };
 }
 
 // ─── Item Version Tracking ──────────────────────────────────────────────────
@@ -294,6 +392,71 @@ router.post("/upload-csv", requireAuth, requireAdmin, upload.single("file"), asy
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// POST /api/items/upload-csv-async — admin web panel: async CSV upload with status polling
+router.post("/upload-csv-async", requireAuth, requireAdmin, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: "No file uploaded" });
+    }
+
+    const mode = req.query.mode === "merge" ? "merge" : "replace";
+    const csvText = req.file.buffer.toString("utf8");
+    const jobId = randomUUID();
+
+    setUploadJob(jobId, {
+      status: "queued",
+      mode,
+      processed: 0,
+      total: 0,
+      inserted: 0,
+      modified: 0,
+      error: null,
+      totalItems: 0,
+    });
+
+    setImmediate(async () => {
+      try {
+        const items = parseCsvItems(csvText);
+        setUploadJob(jobId, {
+          status: "processing",
+          total: items.length,
+          processed: 0,
+        });
+
+        const result = await applyCsvItems(items, mode, (progress) => {
+          setUploadJob(jobId, {
+            status: "processing",
+            ...progress,
+          });
+        });
+
+        setUploadJob(jobId, {
+          status: "done",
+          ...result,
+        });
+      } catch (err) {
+        setUploadJob(jobId, {
+          status: "error",
+          error: err.message,
+        });
+      }
+    });
+
+    return res.json({ success: true, jobId });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/items/upload-csv-status/:jobId — admin polling endpoint for async upload
+router.get("/upload-csv-status/:jobId", requireAuth, requireAdmin, async (req, res) => {
+  const job = uploadJobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ success: false, error: "Upload job not found" });
+  }
+  return res.json({ success: true, ...job });
 });
 
 module.exports = router;
