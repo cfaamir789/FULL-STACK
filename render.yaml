@@ -11,4 +11,10 @@ services:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
-        generateValue: true
+        value: warehouse_inv_super_secret_key_2026
+      - key: MONGODB_URI
+        value: mongodb+srv://cfaamir789_db_user:kZTL1LPTAbc314sX@cluster0.wbs0uma.mongodb.net/inventory?retryWrites=true&w=majority
+      - key: GOOGLE_SHEET_ID
+        value: 1CNnIlgftP40Vtxso9p28XheOH7W4-sO6EkSS1arH_pw
+      - key: GOOGLE_SHEET_TAB
+        value: Sheet1
