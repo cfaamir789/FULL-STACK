@@ -166,8 +166,11 @@ router.put("/:id", requireAuth, async (req, res) => {
 });
 
 // DELETE /api/transactions/:id — delete (owner or admin only)
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
+    if (req.params.id === "all") {
+      return next();
+    }
     const tx = await Transaction.findOneAsync({ _id: req.params.id });
     if (!tx)
       return res

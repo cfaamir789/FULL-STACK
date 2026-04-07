@@ -716,7 +716,13 @@
         if (!(opts.body instanceof FormData))
           headers["Content-Type"] = "application/json";
         const res = await fetch(API + path, { ...opts, headers });
-        const data = await res.json();
+        const raw = await res.text();
+        let data = {};
+        try {
+          data = raw ? JSON.parse(raw) : {};
+        } catch {
+          data = { error: raw || "Request failed" };
+        }
         if (!res.ok) throw new Error(data.error || "Request failed");
         return data;
       }
@@ -1315,12 +1321,73 @@
             html +=
               '<div style="font-size:12px;color:#888">' +
               (u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "") +
-              "</div></div>";
+              '</div></div><div style="display:flex;gap:8px;flex-wrap:wrap">';
+            html +=
+              '<button class="btn-sm btn-danger" onclick="deleteUserDataOnly(' +
+              JSON.stringify(u.username) +
+              ')">Delete Data</button>';
+            if (u.role !== "admin") {
+              html +=
+                '<button class="btn-sm btn-danger" onclick="deleteUserOnly(' +
+                JSON.stringify(u.username) +
+                ')">Delete User</button>';
+              html +=
+                '<button class="btn-sm btn-danger" onclick="deleteUserAndData(' +
+                JSON.stringify(u.username) +
+                ')">Delete User + Data</button>';
+            }
+            html += "</div></div>";
           });
           container.innerHTML = html;
         } catch (err) {
           container.innerHTML =
             '<div class="alert alert-error">' + err.message + "</div>";
+        }
+      }
+
+      async function deleteUserOnly(username) {
+        if (!confirm("Delete user '" + username + "'?")) return;
+        try {
+          await apiFetch("/auth/users/" + encodeURIComponent(username), {
+            method: "DELETE",
+          });
+          await Promise.all([loadUsers(), loadStats()]);
+          alert("User deleted.");
+        } catch (err) {
+          alert("Delete user failed: " + err.message);
+        }
+      }
+
+      async function deleteUserDataOnly(username) {
+        if (!confirm("Delete all transaction data for '" + username + "'?"))
+          return;
+        try {
+          const data = await apiFetch("/transactions/bulk-delete", {
+            method: "POST",
+            body: JSON.stringify({ worker: username }),
+          });
+          await Promise.all([loadTransactions(), loadStats(), loadWorkerStatus()]);
+          alert((data.deleted || 0) + " transaction(s) deleted for " + username + ".");
+        } catch (err) {
+          alert("Delete user data failed: " + err.message);
+        }
+      }
+
+      async function deleteUserAndData(username) {
+        if (!confirm("Delete user '" + username + "' and all their transactions?"))
+          return;
+        try {
+          await apiFetch("/transactions/bulk-delete", {
+            method: "POST",
+            body: JSON.stringify({ worker: username }),
+          });
+          await apiFetch("/auth/users/" + encodeURIComponent(username), {
+            method: "DELETE",
+          });
+          await Promise.all([loadUsers(), loadTransactions(), loadStats(), loadWorkerStatus()]);
+          alert("User and their data deleted.");
+        } catch (err) {
+          alert("Delete user + data failed: " + err.message);
         }
       }
 
