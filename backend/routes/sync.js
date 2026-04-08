@@ -1,33 +1,44 @@
 const express = require("express");
 const router = express.Router();
 const Transaction = require("../models/Transaction");
+const WorkerSync = require("../models/WorkerSync");
 const { appendTransactions } = require("../services/googleSheets");
 const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
 
-// ─── Worker Sync Status Tracking ─────────────────────────────────────────────
-// In-memory map: { workerName: { lastSync, pendingPushed, totalToday } }
-const workerSyncStatus = {};
-
-function recordWorkerSync(workerName, count) {
-  const now = new Date().toISOString();
-  if (!workerSyncStatus[workerName]) {
-    workerSyncStatus[workerName] = { lastSync: now, totalToday: 0 };
+// ─── Worker Sync Status Tracking (MongoDB-backed, shared across servers) ─────
+async function recordWorkerSync(workerName, count) {
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10); // "2026-04-08"
+  const doc = await WorkerSync.findOne({ worker: workerName });
+  if (!doc) {
+    await WorkerSync.create({
+      worker: workerName,
+      lastSync: now,
+      totalToday: count,
+      lastResetDate: todayStr,
+    });
+  } else {
+    doc.lastSync = now;
+    // Reset daily counter if it's a new day
+    if (doc.lastResetDate !== todayStr) {
+      doc.totalToday = count;
+      doc.lastResetDate = todayStr;
+    } else {
+      doc.totalToday += count;
+    }
+    await doc.save();
   }
-  workerSyncStatus[workerName].lastSync = now;
-  workerSyncStatus[workerName].totalToday += count;
 }
 
 // GET /api/sync/worker-status — admin: see last sync time per worker
 router.get("/worker-status", requireAuth, requireAdmin, async (req, res) => {
-  const workers = Object.entries(workerSyncStatus).map(([name, info]) => ({
-    worker: name,
-    lastSync: info.lastSync,
-    totalToday: info.totalToday,
-    minutesAgo: Math.round(
-      (Date.now() - new Date(info.lastSync).getTime()) / 60000,
-    ),
+  const docs = await WorkerSync.find().sort({ lastSync: -1 }).lean();
+  const workers = docs.map((d) => ({
+    worker: d.worker,
+    lastSync: d.lastSync,
+    totalToday: d.totalToday,
+    minutesAgo: Math.round((Date.now() - new Date(d.lastSync).getTime()) / 60000),
   }));
-  workers.sort((a, b) => new Date(b.lastSync) - new Date(a.lastSync));
   res.json({ success: true, workers });
 });
 
