@@ -29,7 +29,7 @@ import {
   getPendingCount,
   getAllTransactions,
 } from "../database/db";
-import { attemptSync } from "../services/syncService";
+import { attemptSync, downloadItemMaster, checkItemMasterUpdate } from "../services/syncService";
 import Colors from "../theme/colors";
 
 const IS_WEB = Platform.OS === "web";
@@ -65,6 +65,12 @@ export default function AdminPanelScreen({ navigation }) {
   const autoBackupRef = useRef(null);
   const loggedUserRef = useRef(null);
 
+  // Item Master state
+  const [masterStatus, setMasterStatus] = useState(null); // { serverVersion, serverCount, localVersion, updateAvailable }
+  const [masterDownloading, setMasterDownloading] = useState(false);
+  const [masterProgress, setMasterProgress] = useState(null); // { phase, percent }
+  const [masterResult, setMasterResult] = useState(null); // { success, count, error }
+
   const loadData = useCallback(async () => {
     const local = await getDashboardStats();
     setLocalStats(local);
@@ -78,6 +84,11 @@ export default function AdminPanelScreen({ navigation }) {
       ]);
       setServerStats(stats);
       setUserCount(usersData.length || 0);
+      // Check item master version
+      try {
+        const ms = await checkItemMasterUpdate();
+        setMasterStatus(ms);
+      } catch {}
     } catch {
       setOnline(false);
     }
@@ -117,6 +128,45 @@ export default function AdminPanelScreen({ navigation }) {
     autoBackupRef.current = setInterval(run, AUTO_BACKUP_INTERVAL_MS);
     return () => clearInterval(autoBackupRef.current);
   }, []);
+
+  // ─── Item Master Download ────────────────────────────────────────────────
+  const handleCheckMasterUpdate = async () => {
+    try {
+      const ms = await checkItemMasterUpdate();
+      setMasterStatus(ms);
+      setMasterResult(null);
+      if (!ms.updateAvailable) {
+        Alert.alert("Up to Date", `Item master is current (v${ms.serverVersion}, ${ms.serverCount.toLocaleString()} items).`);
+      }
+    } catch (err) {
+      Alert.alert("Error", "Could not check server: " + err.message);
+    }
+  };
+
+  const handleDownloadMaster = async () => {
+    setMasterDownloading(true);
+    setMasterResult(null);
+    setMasterProgress({ phase: "downloading", percent: 0 });
+    try {
+      const result = await downloadItemMaster((progress) => {
+        setMasterProgress(progress);
+      });
+      setMasterResult(result);
+      if (result.success) {
+        // Refresh local stats
+        const local = await getDashboardStats();
+        setLocalStats(local);
+        setMasterStatus((prev) => prev ? { ...prev, localVersion: result.version, updateAvailable: false } : prev);
+        Alert.alert("Success", `Downloaded ${result.count.toLocaleString()} items (v${result.version}).`);
+      }
+    } catch (err) {
+      setMasterResult({ success: false, error: err.message });
+      Alert.alert("Download Failed", err.message);
+    } finally {
+      setMasterDownloading(false);
+      setMasterProgress(null);
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -507,6 +557,81 @@ export default function AdminPanelScreen({ navigation }) {
         </View>
 
         {/* Quick Actions */}
+        <Text style={styles.sectionTitle}>Item Master</Text>
+        <View style={styles.masterCard}>
+          <View style={styles.masterStatsRow}>
+            <View style={styles.masterStat}>
+              <Text style={styles.masterStatLabel}>Local Items</Text>
+              <Text style={styles.masterStatValue}>{localStats.totalItems.toLocaleString()}</Text>
+            </View>
+            <View style={styles.masterStat}>
+              <Text style={styles.masterStatLabel}>Local Version</Text>
+              <Text style={styles.masterStatValue}>
+                {masterStatus?.localVersion != null ? "v" + masterStatus.localVersion : "-"}
+              </Text>
+            </View>
+            <View style={styles.masterStat}>
+              <Text style={styles.masterStatLabel}>Server</Text>
+              <Text style={styles.masterStatValue}>
+                {masterStatus ? masterStatus.serverCount.toLocaleString() + " (v" + masterStatus.serverVersion + ")" : "-"}
+              </Text>
+            </View>
+          </View>
+
+          {masterStatus?.updateAvailable && (
+            <View style={styles.masterUpdateBanner}>
+              <MaterialCommunityIcons name="alert-circle" size={16} color="#e65100" />
+              <Text style={styles.masterUpdateText}>
+                Update available! Server v{masterStatus.serverVersion} vs local v{masterStatus.localVersion ?? "none"}
+              </Text>
+            </View>
+          )}
+
+          {masterDownloading && masterProgress && (
+            <View style={styles.masterProgressBar}>
+              <View style={[styles.masterProgressFill, { width: masterProgress.percent + "%" }]} />
+              <Text style={styles.masterProgressText}>
+                {masterProgress.phase === "downloading" ? "Downloading..." : "Saving to phone..."}
+                {" "}{masterProgress.percent}%
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.masterButtons}>
+            <TouchableOpacity
+              style={[styles.masterBtn, { backgroundColor: Colors.primary }]}
+              onPress={handleCheckMasterUpdate}
+              disabled={masterDownloading || !online}
+            >
+              <MaterialCommunityIcons name="cloud-search" size={18} color="#fff" />
+              <Text style={styles.masterBtnText}>Check Updates</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.masterBtn, { backgroundColor: "#2e7d32" }]}
+              onPress={handleDownloadMaster}
+              disabled={masterDownloading || !online}
+            >
+              {masterDownloading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialCommunityIcons name="cloud-download" size={18} color="#fff" />
+              )}
+              <Text style={styles.masterBtnText}>
+                {masterDownloading ? "Downloading..." : "Download from Server"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.masterBtn, { backgroundColor: Colors.warning }]}
+              onPress={() => navigation.navigate("Import")}
+            >
+              <MaterialCommunityIcons name="file-upload" size={18} color="#fff" />
+              <Text style={styles.masterBtnText}>Import from File</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <Text style={styles.sectionTitle}>Admin Actions</Text>
         <View style={styles.actionsGrid}>
           <TouchableOpacity
@@ -1008,4 +1133,72 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontWeight: "500",
   },
+  // Item Master
+  masterCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: Colors.primary + "30",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  masterStatsRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
+  masterStat: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    padding: 10,
+    alignItems: "center",
+  },
+  masterStatLabel: { fontSize: 11, color: Colors.textSecondary },
+  masterStatValue: { fontSize: 16, fontWeight: "800", color: Colors.textPrimary, marginTop: 2 },
+  masterUpdateBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#fff3e0",
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 10,
+  },
+  masterUpdateText: { fontSize: 12, fontWeight: "600", color: "#e65100", flex: 1 },
+  masterProgressBar: {
+    height: 28,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 6,
+    marginBottom: 10,
+    overflow: "hidden",
+    justifyContent: "center",
+  },
+  masterProgressFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "#2e7d32",
+    borderRadius: 6,
+  },
+  masterProgressText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#fff",
+    textAlign: "center",
+    zIndex: 1,
+  },
+  masterButtons: { gap: 8 },
+  masterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  masterBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
 });

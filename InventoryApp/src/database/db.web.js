@@ -272,6 +272,35 @@ export const clearAllItems = async () => {
   });
 };
 
+// Atomic clear + replace: clears store and inserts all items in a single IndexedDB transaction.
+// If anything fails, the entire transaction rolls back — local data stays untouched.
+export const clearAndReplaceAllItems = async (itemsArray, onProgress) => {
+  if (!itemsArray || itemsArray.length === 0) return 0;
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(ITEMS_STORE, "readwrite");
+    const store = tx.objectStore(ITEMS_STORE);
+    store.clear();
+    const total = itemsArray.length;
+    for (let i = 0; i < total; i++) {
+      const item = itemsArray[i];
+      store.put({
+        barcode: item.Barcode,
+        item_code: item.ItemCode,
+        item_name: item.Item_Name,
+      });
+      if (onProgress && (i % 5000 === 0 || i === total - 1)) {
+        onProgress({ processed: i + 1, total });
+      }
+    }
+    tx.oncomplete = () => {
+      _itemsCache = null; // invalidate cache so next read reflects new data
+      resolve(total);
+    };
+    tx.onerror = (e) => reject(e.target.error);
+  });
+};
+
 export const getPendingCount = async () => {
   return loadTx().filter((t) => t.synced === 0).length;
 };

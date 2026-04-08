@@ -172,7 +172,14 @@ export const fetchItemsPage = async (page = 1, limit = 2000) => {
 
 export const fetchItemsVersion = async () => {
   const res = await healthClient.get("/items/version");
-  return res.data; // { version: <number> }
+  return res.data; // { version, totalItems }
+};
+
+// Download ALL items in a single request (gzip compressed by server).
+// Used for atomic item master download — no pagination, no partial data.
+export const fetchItemsBulk = async () => {
+  const res = await apiClient.get("/items/bulk", { timeout: 120000 });
+  return res.data; // { version, total, items }
 };
 
 export const syncTransactions = async (transactions) => {

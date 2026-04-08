@@ -265,6 +265,35 @@ export const clearAllItems = async () => {
   return result.changes;
 };
 
+// Atomic clear + replace: downloads all items to memory first, then replaces in one transaction.
+// If ANY chunk fails, the entire operation rolls back — local data stays untouched.
+export const clearAndReplaceAllItems = async (itemsArray, onProgress) => {
+  if (!itemsArray || itemsArray.length === 0) return 0;
+  const CHUNK_SIZE = 300;
+  const total = itemsArray.length;
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM items");
+    for (let i = 0; i < total; i += CHUNK_SIZE) {
+      const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "(?,?,?)").join(",");
+      const params = chunk.flatMap((item) => [
+        item.ItemCode,
+        item.Barcode,
+        item.Item_Name,
+      ]);
+      await db.runAsync(
+        `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
+         ON CONFLICT(barcode) DO UPDATE SET
+           item_code = excluded.item_code,
+           item_name = excluded.item_name`,
+        params,
+      );
+      if (onProgress) onProgress({ processed: Math.min(i + CHUNK_SIZE, total), total });
+    }
+  });
+  return total;
+};
+
 export const getPendingCount = async () => {
   const row = await db.getFirstAsync(
     "SELECT COUNT(*) as count FROM transactions WHERE synced = 0",

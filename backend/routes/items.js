@@ -153,7 +153,36 @@ async function bumpItemsVersion() {
 
 // GET /api/items/version — lightweight check for phones (no auth needed)
 router.get("/version", async (req, res) => {
-  res.json({ success: true, version: _itemsVersion });
+  const count = await Item.countDocuments({});
+  res.json({ success: true, version: _itemsVersion, totalItems: count });
+});
+
+// GET /api/items/bulk — download ALL items in a single compressed JSON response
+// Used by phones for atomic item master download (replaces paginated pull)
+router.get("/bulk", async (req, res) => {
+  try {
+    const items = await Item.find({}, { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1 })
+      .sort({ Item_Name: 1 })
+      .lean();
+    res.json({ success: true, version: _itemsVersion, total: items.length, items });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/items/push-master — admin explicitly pushes current master to all phones
+// Bumps version so phones know to re-download
+router.post("/push-master", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const count = await Item.countDocuments({});
+    if (count === 0) {
+      return res.status(400).json({ success: false, error: "No items in database. Upload a CSV first." });
+    }
+    const newVersion = await bumpItemsVersion();
+    res.json({ success: true, version: newVersion, totalItems: count });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // GET /api/items/count — fast count without fetching all docs

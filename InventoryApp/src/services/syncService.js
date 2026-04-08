@@ -3,14 +3,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   checkHealth,
   syncTransactions,
-  fetchItemsPage,
+  fetchItemsBulk,
   fetchItemsVersion,
 } from "./api";
 import {
   getPendingTransactions,
   markTransactionsSynced,
-  upsertItems,
-  clearAllItems,
+  clearAndReplaceAllItems,
 } from "../database/db";
 
 let _onStatusChange = null;
@@ -39,37 +38,47 @@ export const checkConnectivity = async () => {
   }
 };
 
-// Pull latest item master if server version differs from local
-const pullItemsIfNeeded = async () => {
-  try {
-    const serverVer = await fetchItemsVersion();
-    const localVer = await AsyncStorage.getItem("itemsVersion");
-    if (localVer === String(serverVer.version)) return; // already up-to-date
+// ─── Item Master Download (standalone, admin-triggered only) ─────────────────
+// Downloads ALL items in one bulk request, then atomically replaces local DB.
+// If download fails, local items are UNTOUCHED (no clearing).
+export const downloadItemMaster = async (onProgress) => {
+  onProgress?.({ phase: "downloading", percent: 0 });
 
-    await clearAllItems();
-    let page = 1;
-    const limit = 2000;
-    while (true) {
-      const chunk = await fetchItemsPage(page, limit);
-      const items = chunk.items || [];
-      if (items.length > 0) {
-        await upsertItems(
-          items.map((i) => ({
-            ItemCode: i.ItemCode,
-            Barcode: i.Barcode,
-            Item_Name: i.Item_Name,
-          })),
-        );
-      }
-      const total = chunk.total || 0;
-      const loaded = page * limit;
-      if (loaded >= total || items.length === 0) break;
-      page++;
-    }
-    await AsyncStorage.setItem("itemsVersion", String(serverVer.version));
-  } catch (_) {
-    // Item pull failure must not break sync
+  // 1. Download all items into memory (single compressed JSON response)
+  const data = await fetchItemsBulk();
+  const items = data.items || [];
+  const serverVersion = data.version;
+
+  if (items.length === 0) {
+    return { success: false, count: 0, version: serverVersion, error: "Server has no items" };
   }
+
+  onProgress?.({ phase: "downloading", percent: 100 });
+  onProgress?.({ phase: "saving", percent: 0 });
+
+  // 2. Atomically replace local DB (clear + insert in one transaction)
+  // If this fails mid-way, SQLite rolls back — previous data stays intact
+  await clearAndReplaceAllItems(items, ({ processed, total }) => {
+    onProgress?.({ phase: "saving", percent: Math.round((processed / total) * 100) });
+  });
+
+  // 3. Save version ONLY after successful write
+  await AsyncStorage.setItem("itemsVersion", String(serverVersion));
+
+  onProgress?.({ phase: "done", percent: 100 });
+  return { success: true, count: items.length, version: serverVersion };
+};
+
+// Check if a newer item master version is available on server
+export const checkItemMasterUpdate = async () => {
+  const serverData = await fetchItemsVersion();
+  const localVer = await AsyncStorage.getItem("itemsVersion");
+  return {
+    serverVersion: serverData.version,
+    serverCount: serverData.totalItems ?? 0,
+    localVersion: localVer ? Number(localVer) : null,
+    updateAvailable: localVer !== String(serverData.version),
+  };
 };
 
 // Chunk large transaction arrays to avoid payload limits
@@ -101,8 +110,8 @@ export const attemptSync = async () => {
 
   notifyStatus({ online: true, lastSync: null, pendingCount: null });
 
-  // ALWAYS pull latest items when online (version-aware to save bandwidth)
-  await pullItemsIfNeeded();
+  // Item master is NO LONGER auto-synced here.
+  // Admin pushes master explicitly; workers download via AdminPanel.
 
   const pending = await getPendingTransactions();
   if (pending.length === 0) {

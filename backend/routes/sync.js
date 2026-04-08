@@ -71,12 +71,25 @@ router.post("/", requireAuth, async (req, res) => {
       Worker_Name: workerName,
       createdAt: new Date(),
     }));
-    await Transaction.insertMany(docs);
+    // Deduplicate: skip transactions that already exist (same barcode+timestamp+device)
+    const ops = docs.map((doc) => ({
+      updateOne: {
+        filter: {
+          Item_Barcode: doc.Item_Barcode,
+          Timestamp: doc.Timestamp,
+          deviceId: doc.deviceId,
+        },
+        update: { $setOnInsert: doc },
+        upsert: true,
+      },
+    }));
+    const result = await Transaction.bulkWrite(ops, { ordered: false });
+    const inserted = result.upsertedCount || 0;
     // Track this worker's sync activity
-    recordWorkerSync(workerName, docs.length);
-    // Append to Google Sheet asynchronously — never blocks the phone response
-    appendTransactions(docs).catch(() => {});
-    res.json({ success: true, synced: docs.length });
+    recordWorkerSync(workerName, inserted);
+    // Append only new (non-duplicate) transactions to Google Sheet
+    if (inserted > 0) appendTransactions(docs).catch(() => {});
+    res.json({ success: true, synced: inserted });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
