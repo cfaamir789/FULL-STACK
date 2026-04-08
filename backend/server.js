@@ -83,18 +83,18 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`Health check: http://localhost:${PORT}/api/health`);
   console.log(`Admin panel:  http://localhost:${PORT}/admin`);
 
-  // Keep-alive self-ping every 14 min to prevent Render free tier sleep
+  // Keep-alive self-ping every 4 min to prevent Render free tier sleep
   if (process.env.NODE_ENV === "production") {
     const keepAliveUrl = `https://inventory-backend-fdex.onrender.com/api/health`;
-    setInterval(
-      () => {
-        require("https")
-          .get(keepAliveUrl, () => {})
-          .on("error", () => {});
-      },
-      14 * 60 * 1000,
-    );
-    console.log("Keep-alive ping enabled (every 14 min)");
+    const ping = () => {
+      require("https")
+        .get(keepAliveUrl, () => {})
+        .on("error", () => {});
+    };
+    // First ping after 30s, then every 4 minutes
+    setTimeout(ping, 30 * 1000);
+    setInterval(ping, 4 * 60 * 1000);
+    console.log("Keep-alive ping enabled (every 4 min)");
   }
 });
 
