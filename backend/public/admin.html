@@ -926,7 +926,31 @@
     </div>
 
     <script>
-      const API = window.location.origin + "/api";
+      // ─── Failover: list of backend servers (same MongoDB) ────────────────────
+      const SERVERS = [
+        window.location.origin,
+        "https://full-stack-4m9b.onrender.com",
+        "https://inventory-backend-fdex.onrender.com",
+      ];
+      // Remove duplicates (if we're already on one of them)
+      const UNIQUE_SERVERS = [...new Set(SERVERS)];
+      let API = window.location.origin + "/api";
+
+      async function findWorkingServer() {
+        for (const server of UNIQUE_SERVERS) {
+          try {
+            const res = await fetch(server + "/api/health", {
+              signal: AbortSignal.timeout(5000),
+            });
+            if (res.ok) {
+              API = server + "/api";
+              console.log("[Failover] Using server:", server);
+              return server;
+            }
+          } catch (_) {}
+        }
+        return null;
+      }
       let authToken = localStorage.getItem("adminToken") || "";
       let adminUsername = localStorage.getItem("adminUsername") || "admin";
       let uploadMode = "replace";
@@ -946,16 +970,34 @@
         if (authToken) headers["Authorization"] = "Bearer " + authToken;
         if (!(opts.body instanceof FormData))
           headers["Content-Type"] = "application/json";
-        const res = await fetch(API + path, { ...opts, headers });
-        const raw = await res.text();
-        let data = {};
         try {
-          data = raw ? JSON.parse(raw) : {};
-        } catch {
-          data = { error: raw || "Request failed" };
+          const res = await fetch(API + path, { ...opts, headers });
+          const raw = await res.text();
+          let data = {};
+          try {
+            data = raw ? JSON.parse(raw) : {};
+          } catch {
+            data = { error: raw || "Request failed" };
+          }
+          if (!res.ok) throw new Error(data.error || "Request failed");
+          return data;
+        } catch (err) {
+          // Network failure — try failover
+          const working = await findWorkingServer();
+          if (working) {
+            const res2 = await fetch(API + path, { ...opts, headers });
+            const raw2 = await res2.text();
+            let data2 = {};
+            try {
+              data2 = raw2 ? JSON.parse(raw2) : {};
+            } catch {
+              data2 = { error: raw2 || "Request failed" };
+            }
+            if (!res2.ok) throw new Error(data2.error || "Request failed");
+            return data2;
+          }
+          throw err;
         }
-        if (!res.ok) throw new Error(data.error || "Request failed");
-        return data;
       }
 
       async function checkSetup() {

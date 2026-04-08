@@ -3,6 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 export const CLOUD_SERVER_URL = "https://full-stack-4m9b.onrender.com";
+export const CLOUD_SERVER_FAILOVER = "https://inventory-backend-fdex.onrender.com";
+export const CLOUD_SERVERS = [CLOUD_SERVER_URL, CLOUD_SERVER_FAILOVER];
 export const DEFAULT_SERVER_IP = CLOUD_SERVER_URL;
 
 const isPrivateHost = (host) => {
@@ -119,9 +121,94 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
+// ─── Failover: auto-switch to backup server on network errors ─────────────
+let _failoverActive = false;
+
+const switchToNextServer = async () => {
+  // Find which cloud server we're currently NOT using
+  const currentServer = currentBaseUrl.replace(/\/api$/, "");
+  const next = CLOUD_SERVERS.find((s) => s !== currentServer);
+  if (!next) return false;
+
+  console.log(`[Failover] Switching from ${currentServer} to ${next}`);
+  currentBaseUrl = `${next}/api`;
+  apiClient.defaults.baseURL = currentBaseUrl;
+  healthClient.defaults.baseURL = currentBaseUrl;
+  return true;
+};
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error.config;
+    // Only attempt failover once per request, and only for network/5xx errors
+    if (
+      !config._failoverAttempted &&
+      !_failoverActive &&
+      (error.code === "ECONNABORTED" ||
+        !error.response ||
+        error.response.status >= 502)
+    ) {
+      config._failoverAttempted = true;
+      _failoverActive = true;
+      const switched = await switchToNextServer();
+      _failoverActive = false;
+      if (switched) {
+        config.baseURL = currentBaseUrl;
+        return apiClient.request(config);
+      }
+    }
+    return Promise.reject(error);
+  },
+);
+
+healthClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const config = error.config;
+    if (
+      !config._failoverAttempted &&
+      !_failoverActive &&
+      (error.code === "ECONNABORTED" ||
+        !error.response ||
+        error.response.status >= 502)
+    ) {
+      config._failoverAttempted = true;
+      _failoverActive = true;
+      const switched = await switchToNextServer();
+      _failoverActive = false;
+      if (switched) {
+        config.baseURL = currentBaseUrl;
+        return healthClient.request(config);
+      }
+    }
+    return Promise.reject(error);
+  },
+);
+
 export const checkHealth = async () => {
-  const res = await healthClient.get("/health");
-  return res.data;
+  // Try current server first, then failover picks up automatically via interceptor
+  try {
+    const res = await healthClient.get("/health");
+    return res.data;
+  } catch (err) {
+    // If failover interceptor already switched, this will have been retried.
+    // If still failing, try all servers explicitly
+    for (const server of CLOUD_SERVERS) {
+      try {
+        const res = await axios.get(`${server}/api/health`, { timeout: 5000 });
+        if (res.data?.status === "ok") {
+          // Switch to this working server
+          currentBaseUrl = `${server}/api`;
+          apiClient.defaults.baseURL = currentBaseUrl;
+          healthClient.defaults.baseURL = currentBaseUrl;
+          console.log(`[Failover] Health check found working server: ${server}`);
+          return res.data;
+        }
+      } catch (_) {}
+    }
+    throw err;
+  }
 };
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
