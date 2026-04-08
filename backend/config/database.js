@@ -25,9 +25,8 @@ const connectDB = async (retries = 5) => {
     }
   }
   console.error(
-    "FATAL: Could not connect to MongoDB after " + retries + " attempts",
+    "WARNING: Could not connect to MongoDB after " + retries + " attempts. Server will start without DB.",
   );
-  process.exit(1);
 };
 
 module.exports = connectDB;

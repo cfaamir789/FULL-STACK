@@ -76,8 +76,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, error: "Internal server error" });
 });
 
-// Connect to MongoDB FIRST, then start listening
-connectDB().then(() => {
+// Connect to MongoDB, but start listening regardless
+connectDB().catch((err) => {
+  console.error("MongoDB connection failed, server starting without DB:", err?.message);
+}).finally(() => {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/api/health`);
