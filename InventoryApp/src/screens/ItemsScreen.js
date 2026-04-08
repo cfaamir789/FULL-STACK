@@ -147,7 +147,7 @@ export default function ItemsScreen({ navigation, route }) {
             clearButtonMode="while-editing"
             returnKeyType="search"
           />
-          <VoiceMic onResult={(t) => setQuery(t.toUpperCase())} size={20} />
+          <VoiceMic onResult={(t) => setQuery(t.toUpperCase())} size={18} style={{ backgroundColor: "transparent", marginRight: 2 }} />
           {query.length > 0 && (
             <TouchableOpacity
               onPress={() => setQuery("")}

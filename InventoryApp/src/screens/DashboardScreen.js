@@ -152,8 +152,8 @@ export default function DashboardScreen() {
           />
           <VoiceMic
             onResult={(t) => setQuery(t.toUpperCase())}
-            size={20}
-            style={{ marginRight: 4 }}
+            size={18}
+            style={{ backgroundColor: "transparent", marginRight: 2 }}
           />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery("")}>

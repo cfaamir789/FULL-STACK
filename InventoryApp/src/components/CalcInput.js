@@ -1,35 +1,25 @@
 /**
- * CalcInput — A calculator-style Quantity input component.
+ * CalcInput — Inline quantity input with auto-calculate.
  *
- * Shows current expression (e.g. "3×48") and the evaluated result.
- * Supports: +  −  ×  and parentheses-free left-to-right evaluation.
+ * Works with the phone's built-in keyboard. Type math like 3*48 or 10+5
+ * and see the result shown inline. No modal popup — just type naturally.
  * The parent receives the final numeric value via onValueChange(number).
  */
 import React, {
   useState,
   useEffect,
+  useRef,
   forwardRef,
   useImperativeHandle,
 } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-} from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { View, Text, TextInput, StyleSheet } from "react-native";
 import Colors from "../theme/colors";
 
 function evaluate(expr) {
-  // Replace × with * and − with -
-  let s = expr.replace(/×/g, "*").replace(/−/g, "-");
-  // Remove anything that isn't digit, ., +, -, *
+  let s = expr.replace(/×/g, "*").replace(/x/gi, "*").replace(/−/g, "-");
   s = s.replace(/[^0-9.+\-*]/g, "");
   if (!s) return 0;
   try {
-    // Safe evaluation: only numbers and basic operations
     if (!/^[0-9.+\-*]+$/.test(s)) return 0;
     const parts = [];
     let current = "";
@@ -44,8 +34,7 @@ function evaluate(expr) {
       }
     }
     if (current) parts.push(parseFloat(current));
-
-    // First pass: multiplication
+    // Multiplication first
     let i = 0;
     while (i < parts.length) {
       if (parts[i] === "*") {
@@ -57,7 +46,7 @@ function evaluate(expr) {
         i++;
       }
     }
-    // Second pass: addition / subtraction
+    // Addition / subtraction
     let result = typeof parts[0] === "number" ? parts[0] : 0;
     for (let j = 1; j < parts.length; j += 2) {
       const op = parts[j];
@@ -71,162 +60,73 @@ function evaluate(expr) {
   }
 }
 
+const hasOperator = (s) => /[+\-*×x]/i.test(s);
+
 const CalcInput = forwardRef(function CalcInput(
   { value, onValueChange, placeholder, style },
   ref,
 ) {
   const [expr, setExpr] = useState(value || "");
-  const [showCalc, setShowCalc] = useState(false);
+  const inputRef = useRef(null);
   const result = evaluate(expr);
+  const showResult = expr.length > 0 && hasOperator(expr) && result > 0;
 
   useEffect(() => {
-    // Sync external value changes
-    if (value !== undefined && value !== expr) {
-      setExpr(value);
-    }
+    if (value !== undefined && value !== expr) setExpr(value);
   }, [value]);
 
   useImperativeHandle(ref, () => ({
-    focus: () => setShowCalc(true),
+    focus: () => inputRef.current?.focus(),
     clear: () => {
       setExpr("");
       onValueChange?.("");
     },
   }));
 
-  const press = (ch) => {
-    const next = expr + ch;
-    setExpr(next);
-  };
-
-  const backspace = () => {
-    setExpr(expr.slice(0, -1));
-  };
-
-  const clear = () => {
-    setExpr("");
-  };
-
-  const done = () => {
-    const v = evaluate(expr);
-    const final = v > 0 ? String(v) : expr;
-    setExpr(final);
-    onValueChange?.(final);
-    setShowCalc(false);
-  };
-
-  const handleDirectInput = (text) => {
-    // Allow only digits and operators
-    const clean = text.replace(/[^0-9.+\-×*]/g, "");
+  const handleChange = (text) => {
+    // Allow digits, operators (*, +, -, x, ×, .)
+    const clean = text.replace(/[^0-9.+\-×*xX]/g, "");
     setExpr(clean);
-    // If it's a plain number, pass to parent immediately
-    const num = parseFloat(clean);
-    if (!isNaN(num) && /^[0-9.]+$/.test(clean)) {
+    // If plain number, pass immediately
+    if (/^[0-9.]+$/.test(clean)) {
       onValueChange?.(clean);
     }
   };
 
-  const CalcButton = ({ label, onPress: op, color, bg, flex }) => (
-    <TouchableOpacity
-      style={[s.calcBtn, bg && { backgroundColor: bg }, flex && { flex }]}
-      onPress={op || (() => press(label))}
-      activeOpacity={0.6}
-    >
-      <Text style={[s.calcBtnText, color && { color }]}>{label}</Text>
-    </TouchableOpacity>
-  );
+  const handleBlur = () => {
+    // Auto-evaluate on blur if expression has operators
+    if (hasOperator(expr)) {
+      const v = evaluate(expr);
+      if (v > 0) {
+        const final = String(v);
+        setExpr(final);
+        onValueChange?.(final);
+      }
+    } else {
+      onValueChange?.(expr);
+    }
+  };
 
   return (
     <View style={style}>
-      <TouchableOpacity
-        style={s.inputRow}
-        onPress={() => setShowCalc(true)}
-        activeOpacity={0.8}
-      >
+      <View style={s.inputRow}>
         <TextInput
+          ref={inputRef}
           style={s.input}
           value={expr}
-          onChangeText={handleDirectInput}
-          placeholder={placeholder || "Qty (tap for calculator)"}
+          onChangeText={handleChange}
+          onBlur={handleBlur}
+          placeholder={placeholder || "Qty (e.g. 3*48)"}
           placeholderTextColor={Colors.textLight}
           keyboardType="numeric"
           returnKeyType="done"
-          onFocus={() => {}}
         />
-        <TouchableOpacity style={s.calcIcon} onPress={() => setShowCalc(true)}>
-          <MaterialCommunityIcons
-            name="calculator"
-            size={22}
-            color={Colors.primary}
-          />
-        </TouchableOpacity>
-      </TouchableOpacity>
-
-      <Modal
-        visible={showCalc}
-        transparent
-        animationType="slide"
-        onRequestClose={done}
-      >
-        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={done}>
-          <View style={s.calcCard} onStartShouldSetResponder={() => true}>
-            {/* Expression */}
-            <View style={s.exprRow}>
-              <Text style={s.exprText} numberOfLines={2}>
-                {expr || "0"}
-              </Text>
-              <TouchableOpacity onPress={backspace} style={s.bksp}>
-                <MaterialCommunityIcons
-                  name="backspace-outline"
-                  size={24}
-                  color={Colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-            {/* Result */}
-            {expr.length > 0 && /[+\-×*]/.test(expr) && (
-              <Text style={s.resultText}>= {result}</Text>
-            )}
-            {/* Keypad */}
-            <View style={s.keypad}>
-              <View style={s.keyRow}>
-                <CalcButton label="7" />
-                <CalcButton label="8" />
-                <CalcButton label="9" />
-                <CalcButton label="×" color="#9C27B0" bg="#F3E5F5" />
-              </View>
-              <View style={s.keyRow}>
-                <CalcButton label="4" />
-                <CalcButton label="5" />
-                <CalcButton label="6" />
-                <CalcButton label="−" color="#E65100" bg="#FFF3E0" />
-              </View>
-              <View style={s.keyRow}>
-                <CalcButton label="1" />
-                <CalcButton label="2" />
-                <CalcButton label="3" />
-                <CalcButton label="+" color="#1B5E20" bg="#E8F5E9" />
-              </View>
-              <View style={s.keyRow}>
-                <CalcButton
-                  label="C"
-                  onPress={clear}
-                  color={Colors.error}
-                  bg="#FFEBEE"
-                />
-                <CalcButton label="0" />
-                <CalcButton label="." />
-                <CalcButton
-                  label="="
-                  onPress={done}
-                  color="#fff"
-                  bg={Colors.primary}
-                />
-              </View>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      </View>
+      {showResult && (
+        <Text style={s.resultText}>
+          = {result}
+        </Text>
+      )}
     </View>
   );
 });
@@ -236,73 +136,25 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.card,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 10,
+    borderWidth: 1.5,
     borderColor: Colors.border,
     overflow: "hidden",
   },
   input: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: Colors.textPrimary,
-  },
-  calcIcon: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-  },
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
-  calcCard: {
-    backgroundColor: Colors.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
-    paddingBottom: 24,
-  },
-  exprRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    marginBottom: 4,
-  },
-  exprText: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: Colors.textPrimary,
-    flex: 1,
-  },
-  bksp: { padding: 6 },
-  resultText: {
-    fontSize: 18,
-    color: Colors.success,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
     fontWeight: "600",
-    textAlign: "right",
-    paddingHorizontal: 12,
-    marginBottom: 10,
-  },
-  keypad: { gap: 8, marginTop: 6 },
-  keyRow: { flexDirection: "row", gap: 8 },
-  calcBtn: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    borderRadius: 12,
-    backgroundColor: Colors.background,
-  },
-  calcBtnText: {
-    fontSize: 22,
-    fontWeight: "700",
     color: Colors.textPrimary,
+  },
+  resultText: {
+    fontSize: 13,
+    color: Colors.success,
+    fontWeight: "700",
+    marginTop: 4,
+    marginLeft: 4,
   },
 });
 

@@ -81,7 +81,6 @@ const s = StyleSheet.create({
   btn: {
     padding: 6,
     borderRadius: 8,
-    backgroundColor: Colors.background,
     alignItems: "center",
     justifyContent: "center",
   },

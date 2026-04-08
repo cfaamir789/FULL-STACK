@@ -252,21 +252,24 @@ export default function ScannerScreen() {
         <>
           <Text style={styles.label}>Barcode</Text>
           <View style={styles.searchRow}>
-            <TextInput
-              ref={barcodeRef}
-              style={[styles.input, { flex: 1 }]}
-              value={barcode}
-              onChangeText={(t) => setBarcode(t.toUpperCase())}
-              placeholder="Scan or type barcode"
-              autoCapitalize="characters"
-              returnKeyType="search"
-              onSubmitEditing={handleBarcodeSearch}
-              blurOnSubmit={false}
-            />
-            <VoiceMic
-              onResult={(t) => setBarcode(t)}
-              style={{ marginLeft: 4 }}
-            />
+            <View style={styles.inputWithMic}>
+              <TextInput
+                ref={barcodeRef}
+                style={styles.inputInner}
+                value={barcode}
+                onChangeText={(t) => setBarcode(t.toUpperCase())}
+                placeholder="Scan or type barcode"
+                autoCapitalize="characters"
+                returnKeyType="search"
+                onSubmitEditing={handleBarcodeSearch}
+                blurOnSubmit={false}
+              />
+              <VoiceMic
+                onResult={(t) => setBarcode(t)}
+                size={18}
+                style={styles.micInside}
+              />
+            </View>
             <TouchableOpacity
               style={styles.searchBtn}
               onPress={handleBarcodeSearch}
@@ -286,21 +289,24 @@ export default function ScannerScreen() {
         <>
           <Text style={styles.label}>Item Code</Text>
           <View style={styles.searchRow}>
-            <TextInput
-              ref={itemCodeRef}
-              style={[styles.input, { flex: 1 }]}
-              value={itemCode}
-              onChangeText={(t) => setItemCode(t.toUpperCase())}
-              placeholder="Type item code"
-              autoCapitalize="characters"
-              returnKeyType="search"
-              onSubmitEditing={handleItemCodeSearch}
-              blurOnSubmit={false}
-            />
-            <VoiceMic
-              onResult={(t) => setItemCode(t)}
-              style={{ marginLeft: 4 }}
-            />
+            <View style={styles.inputWithMic}>
+              <TextInput
+                ref={itemCodeRef}
+                style={styles.inputInner}
+                value={itemCode}
+                onChangeText={(t) => setItemCode(t.toUpperCase())}
+                placeholder="Type item code"
+                autoCapitalize="characters"
+                returnKeyType="search"
+                onSubmitEditing={handleItemCodeSearch}
+                blurOnSubmit={false}
+              />
+              <VoiceMic
+                onResult={(t) => setItemCode(t)}
+                size={18}
+                style={styles.micInside}
+              />
+            </View>
             <TouchableOpacity
               style={styles.searchBtn}
               onPress={handleItemCodeSearch}
@@ -320,21 +326,24 @@ export default function ScannerScreen() {
       <>
         <Text style={styles.label}>Item Name</Text>
         <View style={styles.searchRow}>
-          <TextInput
-            ref={itemNameRef}
-            style={[styles.input, { flex: 1 }]}
-            value={itemName}
-            onChangeText={(t) => setItemName(t.toUpperCase())}
-            placeholder="Type part of item name..."
-            autoCapitalize="characters"
-            returnKeyType="search"
-            onSubmitEditing={handleItemNameSearch}
-            blurOnSubmit={false}
-          />
-          <VoiceMic
-            onResult={(t) => setItemName(t)}
-            style={{ marginLeft: 4 }}
-          />
+          <View style={styles.inputWithMic}>
+            <TextInput
+              ref={itemNameRef}
+              style={styles.inputInner}
+              value={itemName}
+              onChangeText={(t) => setItemName(t.toUpperCase())}
+              placeholder="Type part of item name..."
+              autoCapitalize="characters"
+              returnKeyType="search"
+              onSubmitEditing={handleItemNameSearch}
+              blurOnSubmit={false}
+            />
+            <VoiceMic
+              onResult={(t) => setItemName(t)}
+              size={18}
+              style={styles.micInside}
+            />
+          </View>
           <TouchableOpacity
             style={styles.searchBtn}
             onPress={handleItemNameSearch}
@@ -420,10 +429,10 @@ export default function ScannerScreen() {
   const renderBinQtyFields = () => (
     <>
       <Text style={styles.label}>From Bin</Text>
-      <View style={styles.fieldRow}>
+      <View style={styles.inputWithMic}>
         <TextInput
           ref={fromBinRef}
-          style={[styles.input, { flex: 1 }]}
+          style={styles.inputInner}
           value={frombin}
           onChangeText={uc(setFrombin)}
           placeholder="e.g. A-01"
@@ -432,14 +441,14 @@ export default function ScannerScreen() {
           onSubmitEditing={() => toBinRef.current?.focus()}
           blurOnSubmit={false}
         />
-        <VoiceMic onResult={(t) => setFrombin(t)} style={{ marginLeft: 4 }} />
+        <VoiceMic onResult={(t) => setFrombin(t)} size={18} style={styles.micInside} />
       </View>
 
       <Text style={styles.label}>To Bin</Text>
-      <View style={styles.fieldRow}>
+      <View style={styles.inputWithMic}>
         <TextInput
           ref={toBinRef}
-          style={[styles.input, { flex: 1 }]}
+          style={styles.inputInner}
           value={tobin}
           onChangeText={uc(setTobin)}
           placeholder="e.g. B-03"
@@ -448,7 +457,7 @@ export default function ScannerScreen() {
           onSubmitEditing={() => qtyRef.current?.focus()}
           blurOnSubmit={false}
         />
-        <VoiceMic onResult={(t) => setTobin(t)} style={{ marginLeft: 4 }} />
+        <VoiceMic onResult={(t) => setTobin(t)} size={18} style={styles.micInside} />
       </View>
 
       <Text style={styles.label}>
@@ -456,14 +465,14 @@ export default function ScannerScreen() {
         <Text
           style={{ fontWeight: "400", color: Colors.textLight, fontSize: 11 }}
         >
-          (tap calculator for math: 3x48 = 144)
+          (type math: 3*48 = auto calculates)
         </Text>
       </Text>
       <CalcInput
         ref={qtyRef}
         value={qty}
         onValueChange={setQty}
-        placeholder="Qty - tap calculator icon"
+        placeholder="Qty (e.g. 3*48)"
       />
 
       <Text style={styles.label}>
@@ -472,10 +481,10 @@ export default function ScannerScreen() {
           (optional)
         </Text>
       </Text>
-      <View style={styles.fieldRow}>
+      <View style={styles.inputWithMic}>
         <TextInput
           ref={notesRef}
-          style={[styles.input, { flex: 1 }]}
+          style={styles.inputInner}
           value={notes}
           onChangeText={uc(setNotes)}
           placeholder="e.g. DAMAGE, EXPIRY 2026-12"
@@ -483,7 +492,7 @@ export default function ScannerScreen() {
           returnKeyType="done"
           onSubmitEditing={handleSave}
         />
-        <VoiceMic onResult={(t) => setNotes(t)} style={{ marginLeft: 4 }} />
+        <VoiceMic onResult={(t) => setNotes(t)} size={18} style={styles.micInside} />
       </View>
 
       <TouchableOpacity
@@ -776,8 +785,29 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.textPrimary,
   },
-  searchRow: { flexDirection: "row", alignItems: "center" },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   fieldRow: { flexDirection: "row", alignItems: "center" },
+  inputWithMic: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.card,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  inputInner: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+  },
+  micInside: {
+    marginRight: 8,
+    backgroundColor: "transparent",
+  },
   searchBtn: {
     backgroundColor: Colors.primary,
     borderRadius: 10,

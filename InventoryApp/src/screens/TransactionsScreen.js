@@ -146,16 +146,14 @@ export default function TransactionsScreen({ username, role }) {
             _source: "server",
           }));
 
-          // Merge: use local for unsynced, server for everything else
-          const localUnsyncedIds = new Set(
-            localData
-              .filter((t) => t.synced === 0)
-              .map((t) => `${t.item_barcode}-${t.timestamp}`),
+          // Merge: keep ALL local + add server-only transactions
+          const localKeys = new Set(
+            localData.map((t) => `${t.item_barcode}-${t.timestamp}`),
           );
-          const merged = [...localData.filter((t) => t.synced === 0)];
+          const merged = [...localData];
           for (const stx of serverTxs) {
             const key = `${stx.item_barcode}-${stx.timestamp}`;
-            if (!localUnsyncedIds.has(key)) {
+            if (!localKeys.has(key)) {
               merged.push(stx);
             }
           }
@@ -280,6 +278,7 @@ export default function TransactionsScreen({ username, role }) {
           clearButtonMode="while-editing"
           returnKeyType="search"
         />
+        <VoiceMic onResult={(t) => setQuery(t)} size={18} style={{ backgroundColor: "transparent", marginRight: 2 }} />
         {query.length > 0 && (
           <TouchableOpacity onPress={() => setQuery("")}>
             <MaterialCommunityIcons
@@ -289,7 +288,6 @@ export default function TransactionsScreen({ username, role }) {
             />
           </TouchableOpacity>
         )}
-        <VoiceMic onResult={(t) => setQuery(t)} style={{ marginLeft: 6 }} />
       </View>
 
       {/* Worker filter chips (admin only) */}
