@@ -21,7 +21,9 @@ const toDate = (value, fallback = new Date()) => {
 };
 
 const normalizeStatus = (value, fallback = "pending") => {
-  const status = String(value || fallback).trim().toLowerCase();
+  const status = String(value || fallback)
+    .trim()
+    .toLowerCase();
   if (["pending", "processed", "archived", "all", "active"].includes(status)) {
     return status;
   }
@@ -51,7 +53,8 @@ const makeLegacyClientTxId = (tx) => {
 
 const hasMeaningfulChange = (existing, incoming) => {
   return (
-    String(existing.Item_Barcode || "") !== String(incoming.Item_Barcode || "") ||
+    String(existing.Item_Barcode || "") !==
+      String(incoming.Item_Barcode || "") ||
     String(existing.Item_Code || "") !== String(incoming.Item_Code || "") ||
     String(existing.Item_Name || "") !== String(incoming.Item_Name || "") ||
     String(existing.Frombin || "") !== String(incoming.Frombin || "") ||
@@ -296,6 +299,12 @@ router.post("/bulk-status", requireAuth, requireAdmin, async (req, res) => {
       : "";
     const fromStatus = normalizeStatus(req.body?.fromStatus || "all", "all");
     const nextStatus = normalizeStatus(req.body?.status, "pending");
+    const erpDocument = String(req.body?.erpDocument || "")
+      .trim()
+      .toUpperCase();
+    const erpBatch = String(req.body?.erpBatch || "")
+      .trim()
+      .toUpperCase();
 
     if (!["pending", "processed", "archived"].includes(nextStatus)) {
       return res.status(400).json({
@@ -324,12 +333,16 @@ router.post("/bulk-status", requireAuth, requireAdmin, async (req, res) => {
     if (nextStatus === "processed") {
       update.processedAt = new Date();
       update.processedBy = req.user.username;
+      update.erpDocument = erpDocument;
+      update.erpBatch = erpBatch;
       update.archivedAt = null;
     } else if (nextStatus === "archived") {
       update.archivedAt = new Date();
     } else {
       update.processedAt = null;
       update.processedBy = "";
+      update.erpDocument = "";
+      update.erpBatch = "";
       update.archivedAt = null;
     }
 
@@ -441,12 +454,13 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
 
 router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const [pendingTx, totalAll, totalProcessed, totalArchived] = await Promise.all([
-      Transaction.find(PENDING_QUERY),
-      Transaction.countDocuments({}),
-      Transaction.countDocuments({ syncStatus: "processed" }),
-      Transaction.countDocuments({ syncStatus: "archived" }),
-    ]);
+    const [pendingTx, totalAll, totalProcessed, totalArchived] =
+      await Promise.all([
+        Transaction.find(PENDING_QUERY),
+        Transaction.countDocuments({}),
+        Transaction.countDocuments({ syncStatus: "processed" }),
+        Transaction.countDocuments({ syncStatus: "archived" }),
+      ]);
 
     const workerMap = {};
     for (const tx of pendingTx) {
@@ -500,14 +514,17 @@ router.get("/export", requireAuth, requireAdmin, async (req, res) => {
     }
 
     const header =
-      "Status,Processed_At,Processed_By,Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Notes,Timestamp\n";
+      "Status,Processed_At,Processed_By,ERP_Document,ERP_Batch,Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Notes,Timestamp\n";
     const rows = transactions
       .map((tx) => {
-        const escape = (value) => `"${String(value || "").replace(/"/g, '""')}"`;
+        const escape = (value) =>
+          `"${String(value || "").replace(/"/g, '""')}"`;
         return [
           escape(tx.syncStatus || "pending"),
           escape(tx.processedAt ? new Date(tx.processedAt).toISOString() : ""),
           escape(tx.processedBy || ""),
+          escape(tx.erpDocument || ""),
+          escape(tx.erpBatch || ""),
           escape(tx.Item_Barcode),
           escape(tx.Item_Code),
           escape(tx.Item_Name),

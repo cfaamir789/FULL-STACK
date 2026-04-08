@@ -34,6 +34,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   getItemByBarcode,
   getItemByItemCode,
+  searchItemsByItemCode,
   searchItems,
   insertTransaction,
 } from "../database/db";
@@ -50,6 +51,7 @@ export default function ScannerScreen() {
   const [foundItem, setFoundItem] = useState(null);
   const [barcode, setBarcode] = useState("");
   const [itemCode, setItemCode] = useState("");
+  const [quickCode, setQuickCode] = useState("");
   const [frombin, setFrombin] = useState("");
   const [tobin, setTobin] = useState("");
   const [qty, setQty] = useState("");
@@ -60,6 +62,7 @@ export default function ScannerScreen() {
   const [searching, setSearching] = useState(false);
   const [itemName, setItemName] = useState("");
   const [nameResults, setNameResults] = useState([]);
+  const [quickCodeResults, setQuickCodeResults] = useState([]);
   const [lastSaved, setLastSaved] = useState(null);
 
   const fromBinRef = useRef(null);
@@ -68,6 +71,7 @@ export default function ScannerScreen() {
   const notesRef = useRef(null);
   const barcodeRef = useRef(null);
   const itemCodeRef = useRef(null);
+  const quickCodeRef = useRef(null);
   const itemNameRef = useRef(null);
 
   const digitsOnly = (text) => String(text || "").replace(/\D+/g, "");
@@ -86,8 +90,10 @@ export default function ScannerScreen() {
     setFoundItem(null);
     setBarcode("");
     setItemCode("");
+    setQuickCode("");
     setItemName("");
     setNameResults([]);
+    setQuickCodeResults([]);
     setFrombin("");
     setTobin("");
     setQty("");
@@ -102,14 +108,35 @@ export default function ScannerScreen() {
     setFoundItem(null);
     setBarcode("");
     setItemCode("");
+    setQuickCode("");
     setItemName("");
     setNameResults([]);
+    setQuickCodeResults([]);
     setFrombin("");
     setTobin("");
     setQty("");
     setNotes("");
     setShowCamera(m === "barcode");
     setCameraActive(m === "barcode");
+  };
+
+  const applySelectedItem = (item) => {
+    if (!item) {
+      setFoundItem(null);
+      setScanned(true);
+      focusFromBin();
+      return;
+    }
+
+    setFoundItem(item);
+    setBarcode(item.barcode || "");
+    setItemCode(item.item_code || "");
+    setQuickCode(item.item_code || "");
+    setItemName(item.item_name || "");
+    setScanned(true);
+    setNameResults([]);
+    setQuickCodeResults([]);
+    focusFromBin();
   };
 
   const handleBarCodeScanned = async ({ data }) => {
@@ -121,31 +148,46 @@ export default function ScannerScreen() {
     setBarcode(code);
     if (!IS_WEB) Vibration.vibrate(100);
     const item = await getItemByBarcode(code);
-    setFoundItem(item);
-    focusFromBin();
+    applySelectedItem(item);
   };
 
   const handleBarcodeSearch = async () => {
     if (!barcode.trim()) return;
     setSearching(true);
     const item = await getItemByBarcode(barcode.trim());
-    setFoundItem(item);
+    applySelectedItem(item);
     setShowCamera(false);
     setCameraActive(false);
-    setScanned(true);
     setSearching(false);
-    focusFromBin();
   };
 
   const handleItemCodeSearch = async () => {
     if (!itemCode.trim()) return;
     setSearching(true);
     const item = await getItemByItemCode(itemCode.trim());
-    setFoundItem(item);
-    setScanned(true);
-    if (item) setBarcode(item.barcode);
+    applySelectedItem(item);
     setSearching(false);
-    focusFromBin();
+  };
+
+  const handleQuickCodeSearch = async () => {
+    const query = digitsOnly(quickCode);
+    if (!query.trim()) return;
+    if (query.trim().length < 3) {
+      Alert.alert(
+        "Need More Digits",
+        "Enter at least 3 digits from the item code for quick matching.",
+      );
+      return;
+    }
+    setSearching(true);
+    const results = await searchItemsByItemCode(query.trim(), 50);
+    setQuickCodeResults(results);
+    setScanned(false);
+    setFoundItem(null);
+    if (results.length === 1) {
+      applySelectedItem(results[0]);
+    }
+    setSearching(false);
   };
 
   const handleItemNameSearch = async () => {
@@ -163,11 +205,11 @@ export default function ScannerScreen() {
   };
 
   const handleNameResultSelect = (item) => {
-    setFoundItem(item);
-    setBarcode(item.barcode);
-    setNameResults([]);
-    setScanned(true);
-    focusFromBin();
+    applySelectedItem(item);
+  };
+
+  const handleQuickCodeResultSelect = (item) => {
+    applySelectedItem(item);
   };
 
   // directQty is passed from CalcInput's SAVE button to avoid stale React state.
@@ -220,6 +262,7 @@ export default function ScannerScreen() {
       setTimeout(() => {
         if (mode === "barcode") barcodeRef.current?.focus();
         else if (mode === "itemcode") itemCodeRef.current?.focus();
+          else if (mode === "quickcode") quickCodeRef.current?.focus();
         else if (mode === "itemname") itemNameRef.current?.focus();
       }, 50);
     } catch (err) {
@@ -237,6 +280,7 @@ export default function ScannerScreen() {
       {[
         { key: "barcode", icon: "barcode-scan", label: "Barcode" },
         { key: "itemcode", icon: "pound-box", label: "Item Code" },
+          { key: "quickcode", icon: "dialpad", label: "Quick Code" },
         { key: "itemname", icon: "text-search", label: "Item Name" },
       ].map((t) => (
         <TouchableOpacity
@@ -341,6 +385,82 @@ export default function ScannerScreen() {
               )}
             </TouchableOpacity>
           </View>
+        </>
+      );
+    }
+    if (mode === "quickcode") {
+      return (
+        <>
+          <Text style={styles.label}>Quick Code</Text>
+          <View style={styles.searchRow}>
+            <View style={styles.inputWithMic}>
+              <TextInput
+                ref={quickCodeRef}
+                style={styles.inputInner}
+                value={quickCode}
+                onChangeText={(t) => setQuickCode(digitsOnly(t))}
+                placeholder="Type last 3-10 digits"
+                keyboardType={IS_WEB ? "default" : "number-pad"}
+                returnKeyType="search"
+                onSubmitEditing={handleQuickCodeSearch}
+                onKeyPress={(e) => {
+                  if (e.nativeEvent.key === "Enter") handleQuickCodeSearch();
+                }}
+                blurOnSubmit={false}
+              />
+              <VoiceMic
+                onResult={(t) => setQuickCode(digitsOnly(t))}
+                mode="numeric"
+                focusTargetRef={quickCodeRef}
+                size={18}
+                style={styles.micInside}
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.searchBtn}
+              onPress={handleQuickCodeSearch}
+            >
+              {searching ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+          <View style={styles.quickHintBox}>
+            <MaterialCommunityIcons
+              name="lightning-bolt-outline"
+              size={16}
+              color={Colors.primary}
+            />
+            <Text style={styles.quickHintText}>
+              Fast lookup by last digits. Example: 627866 can match 0101627866.
+            </Text>
+          </View>
+          {quickCodeResults.length > 0 && (
+            <View style={styles.nameResultsList}>
+              {quickCodeResults.map((r) => (
+                <TouchableOpacity
+                  key={r.id || r.barcode}
+                  style={styles.nameResultItem}
+                  onPress={() => handleQuickCodeResultSelect(r)}
+                >
+                  <Text style={styles.nameResultCode}>{r.item_code}</Text>
+                  <Text style={styles.nameResultName} numberOfLines={1}>
+                    {r.item_name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {quickCodeResults.length === 0 &&
+            quickCode.trim().length > 0 &&
+            !searching &&
+            !scanned && (
+              <Text style={styles.nameHint}>
+                No quick-code matches yet. Try more digits.
+              </Text>
+            )}
         </>
       );
     }
@@ -745,7 +865,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tabActive: { backgroundColor: Colors.primary },
-  tabText: { fontSize: 13, fontWeight: "700", color: Colors.textSecondary },
+  tabText: { fontSize: 12, fontWeight: "700", color: Colors.textSecondary },
   tabTextActive: { color: "#fff" },
 
   cameraWrap: { height: 240, overflow: "hidden", backgroundColor: "#000" },
@@ -906,6 +1026,22 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     marginTop: 8,
     textAlign: "center",
+  },
+  quickHintBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.primary + "10",
+  },
+  quickHintText: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+    fontWeight: "600",
   },
 
   saveBtn: {

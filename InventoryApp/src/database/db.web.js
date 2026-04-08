@@ -24,6 +24,60 @@ const normalizeIsoString = (value) => {
     : date.toISOString();
 };
 
+const buildRestoreFallbackId = ({
+  worker_name = "unknown",
+  item_barcode = "unknown",
+  timestamp,
+}) => {
+  const safeWorker = String(worker_name || "unknown").replace(
+    /[^a-zA-Z0-9_-]/g,
+    "_",
+  );
+  const safeBarcode = String(item_barcode || "unknown").replace(
+    /[^a-zA-Z0-9_-]/g,
+    "_",
+  );
+  const timePart = new Date(timestamp || Date.now()).getTime().toString(36);
+  return `restored_${safeWorker}_${safeBarcode}_${timePart}`;
+};
+
+const normalizeRestoreTx = (tx) => {
+  const item_barcode = String(tx?.item_barcode || "").trim();
+  const item_name = String(tx?.item_name || "").trim();
+  const frombin = String(tx?.frombin || "")
+    .trim()
+    .toUpperCase();
+  const tobin = String(tx?.tobin || "")
+    .trim()
+    .toUpperCase();
+  const qty = Number(tx?.qty);
+
+  if (!item_barcode || !item_name || !frombin || !tobin || !qty || qty < 1) {
+    return null;
+  }
+
+  const timestamp = normalizeIsoString(tx?.timestamp);
+  const worker_name = String(tx?.worker_name || "unknown").trim() || "unknown";
+  const client_tx_id =
+    String(tx?.client_tx_id || "").trim() ||
+    buildRestoreFallbackId({ worker_name, item_barcode, timestamp });
+
+  return {
+    item_barcode,
+    item_code: String(tx?.item_code || "").trim(),
+    item_name,
+    frombin,
+    tobin,
+    qty,
+    timestamp,
+    synced: Number(tx?.synced) === 1 ? 1 : 0,
+    worker_name,
+    notes: String(tx?.notes || "").trim(),
+    client_tx_id,
+    updated_at: normalizeIsoString(tx?.updated_at || timestamp),
+  };
+};
+
 // ─── IndexedDB for Items ──────────────────────────────────────────────────────
 
 const IDB_NAME = "inventory_db";
@@ -160,6 +214,30 @@ export const getItemByItemCode = async (itemCode) => {
   const code = itemCode.trim().toLowerCase();
   const items = await getItemsCache();
   return items.find((i) => i.item_code.toLowerCase() === code) || null;
+};
+
+export const searchItemsByItemCode = async (query, limit = 50) => {
+  const items = await getItemsCache();
+  const q = String(query || "").trim().toLowerCase();
+  if (!q) return [];
+
+  const scoreItem = (itemCode) => {
+    const code = String(itemCode || "").toLowerCase();
+    if (code === q) return 0;
+    if (code.endsWith(q)) return 1;
+    if (code.includes(q)) return 2;
+    return 3;
+  };
+
+  return items
+    .filter((i) => scoreItem(i.item_code) < 3)
+    .sort(
+      (a, b) =>
+        scoreItem(a.item_code) - scoreItem(b.item_code) ||
+        String(a.item_code || "").length - String(b.item_code || "").length ||
+        a.item_name.localeCompare(b.item_name),
+    )
+    .slice(0, limit);
 };
 
 export const searchItems = async (query) => {
@@ -313,6 +391,55 @@ export const clearAllTransactions = async () => {
   const count = loadTx().length;
   saveTx([]);
   return count;
+};
+
+export const restoreTransactions = async (
+  rows,
+  { replaceExisting = false } = {},
+) => {
+  const totalRows = Array.isArray(rows) ? rows.length : 0;
+  const normalizedRows = (rows || []).map(normalizeRestoreTx).filter(Boolean);
+  const existingRows = replaceExisting ? [] : loadTx();
+
+  let inserted = 0;
+  let updated = 0;
+  const skipped = totalRows - normalizedRows.length;
+
+  const nextRows = [...existingRows];
+
+  normalizedRows.forEach((tx) => {
+    const existingIndex = nextRows.findIndex(
+      (row) =>
+        row.client_tx_id === tx.client_tx_id ||
+        (row.item_barcode === tx.item_barcode &&
+          row.timestamp === tx.timestamp &&
+          row.worker_name === tx.worker_name),
+    );
+
+    if (existingIndex >= 0) {
+      nextRows[existingIndex] = {
+        ...nextRows[existingIndex],
+        ...tx,
+        id: nextRows[existingIndex].id,
+      };
+      updated += 1;
+      return;
+    }
+
+    const nextId =
+      nextRows.length > 0 ? Math.max(...nextRows.map((row) => row.id || 0)) + 1 : 1;
+    nextRows.push({ id: nextId, ...tx });
+    inserted += 1;
+  });
+
+  saveTx(nextRows);
+
+  return {
+    total: normalizedRows.length,
+    inserted,
+    updated,
+    skipped,
+  };
 };
 
 export const clearAllItems = async () => {

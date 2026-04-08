@@ -561,7 +561,7 @@ export default function AdminPanelScreen({ navigation }) {
             />
             <Text style={styles.statValue}>
               {online
-                ? serverStats.totalPending ?? serverStats.total
+                ? (serverStats.totalPending ?? serverStats.total)
                 : localStats.totalTransactions}
             </Text>
             <Text style={styles.statLabel}>Pending Queue</Text>
@@ -793,6 +793,26 @@ export default function AdminPanelScreen({ navigation }) {
             </View>
             <Text style={styles.actionTitle}>Pending Queue</Text>
             <Text style={styles.actionSub}>View shared server work</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate("BackupRestore")}
+          >
+            <View
+              style={[
+                styles.actionIcon,
+                { backgroundColor: "#5D4037" + "15" },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="backup-restore"
+                size={24}
+                color="#5D4037"
+              />
+            </View>
+            <Text style={styles.actionTitle}>Backup & Restore</Text>
+            <Text style={styles.actionSub}>Recover this phone from backup</Text>
           </TouchableOpacity>
         </View>
 

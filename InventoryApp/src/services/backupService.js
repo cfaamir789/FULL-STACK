@@ -14,6 +14,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Papa from "papaparse";
+import { restoreTransactions } from "../database/db";
 
 // ─── Folder ───────────────────────────────────────────────────────────────────
 const BACKUP_DIR = FileSystem.documentDirectory + "InventoryManager/";
@@ -56,6 +57,7 @@ function transactionsToCSV(transactions) {
   const rows = transactions.map((tx) => ({
     Worker: tx.worker_name || "",
     Date: tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "",
+    TimestampISO: tx.timestamp || "",
     Barcode: tx.item_barcode || "",
     ItemCode: tx.item_code || "",
     ItemName: tx.item_name || "",
@@ -64,6 +66,8 @@ function transactionsToCSV(transactions) {
     Qty: tx.qty ?? "",
     Notes: tx.notes || "",
     Synced: tx.synced ? "Yes" : "No",
+    ClientTxId: tx.client_tx_id || "",
+    UpdatedAt: tx.updated_at || tx.timestamp || "",
   }));
   return Papa.unparse(rows);
 }
@@ -83,6 +87,7 @@ async function transactionsToXLSX(transactions) {
     [
       "Worker",
       "Date",
+      "TimestampISO",
       "Barcode",
       "ItemCode",
       "ItemName",
@@ -91,10 +96,13 @@ async function transactionsToXLSX(transactions) {
       "Qty",
       "Notes",
       "Synced",
+      "ClientTxId",
+      "UpdatedAt",
     ],
     ...transactions.map((tx) => [
       tx.worker_name || "",
       tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "",
+      tx.timestamp || "",
       tx.item_barcode || "",
       tx.item_code || "",
       tx.item_name || "",
@@ -103,6 +111,8 @@ async function transactionsToXLSX(transactions) {
       tx.qty ?? "",
       tx.notes || "",
       tx.synced ? "Yes" : "No",
+      tx.client_tx_id || "",
+      tx.updated_at || tx.timestamp || "",
     ]),
   ];
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -209,4 +219,141 @@ export async function listBackups() {
   } catch {
     return [];
   }
+}
+
+export async function listBackupsDetailed() {
+  const files = await listBackups();
+  const rows = await Promise.all(
+    files.map(async (name) => {
+      const uri = BACKUP_DIR + name;
+      const info = await FileSystem.getInfoAsync(uri);
+      return {
+        name,
+        uri,
+        size: info.size || 0,
+        modifiedAt: info.modificationTime
+          ? new Date(info.modificationTime * 1000).toISOString()
+          : null,
+      };
+    }),
+  );
+
+  return rows.sort((a, b) => {
+    const aTime = a.modifiedAt ? new Date(a.modifiedAt).getTime() : 0;
+    const bTime = b.modifiedAt ? new Date(b.modifiedAt).getTime() : 0;
+    return bTime - aTime;
+  });
+}
+
+const normalizeKey = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+
+const getRowValue = (row, candidates) => {
+  const wanted = new Set(candidates.map(normalizeKey));
+  for (const [key, value] of Object.entries(row || {})) {
+    if (wanted.has(normalizeKey(key))) {
+      return value;
+    }
+  }
+  return "";
+};
+
+const parseTruthy = (value) => {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  return ["1", "true", "yes", "y"].includes(normalized) ? 1 : 0;
+};
+
+const parseBackupDate = (...values) => {
+  for (const value of values) {
+    if (value == null || value === "") continue;
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+  }
+  return new Date().toISOString();
+};
+
+const normalizeBackupRow = (row) => {
+  const qty = Number(
+    String(
+      getRowValue(row, ["Qty", "Quantity", "qty", "quantity"]),
+    ).replace(/,/g, ""),
+  );
+
+  return {
+    worker_name: String(
+      getRowValue(row, ["Worker", "Worker_Name", "worker"]),
+    ).trim(),
+    timestamp: parseBackupDate(
+      getRowValue(row, ["TimestampISO", "timestamp", "Timestamp"]),
+      getRowValue(row, ["Date", "date"]),
+    ),
+    item_barcode: String(
+      getRowValue(row, ["Barcode", "Item_Barcode", "barcode"]),
+    ).trim(),
+    item_code: String(
+      getRowValue(row, ["ItemCode", "Item_Code", "item_code"]),
+    ).trim(),
+    item_name: String(
+      getRowValue(row, ["ItemName", "Item_Name", "item_name"]),
+    ).trim(),
+    frombin: String(
+      getRowValue(row, ["From", "Frombin", "From_Bin", "frombin"]),
+    ).trim(),
+    tobin: String(
+      getRowValue(row, ["To", "Tobin", "To_Bin", "tobin"]),
+    ).trim(),
+    qty,
+    notes: String(getRowValue(row, ["Notes", "notes"])).trim(),
+    synced: parseTruthy(getRowValue(row, ["Synced", "synced"])),
+    client_tx_id: String(
+      getRowValue(row, ["ClientTxId", "Client_Tx_Id", "client_tx_id"]),
+    ).trim(),
+    updated_at: parseBackupDate(
+      getRowValue(row, ["UpdatedAt", "updated_at", "Updated_At"]),
+      getRowValue(row, ["TimestampISO", "timestamp", "Timestamp"]),
+      getRowValue(row, ["Date", "date"]),
+    ),
+  };
+};
+
+async function readBackupRows(fileUri, fileName = "") {
+  const lowerName = String(fileName || fileUri || "").toLowerCase();
+
+  if (lowerName.endsWith(".xlsx")) {
+    const XLSX = await getXLSX();
+    const base64 = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const workbook = XLSX.read(base64, { type: "base64" });
+    const firstSheet = workbook.SheetNames[0];
+    if (!firstSheet) return [];
+    return XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], {
+      defval: "",
+    });
+  }
+
+  const csv = await FileSystem.readAsStringAsync(fileUri, {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+  const parsed = Papa.parse(csv, {
+    header: true,
+    skipEmptyLines: true,
+  });
+  return parsed.data || [];
+}
+
+export async function restoreBackupFromFile(
+  fileUri,
+  { replaceExisting = false, fileName = "" } = {},
+) {
+  const rawRows = await readBackupRows(fileUri, fileName);
+  const normalizedRows = rawRows.map(normalizeBackupRow);
+  return restoreTransactions(normalizedRows, { replaceExisting });
 }

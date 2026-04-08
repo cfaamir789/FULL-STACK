@@ -23,6 +23,60 @@ const normalizeIsoString = (value) => {
     : date.toISOString();
 };
 
+const buildRestoreFallbackId = ({
+  worker_name = "unknown",
+  item_barcode = "unknown",
+  timestamp,
+}) => {
+  const safeWorker = String(worker_name || "unknown").replace(
+    /[^a-zA-Z0-9_-]/g,
+    "_",
+  );
+  const safeBarcode = String(item_barcode || "unknown").replace(
+    /[^a-zA-Z0-9_-]/g,
+    "_",
+  );
+  const timePart = new Date(timestamp || Date.now()).getTime().toString(36);
+  return `restored_${safeWorker}_${safeBarcode}_${timePart}`;
+};
+
+const normalizeRestoreTx = (tx) => {
+  const item_barcode = String(tx?.item_barcode || "").trim();
+  const item_name = String(tx?.item_name || "").trim();
+  const frombin = String(tx?.frombin || "")
+    .trim()
+    .toUpperCase();
+  const tobin = String(tx?.tobin || "")
+    .trim()
+    .toUpperCase();
+  const qty = Number(tx?.qty);
+
+  if (!item_barcode || !item_name || !frombin || !tobin || !qty || qty < 1) {
+    return null;
+  }
+
+  const timestamp = normalizeIsoString(tx?.timestamp);
+  const worker_name = String(tx?.worker_name || "unknown").trim() || "unknown";
+  const client_tx_id =
+    String(tx?.client_tx_id || "").trim() ||
+    buildRestoreFallbackId({ worker_name, item_barcode, timestamp });
+
+  return {
+    item_barcode,
+    item_code: String(tx?.item_code || "").trim(),
+    item_name,
+    frombin,
+    tobin,
+    qty,
+    timestamp,
+    synced: Number(tx?.synced) === 1 ? 1 : 0,
+    worker_name,
+    notes: String(tx?.notes || "").trim(),
+    client_tx_id,
+    updated_at: normalizeIsoString(tx?.updated_at || timestamp),
+  };
+};
+
 export const initDB = async () => {
   db = await SQLite.openDatabaseAsync("inventory.db");
   await db.execAsync(`
@@ -179,6 +233,30 @@ export const getItemByItemCode = async (itemCode) => {
     [itemCode.trim()],
   );
   return row || null;
+};
+
+export const searchItemsByItemCode = async (query, limit = 50) => {
+  const normalized = String(query || "").trim();
+  if (!normalized) return [];
+
+  const suffix = `%${normalized}`;
+  const contains = `%${normalized}%`;
+
+  return await db.getAllAsync(
+    `SELECT * FROM items
+     WHERE item_code = ? OR item_code LIKE ? OR item_code LIKE ?
+     ORDER BY
+       CASE
+         WHEN item_code = ? THEN 0
+         WHEN item_code LIKE ? THEN 1
+         WHEN item_code LIKE ? THEN 2
+         ELSE 3
+       END,
+       LENGTH(item_code) ASC,
+       item_name ASC
+     LIMIT ?`,
+    [normalized, suffix, contains, normalized, suffix, contains, limit],
+  );
 };
 
 export const searchItems = async (query) => {
@@ -349,6 +427,113 @@ export const clearSyncedTransactions = async () => {
 export const clearAllTransactions = async () => {
   const result = await db.runAsync("DELETE FROM transactions");
   return result.changes;
+};
+
+export const restoreTransactions = async (
+  rows,
+  { replaceExisting = false } = {},
+) => {
+  const totalRows = Array.isArray(rows) ? rows.length : 0;
+  const normalizedRows = (rows || []).map(normalizeRestoreTx).filter(Boolean);
+  let inserted = 0;
+  let updated = 0;
+  const skipped = totalRows - normalizedRows.length;
+
+  await db.withTransactionAsync(async () => {
+    if (replaceExisting) {
+      await db.runAsync("DELETE FROM transactions");
+    }
+
+    for (const tx of normalizedRows) {
+      const existing = await db.getFirstAsync(
+        `SELECT id FROM transactions
+         WHERE client_tx_id = ?
+            OR (
+              item_barcode = ?
+              AND timestamp = ?
+              AND worker_name = ?
+            )
+         LIMIT 1`,
+        [tx.client_tx_id, tx.item_barcode, tx.timestamp, tx.worker_name],
+      );
+
+      if (existing?.id) {
+        await db.runAsync(
+          `UPDATE transactions
+           SET item_barcode = ?,
+               item_code = ?,
+               item_name = ?,
+               frombin = ?,
+               tobin = ?,
+               qty = ?,
+               timestamp = ?,
+               synced = ?,
+               worker_name = ?,
+               notes = ?,
+               client_tx_id = ?,
+               updated_at = ?
+           WHERE id = ?`,
+          [
+            tx.item_barcode,
+            tx.item_code,
+            tx.item_name,
+            tx.frombin,
+            tx.tobin,
+            tx.qty,
+            tx.timestamp,
+            tx.synced,
+            tx.worker_name,
+            tx.notes,
+            tx.client_tx_id,
+            tx.updated_at,
+            existing.id,
+          ],
+        );
+        updated += 1;
+        continue;
+      }
+
+      await db.runAsync(
+        `INSERT INTO transactions (
+           item_barcode,
+           item_code,
+           item_name,
+           frombin,
+           tobin,
+           qty,
+           timestamp,
+           synced,
+           worker_name,
+           notes,
+           client_tx_id,
+           updated_at
+         )
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          tx.item_barcode,
+          tx.item_code,
+          tx.item_name,
+          tx.frombin,
+          tx.tobin,
+          tx.qty,
+          tx.timestamp,
+          tx.synced,
+          tx.worker_name,
+          tx.notes,
+          tx.client_tx_id,
+          tx.updated_at,
+        ],
+      );
+      inserted += 1;
+    }
+  });
+
+  return {
+    total: normalizedRows.length,
+    inserted,
+    updated,
+    skipped,
+  };
 };
 
 export const clearAllItems = async () => {

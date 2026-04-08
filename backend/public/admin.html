@@ -1381,6 +1381,8 @@
         { key: "Notes", label: "Notes", vis: true },
         { key: "processedBy", label: "Processed By", vis: false },
         { key: "processedAt", label: "Processed At", vis: false },
+        { key: "erpDocument", label: "ERP Document", vis: false },
+        { key: "erpBatch", label: "ERP Batch", vis: false },
         { key: "Timestamp", label: "Date/Time", vis: true },
       ];
 
@@ -1548,6 +1550,8 @@
               tx.Frombin,
               tx.Tobin,
               tx.Worker_Name,
+              tx.erpDocument,
+              tx.erpBatch,
             ]
               .join(" ")
               .toLowerCase();
@@ -1569,7 +1573,7 @@
         return (
           '<td><span style="display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:' +
           bg +
-          '18;color:' +
+          "18;color:" +
           bg +
           ';font-weight:700;font-size:12px;text-transform:capitalize">' +
           esc(status) +
@@ -1598,9 +1602,38 @@
         if (key === "processedBy") {
           return "<td>" + esc(tx.processedBy || "") + "</td>";
         }
+        if (key === "erpDocument") {
+          return "<td>" + esc(tx.erpDocument || "") + "</td>";
+        }
+        if (key === "erpBatch") {
+          return "<td>" + esc(tx.erpBatch || "") + "</td>";
+        }
         if (key === "Qty")
           return "<td>" + (tx.Qty !== undefined ? tx.Qty : "") + "</td>";
         return "<td>" + esc(tx[key] || "") + "</td>";
+      }
+
+      function collectErpDetails(existingTx) {
+        const documentValue = prompt(
+          "ERP document / reference (optional):",
+          existingTx?.erpDocument || "",
+        );
+        if (documentValue === null) return null;
+
+        const batchValue = prompt(
+          "ERP batch / batch number (optional):",
+          existingTx?.erpBatch || "",
+        );
+        if (batchValue === null) return null;
+
+        return {
+          erpDocument: String(documentValue || "")
+            .trim()
+            .toUpperCase(),
+          erpBatch: String(batchValue || "")
+            .trim()
+            .toUpperCase(),
+        };
       }
 
       function renderTransactions(txs) {
@@ -1642,8 +1675,7 @@
               idx +
               ', this)" title="Copy this row"><svg class="copy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><polyline points="20 6 9 17 4 12"></polyline></svg></button></td>';
             const actionLabel =
-              String(tx.syncStatus || "pending").toLowerCase() ===
-              "pending"
+              String(tx.syncStatus || "pending").toLowerCase() === "pending"
                 ? "Done"
                 : "Reopen";
             html +=
@@ -1728,8 +1760,10 @@
         if (!tx || !tx._id) return;
 
         const currentStatus = String(tx.syncStatus || "pending").toLowerCase();
-        const nextStatus = currentStatus === "pending" ? "processed" : "pending";
-        const actionText = nextStatus === "processed" ? "mark as processed" : "reopen";
+        const nextStatus =
+          currentStatus === "pending" ? "processed" : "pending";
+        const actionText =
+          nextStatus === "processed" ? "mark as processed" : "reopen";
 
         const ok = confirm(
           "Do you want to " +
@@ -1747,9 +1781,16 @@
         );
         if (!ok) return;
 
+        const erpDetails =
+          nextStatus === "processed"
+            ? collectErpDetails(tx)
+            : { erpDocument: "", erpBatch: "" };
+        if (erpDetails === null) return;
+
         const original = btnEl.textContent;
         btnEl.disabled = true;
-        btnEl.textContent = nextStatus === "processed" ? "Saving..." : "Reopening...";
+        btnEl.textContent =
+          nextStatus === "processed" ? "Saving..." : "Reopening...";
         try {
           await apiFetch("/transactions/bulk-status", {
             method: "POST",
@@ -1757,6 +1798,7 @@
               ids: [tx._id],
               status: nextStatus,
               fromStatus: "all",
+              ...erpDetails,
             }),
           });
           await Promise.all([
@@ -1778,7 +1820,8 @@
           return;
         }
 
-        const actionText = status === "processed" ? "mark as processed" : "reopen";
+        const actionText =
+          status === "processed" ? "mark as processed" : "reopen";
 
         const confirmMsg =
           "Do you want to " +
@@ -1790,10 +1833,16 @@
           "?";
         if (!confirm(confirmMsg)) return;
 
+        const erpDetails =
+          status === "processed"
+            ? collectErpDetails()
+            : { erpDocument: "", erpBatch: "" };
+        if (erpDetails === null) return;
+
         try {
           const body = workerName
-            ? { worker: workerName, status, fromStatus: "all" }
-            : { ids: safeIds, status, fromStatus: "all" };
+            ? { worker: workerName, status, fromStatus: "all", ...erpDetails }
+            : { ids: safeIds, status, fromStatus: "all", ...erpDetails };
           const data = await apiFetch("/transactions/bulk-status", {
             method: "POST",
             body: JSON.stringify(body),
@@ -1908,6 +1957,11 @@
                 return;
               }
               const headers = [
+                "Status",
+                "ProcessedAt",
+                "ProcessedBy",
+                "ERPDocument",
+                "ERPBatch",
                 "Worker",
                 "Date",
                 "Barcode",
@@ -1921,6 +1975,13 @@
               const aoa = [
                 headers,
                 ...rows.map((r) => [
+                  r.syncStatus || "pending",
+                  r.processedAt
+                    ? new Date(r.processedAt).toLocaleString()
+                    : "",
+                  r.processedBy || "",
+                  r.erpDocument || "",
+                  r.erpBatch || "",
                   r.Worker_Name || r.worker_name || "",
                   r.Timestamp
                     ? new Date(r.Timestamp).toLocaleString()

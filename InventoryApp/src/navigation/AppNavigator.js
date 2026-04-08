@@ -15,6 +15,7 @@ import TransactionsScreen from '../screens/TransactionsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import AdminScreen from '../screens/AdminScreen';
 import AdminPanelScreen from '../screens/AdminPanelScreen';
+import BackupRestoreScreen from '../screens/BackupRestoreScreen';
 import Colors from '../theme/colors';
 import { loadServerUrl } from '../services/api';
 import { attemptSync } from '../services/syncService';
@@ -47,6 +48,7 @@ const AdminStackNavigator = ({ username }) => (
     <AdminStack.Screen name="AdminDashboard" component={AdminPanelScreen} options={{ title: 'Admin Panel' }} />
     <AdminStack.Screen name="AdminUsers" component={AdminScreen} options={{ title: 'Manage Users' }} />
     <AdminStack.Screen name="Import" component={ImportScreen} options={{ title: 'Import CSV' }} />
+    <AdminStack.Screen name="BackupRestore" component={BackupRestoreScreen} options={{ title: 'Backup & Restore' }} />
     <AdminStack.Screen name="AdminTransactions" options={{ title: 'All Transactions' }}>
       {() => <TransactionsScreen username={username} role="admin" />}
     </AdminStack.Screen>

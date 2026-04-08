@@ -58,9 +58,7 @@
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 5000
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "inventory-launch-v1",
     "extra": {
       "eas": {
         "projectId": "e38f8ee8-1b02-4452-b109-b9ad8465236c"

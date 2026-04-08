@@ -20,6 +20,8 @@ const transactionSchema = new mongoose.Schema({
   },
   processedAt: Date,
   processedBy: String,
+  erpDocument: String,
+  erpBatch: String,
   archivedAt: Date,
   lastSyncedAt: Date,
   createdAt: { type: Date, default: Date.now },
