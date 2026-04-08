@@ -18,13 +18,13 @@ import {
   getTransactionStats,
   getExportUrl,
   checkHealth,
-  clearServerTransactions,
   clearServerItems,
   getUsers,
 } from "../services/api";
 import {
   getDashboardStats,
   clearAllTransactions,
+  clearSyncedTransactions,
   clearAllItems,
   getPendingCount,
   getAllTransactions,
@@ -58,7 +58,14 @@ export default function AdminPanelScreen({ navigation }) {
     totalTransactions: 0,
     pendingSync: 0,
   });
-  const [serverStats, setServerStats] = useState({ total: 0, workers: [] });
+  const [serverStats, setServerStats] = useState({
+    total: 0,
+    totalPending: 0,
+    totalProcessed: 0,
+    totalArchived: 0,
+    totalAll: 0,
+    workers: [],
+  });
   const [userCount, setUserCount] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -392,28 +399,27 @@ export default function AdminPanelScreen({ navigation }) {
     }
   };
 
-  // ─── End of Day: Sync → Export → Clear ───────────────────────────────────
+  // ─── Shift Close: Sync → Backup → Clear Safe Local Copies ────────────────
   const handleEndOfDay = () => {
     if (!online) {
       Alert.alert(
         "Offline",
-        "You must be connected to the server for End of Day.",
+        "You must be connected to the server before closing the shift.",
       );
       return;
     }
     Alert.alert(
-      "End of Day Reset",
+      "Close Shift Safely",
       "This will:\n\n" +
         "1. Sync all pending transactions to server\n" +
-        "2. Clear all transactions from THIS phone\n" +
-        "3. Clear all transactions from the server\n\n" +
-        "Make sure you have EXPORTED the data first!\n\n" +
-        "This cannot be undone.",
+        "2. Keep the shared server data intact\n" +
+        "3. Clear only synced history from THIS phone\n\n" +
+        "Unsynced rows will NOT be deleted.\n\n" +
+        "This is the safe daily cleanup flow.",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "I Already Exported — Clear All",
-          style: "destructive",
+          text: "Sync And Clean Phone",
           onPress: doEndOfDay,
         },
       ],
@@ -429,25 +435,29 @@ export default function AdminPanelScreen({ navigation }) {
         await attemptSync();
       }
 
-      // Step 2: clear local transactions (phone SQLite)
-      const localCleared = await clearAllTransactions();
-
-      // Step 3: clear server transactions
-      let serverCleared = 0;
-      try {
-        const result = await clearServerTransactions();
-        serverCleared = result.deleted || 0;
-      } catch (err) {
-        Alert.alert(
-          "Warning",
-          `Phone cleared, but server clear failed: ${err.message}`,
+      const pendingAfterSync = await getPendingCount();
+      if (pendingAfterSync > 0) {
+        throw new Error(
+          `${pendingAfterSync} transaction(s) are still pending. Resolve sync before cleaning this phone.`,
         );
       }
 
+      // Step 2: create one local backup snapshot before cleanup
+      if (!IS_WEB && backupSvc) {
+        const txns = await getAllTransactions();
+        if (txns.length > 0) {
+          const username = loggedUserRef.current || "backup";
+          await backupSvc.silentAutoBackup(txns, username);
+        }
+      }
+
+      // Step 3: clear only synced local transactions
+      const localCleared = await clearSyncedTransactions();
+
       await loadData();
       Alert.alert(
-        "End of Day Complete",
-        `Cleared ${localCleared} local + ${serverCleared} server transactions.\n\nPhones will start fresh on next use.`,
+        "Shift Closed",
+        `Removed ${localCleared} synced transaction(s) from this phone.\n\nServer records were kept safe.`,
       );
     } catch (err) {
       Alert.alert("Error", err.message);
@@ -551,10 +561,10 @@ export default function AdminPanelScreen({ navigation }) {
             />
             <Text style={styles.statValue}>
               {online
-                ? Math.max(serverStats.total, localStats.totalTransactions)
+                ? serverStats.totalPending ?? serverStats.total
                 : localStats.totalTransactions}
             </Text>
-            <Text style={styles.statLabel}>All Transactions</Text>
+            <Text style={styles.statLabel}>Pending Queue</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.statCard}
@@ -781,27 +791,27 @@ export default function AdminPanelScreen({ navigation }) {
                 color="#9C27B0"
               />
             </View>
-            <Text style={styles.actionTitle}>All Transactions</Text>
-            <Text style={styles.actionSub}>View & filter all work</Text>
+            <Text style={styles.actionTitle}>Pending Queue</Text>
+            <Text style={styles.actionSub}>View shared server work</Text>
           </TouchableOpacity>
         </View>
 
-        {/* End of Day Section */}
-        <Text style={styles.sectionTitle}>End of Day</Text>
+        {/* Safe Shift Close Section */}
+        <Text style={styles.sectionTitle}>Safe Shift Close</Text>
         <View style={styles.eodCard}>
           <Text style={styles.eodDesc}>
-            After exporting all data, use this to clear transactions from the
-            server and all phones. Workers' phones will be cleaned on next sync.
+            Use this after sync is complete. It keeps the shared server history,
+            saves a phone backup, and clears only safe local copies.
           </Text>
           <View style={styles.eodSteps}>
             <Text style={styles.eodStep}>
-              1. Export all data (button above)
+              1. Sync all pending work to the server
             </Text>
             <Text style={styles.eodStep}>
-              2. Press "End of Day Reset" below
+              2. Press "Sync And Clean Phone" below
             </Text>
             <Text style={styles.eodStep}>
-              3. Optionally upload new item master CSV
+              3. Server data stays available for admin processing and ERP
             </Text>
           </View>
           <TouchableOpacity
@@ -815,7 +825,7 @@ export default function AdminPanelScreen({ navigation }) {
               <MaterialCommunityIcons name="broom" size={20} color="#fff" />
             )}
             <Text style={styles.eodBtnText}>
-              {resetting ? "Clearing..." : "End of Day Reset"}
+              {resetting ? "Cleaning..." : "Sync And Clean Phone"}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

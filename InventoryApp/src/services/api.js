@@ -3,7 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 export const CLOUD_SERVER_URL = "https://full-stack-4m9b.onrender.com";
-export const CLOUD_SERVER_FAILOVER = "https://inventory-backend-fdex.onrender.com";
+export const CLOUD_SERVER_FAILOVER =
+  "https://inventory-backend-fdex.onrender.com";
 export const CLOUD_SERVERS = [CLOUD_SERVER_URL, CLOUD_SERVER_FAILOVER];
 export const DEFAULT_SERVER_IP = CLOUD_SERVER_URL;
 
@@ -202,7 +203,9 @@ export const checkHealth = async () => {
           currentBaseUrl = `${server}/api`;
           apiClient.defaults.baseURL = currentBaseUrl;
           healthClient.defaults.baseURL = currentBaseUrl;
-          console.log(`[Failover] Health check found working server: ${server}`);
+          console.log(
+            `[Failover] Health check found working server: ${server}`,
+          );
           return res.data;
         }
       } catch (_) {}
@@ -286,8 +289,29 @@ export const getTransactionStats = async () => {
   return res.data;
 };
 
-export const getServerTransactions = async (page = 1, limit = 50) => {
-  const res = await apiClient.get(`/transactions?page=${page}&limit=${limit}`);
+export const getServerTransactions = async (
+  page = 1,
+  limit = 50,
+  status = "pending",
+) => {
+  const res = await apiClient.get(
+    `/transactions?page=${page}&limit=${limit}&status=${encodeURIComponent(status)}`,
+  );
+  return res.data;
+};
+
+export const setServerTransactionStatus = async ({
+  ids,
+  worker,
+  status,
+  fromStatus = "all",
+}) => {
+  const res = await apiClient.post("/transactions/bulk-status", {
+    ids,
+    worker,
+    status,
+    fromStatus,
+  });
   return res.data;
 };
 

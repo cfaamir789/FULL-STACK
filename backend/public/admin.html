@@ -509,7 +509,7 @@
             </div>
             <div class="stat">
               <div class="num" id="statTx">-</div>
-              <div class="label">Transactions</div>
+              <div class="label">Pending Queue</div>
             </div>
           </div>
         </div>
@@ -699,7 +699,7 @@
 
         <div class="card">
           <div class="tx-header">
-            <h2>&#128196; Transactions (Worker Data)</h2>
+            <h2>&#128196; ERP Queue (Shared Server Data)</h2>
             <div class="tx-actions">
               <button
                 class="copy-icon-btn"
@@ -775,34 +775,40 @@
               </button>
               <button
                 class="copy-icon-btn tx-danger-btn"
-                onclick="deleteWorkerTransactions()"
-                title="Delete all transactions for the selected worker"
+                onclick="markWorkerProcessed()"
+                title="Mark all pending transactions for the selected worker as processed"
               >
-                Delete Worker
+                Mark Worker Done
               </button>
               <button
                 class="copy-icon-btn tx-danger-btn"
-                onclick="deleteFilteredTransactions()"
-                title="Delete only the currently filtered transactions"
+                onclick="markFilteredProcessed()"
+                title="Mark only the currently filtered transactions as processed"
               >
-                Delete Filtered
+                Mark Filtered Done
               </button>
               <button
-                class="copy-icon-btn tx-danger-btn"
-                onclick="clearAllTransactions()"
-                title="Delete all transactions from the server"
+                class="copy-icon-btn"
+                onclick="reopenFilteredTransactions()"
+                title="Move processed transactions back into the active queue"
               >
-                Delete All
+                Reopen Filtered
               </button>
             </div>
           </div>
           <p style="color: #888; margin-bottom: 12px; font-size: 13px">
-            Copy &rarr; paste into Excel &rarr; NAV ERP. All worker movements
-            with bin &amp; qty details.
+            Pending rows are the live ERP queue. Processed rows stay in history
+            for audit and are never re-synced as new work.
           </p>
           <div class="tx-filters">
             <select id="txWorkerFilter" onchange="filterTransactions()">
               <option value="">All Workers</option>
+            </select>
+            <select id="txStatusFilter" onchange="loadTransactions(1)">
+              <option value="pending">Pending Queue</option>
+              <option value="processed">Processed History</option>
+              <option value="archived">Archived</option>
+              <option value="all">All Statuses</option>
             </select>
             <input
               type="text"
@@ -857,7 +863,7 @@
         <div class="card" style="border: 1px solid #ffcdd2">
           <h2 style="color: #e53935">&#9888;&#65039; Danger Zone</h2>
           <button class="btn btn-danger" onclick="clearAllTransactions()">
-            Delete All Transactions
+            Hard Delete Disabled
           </button>
         </div>
       </div>
@@ -963,6 +969,7 @@
       };
       let currentItemsPage = 1;
       let currentItemsPages = 1;
+      let liveRefreshTimer = null;
 
       // ─── Auth ────────────────────────────────────────────────────────────────────
       async function apiFetch(path, opts = {}) {
@@ -1082,7 +1089,20 @@
       async function showPanel() {
         document.getElementById("loginSection").classList.add("hidden");
         document.getElementById("mainPanel").classList.remove("hidden");
+        startLiveRefresh();
         switchPage("dashboard");
+      }
+
+      function startLiveRefresh() {
+        if (liveRefreshTimer) return;
+        liveRefreshTimer = setInterval(() => {
+          if (document.hidden || !authToken) return;
+          const tasks = [loadStats()];
+          if (pageLoaded.workers) {
+            tasks.push(loadWorkerStatus(), loadTransactions());
+          }
+          Promise.allSettled(tasks);
+        }, 5000);
       }
 
       async function switchPage(page) {
@@ -1350,6 +1370,7 @@
 
       // ─── Column Config ────────────────────────────────────────────────────────────
       const DEFAULT_TX_COLS = [
+        { key: "syncStatus", label: "Status", vis: true },
         { key: "Item_Code", label: "Item Code", vis: true },
         { key: "Item_Barcode", label: "Barcode", vis: true },
         { key: "Item_Name", label: "Item Name", vis: true },
@@ -1358,6 +1379,8 @@
         { key: "Qty", label: "Qty", vis: true },
         { key: "Worker_Name", label: "Worker", vis: true },
         { key: "Notes", label: "Notes", vis: true },
+        { key: "processedBy", label: "Processed By", vis: false },
+        { key: "processedAt", label: "Processed At", vis: false },
         { key: "Timestamp", label: "Date/Time", vis: true },
       ];
 
@@ -1456,12 +1479,17 @@
         container.innerHTML =
           '<div class="loading">Loading transactions...</div>';
         try {
+          const status =
+            document.getElementById("txStatusFilter")?.value || "pending";
           // Fetch ALL pages to get every transaction
           let all = [];
           let page = 1;
           while (true) {
             const data = await apiFetch(
-              "/transactions?page=" + page + "&limit=200",
+              "/transactions?page=" +
+                page +
+                "&limit=200&status=" +
+                encodeURIComponent(status),
             );
             all = all.concat(data.transactions || []);
             if (all.length >= (data.total || 0)) break;
@@ -1530,13 +1558,45 @@
         renderTransactions(filteredTransactions);
       }
 
+      function txStatusBadge(tx) {
+        const status = String(tx.syncStatus || "pending").toLowerCase();
+        const colors = {
+          pending: "#ef6c00",
+          processed: "#2e7d32",
+          archived: "#6d4c41",
+        };
+        const bg = colors[status] || "#607d8b";
+        return (
+          '<td><span style="display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:' +
+          bg +
+          '18;color:' +
+          bg +
+          ';font-weight:700;font-size:12px;text-transform:capitalize">' +
+          esc(status) +
+          "</span></td>"
+        );
+      }
+
       function txCellValue(tx, key) {
+        if (key === "syncStatus") {
+          return txStatusBadge(tx);
+        }
         if (key === "Timestamp") {
           return tx.Timestamp
             ? '<td style="white-space:nowrap">' +
                 esc(new Date(tx.Timestamp).toLocaleString()) +
                 "</td>"
             : "<td></td>";
+        }
+        if (key === "processedAt") {
+          return tx.processedAt
+            ? '<td style="white-space:nowrap">' +
+                esc(new Date(tx.processedAt).toLocaleString()) +
+                "</td>"
+            : "<td></td>";
+        }
+        if (key === "processedBy") {
+          return "<td>" + esc(tx.processedBy || "") + "</td>";
         }
         if (key === "Qty")
           return "<td>" + (tx.Qty !== undefined ? tx.Qty : "") + "</td>";
@@ -1570,7 +1630,7 @@
           visibleCols.forEach((c) => {
             html += "<th>" + esc(c.label) + "</th>";
           });
-          html += "<th>Copy</th><th>Delete</th></tr></thead><tbody>";
+          html += "<th>Copy</th><th>Action</th></tr></thead><tbody>";
           slice.forEach((tx, i) => {
             const idx = start + i;
             html += "<tr>";
@@ -1581,10 +1641,17 @@
               '<td><button class="copy-icon-btn" onclick="copyRow(' +
               idx +
               ', this)" title="Copy this row"><svg class="copy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px"><polyline points="20 6 9 17 4 12"></polyline></svg></button></td>';
+            const actionLabel =
+              String(tx.syncStatus || "pending").toLowerCase() ===
+              "pending"
+                ? "Done"
+                : "Reopen";
             html +=
-              '<td><button class="copy-icon-btn" style="color:#d32f2f;border-color:#f3c1c1" onclick="deleteTxRow(' +
+              '<td><button class="copy-icon-btn" style="color:#1565c0;border-color:#c7daf8" onclick="setTxRowStatus(' +
               idx +
-              ', this)" title="Delete this row">Delete</button></td>';
+              ', this)" title="Update this row status">' +
+              actionLabel +
+              "</button></td>";
             html += "</tr>";
           });
           html += "</tbody></table></div>";
@@ -1656,12 +1723,18 @@
         }, 1500);
       }
 
-      async function deleteTxRow(idx, btnEl) {
+      async function setTxRowStatus(idx, btnEl) {
         const tx = filteredTransactions[idx];
         if (!tx || !tx._id) return;
 
+        const currentStatus = String(tx.syncStatus || "pending").toLowerCase();
+        const nextStatus = currentStatus === "pending" ? "processed" : "pending";
+        const actionText = nextStatus === "processed" ? "mark as processed" : "reopen";
+
         const ok = confirm(
-          "Delete this transaction?\n\n" +
+          "Do you want to " +
+            actionText +
+            " this transaction?\n\n" +
             (tx.Item_Code || "") +
             " | " +
             (tx.Item_Name || "") +
@@ -1676,10 +1749,15 @@
 
         const original = btnEl.textContent;
         btnEl.disabled = true;
-        btnEl.textContent = "Deleting...";
+        btnEl.textContent = nextStatus === "processed" ? "Saving..." : "Reopening...";
         try {
-          await apiFetch("/transactions/" + encodeURIComponent(tx._id), {
-            method: "DELETE",
+          await apiFetch("/transactions/bulk-status", {
+            method: "POST",
+            body: JSON.stringify({
+              ids: [tx._id],
+              status: nextStatus,
+              fromStatus: "all",
+            }),
           });
           await Promise.all([
             loadTransactions(),
@@ -1687,32 +1765,36 @@
             loadWorkerStatus(),
           ]);
         } catch (err) {
-          alert("Delete failed: " + err.message);
+          alert("Status update failed: " + err.message);
           btnEl.disabled = false;
           btnEl.textContent = original;
         }
       }
 
-      async function bulkDeleteTransactions(ids, label, workerName) {
+      async function bulkSetTransactionStatus(ids, label, workerName, status) {
         const safeIds = (ids || []).filter(Boolean);
-        if (safeIds.length === 0) {
-          alert("No matching transactions to delete.");
+        if (safeIds.length === 0 && !workerName) {
+          alert("No matching transactions found.");
           return;
         }
 
+        const actionText = status === "processed" ? "mark as processed" : "reopen";
+
         const confirmMsg =
-          "Delete " +
+          "Do you want to " +
+          actionText +
+          " " +
           safeIds.length +
           " transaction(s)" +
           (label ? " for " + label : "") +
-          "? This cannot be undone!";
+          "?";
         if (!confirm(confirmMsg)) return;
 
         try {
           const body = workerName
-            ? { worker: workerName, ids: safeIds }
-            : { ids: safeIds };
-          const data = await apiFetch("/transactions/bulk-delete", {
+            ? { worker: workerName, status, fromStatus: "all" }
+            : { ids: safeIds, status, fromStatus: "all" };
+          const data = await apiFetch("/transactions/bulk-status", {
             method: "POST",
             body: JSON.stringify(body),
           });
@@ -1721,20 +1803,31 @@
             loadStats(),
             loadWorkerStatus(),
           ]);
-          alert((data.deleted || 0) + " transaction(s) deleted.");
+          alert((data.updated || 0) + " transaction(s) updated.");
         } catch (err) {
-          alert("Bulk delete failed: " + err.message);
+          alert("Bulk status change failed: " + err.message);
         }
       }
 
-      async function deleteFilteredTransactions() {
-        await bulkDeleteTransactions(
+      async function markFilteredProcessed() {
+        await bulkSetTransactionStatus(
           filteredTransactions.map((tx) => tx._id),
           "current filter",
+          "",
+          "processed",
         );
       }
 
-      async function deleteWorkerTransactions() {
+      async function reopenFilteredTransactions() {
+        await bulkSetTransactionStatus(
+          filteredTransactions.map((tx) => tx._id),
+          "current filter",
+          "",
+          "pending",
+        );
+      }
+
+      async function markWorkerProcessed() {
         const worker = document.getElementById("txWorkerFilter").value;
         if (!worker) {
           alert("Select a worker first from the dropdown.");
@@ -1743,7 +1836,7 @@
         const workerIds = allTransactions
           .filter((tx) => tx.Worker_Name === worker)
           .map((tx) => tx._id);
-        await bulkDeleteTransactions(workerIds, worker, worker);
+        await bulkSetTransactionStatus(workerIds, worker, worker, "processed");
       }
 
       function copyTransactionsToClipboard() {
@@ -1792,13 +1885,18 @@
 
       function downloadTransactionsCSV(format = "csv") {
         const workerFilter = document.getElementById("txWorkerFilter").value;
+        const statusFilter =
+          document.getElementById("txStatusFilter")?.value || "pending";
         let url = API + "/transactions/export";
-        if (workerFilter) url += "?worker=" + encodeURIComponent(workerFilter);
+        const params = new URLSearchParams();
+        if (workerFilter) params.set("worker", workerFilter);
+        params.set("status", statusFilter);
+        url += "?" + params.toString();
         const filename = nextExportFilename(workerFilter) + "." + format;
 
         if (format === "xlsx" && typeof XLSX !== "undefined") {
           // Fetch JSON rows then build XLSX in the browser
-          fetch(url + (workerFilter ? "&json=1" : "?json=1"), {
+          fetch(url + "&json=1", {
             headers: { Authorization: "Bearer " + authToken },
           })
             .then((r) => r.json())
@@ -1892,7 +1990,7 @@
             html +=
               '<button class="btn-sm btn-danger" onclick="deleteUserDataOnly(' +
               JSON.stringify(u.username) +
-              ')">Delete Data</button>';
+              ')">Archive Data</button>';
             if (u.role !== "admin") {
               html +=
                 '<button class="btn-sm btn-danger" onclick="deleteUserOnly(' +
@@ -1901,7 +1999,7 @@
               html +=
                 '<button class="btn-sm btn-danger" onclick="deleteUserAndData(' +
                 JSON.stringify(u.username) +
-                ')">Delete User + Data</button>';
+                ')">Delete User + Archive Data</button>';
             }
             html += "</div></div>";
           });
@@ -1985,12 +2083,22 @@
       }
 
       async function deleteUserDataOnly(username) {
-        if (!confirm("Delete all transaction data for '" + username + "'?"))
+        if (
+          !confirm(
+            "Archive all transaction data for '" +
+              username +
+              "'? Archived data stays available for audit.",
+          )
+        )
           return;
         try {
-          const data = await apiFetch("/transactions/bulk-delete", {
+          const data = await apiFetch("/transactions/bulk-status", {
             method: "POST",
-            body: JSON.stringify({ worker: username }),
+            body: JSON.stringify({
+              worker: username,
+              status: "archived",
+              fromStatus: "all",
+            }),
           });
           await Promise.all([
             loadTransactions(),
@@ -1998,25 +2106,33 @@
             loadWorkerStatus(),
           ]);
           alert(
-            (data.deleted || 0) +
-              " transaction(s) deleted for " +
+            (data.updated || 0) +
+              " transaction(s) archived for " +
               username +
               ".",
           );
         } catch (err) {
-          alert("Delete user data failed: " + err.message);
+          alert("Archive user data failed: " + err.message);
         }
       }
 
       async function deleteUserAndData(username) {
         if (
-          !confirm("Delete user '" + username + "' and all their transactions?")
+          !confirm(
+            "Delete user '" +
+              username +
+              "' and archive all of their transactions first?",
+          )
         )
           return;
         try {
-          await apiFetch("/transactions/bulk-delete", {
+          await apiFetch("/transactions/bulk-status", {
             method: "POST",
-            body: JSON.stringify({ worker: username }),
+            body: JSON.stringify({
+              worker: username,
+              status: "archived",
+              fromStatus: "all",
+            }),
           });
           await apiFetch("/auth/users/" + encodeURIComponent(username), {
             method: "DELETE",
@@ -2027,9 +2143,9 @@
             loadStats(),
             loadWorkerStatus(),
           ]);
-          alert("User and their data deleted.");
+          alert("User deleted. Their transactions were archived.");
         } catch (err) {
-          alert("Delete user + data failed: " + err.message);
+          alert("Delete user + archive data failed: " + err.message);
         }
       }
 
@@ -2139,23 +2255,9 @@
       }
 
       async function clearAllTransactions() {
-        if (
-          !confirm(
-            "DELETE ALL TRANSACTIONS from the server? This cannot be undone!",
-          )
-        )
-          return;
-        try {
-          await apiFetch("/transactions/all", { method: "DELETE" });
-          await Promise.all([
-            loadTransactions(),
-            loadStats(),
-            loadWorkerStatus(),
-          ]);
-          alert("All transactions deleted.");
-        } catch (err) {
-          alert("Error: " + err.message);
-        }
+        alert(
+          "Hard delete is disabled for safety. Use Mark Done, Reopen, or Archive workflows instead.",
+        );
       }
 
       // ─── Init ────────────────────────────────────────────────────────────────────

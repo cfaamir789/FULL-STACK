@@ -4,6 +4,26 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+const makeClientTxId = (
+  workerName = "unknown",
+  timestamp = new Date().toISOString(),
+) => {
+  const safeWorker = String(workerName || "unknown").replace(
+    /[^a-zA-Z0-9_-]/g,
+    "_",
+  );
+  const timePart = new Date(timestamp).getTime().toString(36);
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  return `tx_${safeWorker}_${timePart}_${randomPart}`;
+};
+
+const normalizeIsoString = (value) => {
+  const date = new Date(value || Date.now());
+  return Number.isNaN(date.getTime())
+    ? new Date().toISOString()
+    : date.toISOString();
+};
+
 // ─── IndexedDB for Items ──────────────────────────────────────────────────────
 
 const IDB_NAME = "inventory_db";
@@ -52,9 +72,43 @@ const getItemsCache = async () => {
 // ─── localStorage for Transactions (small dataset) ───────────────────────────
 
 const KEY_TRANSACTIONS = "inv_transactions";
+const normalizeTxRecord = (tx) => {
+  const next = { ...tx };
+  let changed = false;
+
+  if (!next.worker_name) {
+    next.worker_name = "unknown";
+    changed = true;
+  }
+  if (typeof next.notes !== "string") {
+    next.notes = next.notes ? String(next.notes) : "";
+    changed = true;
+  }
+  if (!next.client_tx_id) {
+    next.client_tx_id = makeClientTxId(next.worker_name, next.timestamp);
+    changed = true;
+  }
+  if (!next.updated_at) {
+    next.updated_at = normalizeIsoString(next.timestamp);
+    changed = true;
+  }
+
+  return { next, changed };
+};
+
 const loadTx = () => {
   try {
-    return JSON.parse(localStorage.getItem(KEY_TRANSACTIONS) || "[]");
+    const parsed = JSON.parse(localStorage.getItem(KEY_TRANSACTIONS) || "[]");
+    let changed = false;
+    const rows = parsed.map((tx) => {
+      const normalized = normalizeTxRecord(tx);
+      if (normalized.changed) changed = true;
+      return normalized.next;
+    });
+    if (changed) {
+      localStorage.setItem(KEY_TRANSACTIONS, JSON.stringify(rows));
+    }
+    return rows;
   } catch {
     return [];
   }
@@ -151,6 +205,7 @@ export const insertTransaction = async ({
 }) => {
   const txs = loadTx();
   const id = txs.length > 0 ? Math.max(...txs.map((t) => t.id)) + 1 : 1;
+  const timestamp = new Date().toISOString();
   let resolvedCode = item_code;
   if (!resolvedCode) {
     try {
@@ -166,10 +221,12 @@ export const insertTransaction = async ({
     frombin,
     tobin,
     qty,
-    timestamp: new Date().toISOString(),
+    timestamp,
     synced: 0,
     worker_name,
     notes,
+    client_tx_id: makeClientTxId(worker_name, timestamp),
+    updated_at: timestamp,
   });
   saveTx(txs);
   return id;
@@ -217,6 +274,7 @@ export const updateTransaction = async (
   _username,
   _role,
 ) => {
+  const updatedAt = new Date().toISOString();
   saveTx(
     loadTx().map((t) =>
       t.id === id
@@ -227,6 +285,7 @@ export const updateTransaction = async (
             qty: Number(qty),
             notes: (notes || "").trim(),
             synced: 0,
+            updated_at: updatedAt,
           }
         : t,
     ),

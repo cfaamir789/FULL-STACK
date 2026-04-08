@@ -3,6 +3,26 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 let db;
 
+const makeClientTxId = (
+  workerName = "unknown",
+  timestamp = new Date().toISOString(),
+) => {
+  const safeWorker = String(workerName || "unknown").replace(
+    /[^a-zA-Z0-9_-]/g,
+    "_",
+  );
+  const timePart = new Date(timestamp).getTime().toString(36);
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  return `tx_${safeWorker}_${timePart}_${randomPart}`;
+};
+
+const normalizeIsoString = (value) => {
+  const date = new Date(value || Date.now());
+  return Number.isNaN(date.getTime())
+    ? new Date().toISOString()
+    : date.toISOString();
+};
+
 export const initDB = async () => {
   db = await SQLite.openDatabaseAsync("inventory.db");
   await db.execAsync(`
@@ -26,10 +46,15 @@ export const initDB = async () => {
       tobin        TEXT NOT NULL,
       qty          INTEGER NOT NULL,
       timestamp    TEXT NOT NULL,
-      synced       INTEGER NOT NULL DEFAULT 0
+      synced       INTEGER NOT NULL DEFAULT 0,
+      worker_name  TEXT NOT NULL DEFAULT 'unknown',
+      notes        TEXT NOT NULL DEFAULT '',
+      client_tx_id TEXT NOT NULL DEFAULT '',
+      updated_at   TEXT NOT NULL DEFAULT ''
     );
 
     CREATE INDEX IF NOT EXISTS idx_transactions_synced ON transactions(synced);
+    CREATE INDEX IF NOT EXISTS idx_transactions_client_tx_id ON transactions(client_tx_id);
   `);
 
   // Migration 1: add item_code column if it doesn't exist yet (for existing DBs)
@@ -59,6 +84,22 @@ export const initDB = async () => {
     // Column already exists — safe to ignore
   }
 
+  try {
+    await db.execAsync(
+      `ALTER TABLE transactions ADD COLUMN client_tx_id TEXT NOT NULL DEFAULT ''`,
+    );
+  } catch (_) {
+    // Column already exists — safe to ignore
+  }
+
+  try {
+    await db.execAsync(
+      `ALTER TABLE transactions ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''`,
+    );
+  } catch (_) {
+    // Column already exists — safe to ignore
+  }
+
   // Migration 2: backfill item_code for any transactions where it is still empty
   await db.execAsync(`
     UPDATE transactions
@@ -73,6 +114,29 @@ export const initDB = async () => {
         WHERE items.barcode = transactions.item_barcode
       )
   `);
+
+  const missingClientIds = await db.getAllAsync(
+    `SELECT id, timestamp, worker_name FROM transactions
+     WHERE client_tx_id IS NULL OR client_tx_id = ''`,
+  );
+  for (const row of missingClientIds) {
+    const timestamp = normalizeIsoString(row.timestamp);
+    await db.runAsync(
+      `UPDATE transactions
+       SET client_tx_id = ?, updated_at = CASE
+         WHEN updated_at IS NULL OR updated_at = '' THEN ?
+         ELSE updated_at
+       END
+       WHERE id = ?`,
+      [makeClientTxId(row.worker_name, timestamp), timestamp, row.id],
+    );
+  }
+
+  await db.runAsync(
+    `UPDATE transactions
+     SET updated_at = timestamp
+     WHERE updated_at IS NULL OR updated_at = ''`,
+  );
 };
 
 // ─── Items ────────────────────────────────────────────────────────────────────
@@ -147,9 +211,23 @@ export const insertTransaction = async ({
   notes = "",
 }) => {
   const timestamp = new Date().toISOString();
+  const clientTxId = makeClientTxId(worker_name, timestamp);
   const result = await db.runAsync(
-    `INSERT INTO transactions (item_barcode, item_code, item_name, frombin, tobin, qty, timestamp, synced, worker_name, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    `INSERT INTO transactions (
+       item_barcode,
+       item_code,
+       item_name,
+       frombin,
+       tobin,
+       qty,
+       timestamp,
+       synced,
+       worker_name,
+       notes,
+       client_tx_id,
+       updated_at
+     )
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
     [
       item_barcode,
       item_code,
@@ -160,6 +238,8 @@ export const insertTransaction = async ({
       timestamp,
       worker_name,
       notes,
+      clientTxId,
+      timestamp,
     ],
   );
   return result.lastInsertRowId;
@@ -208,9 +288,24 @@ export const updateTransaction = async (
       throw new Error("You can only edit your own transactions.");
     }
   }
+  const updatedAt = new Date().toISOString();
   await db.runAsync(
-    `UPDATE transactions SET frombin = ?, tobin = ?, qty = ?, notes = ?, synced = 0 WHERE id = ?`,
-    [frombin.trim(), tobin.trim(), Number(qty), (notes || "").trim(), id],
+    `UPDATE transactions
+     SET frombin = ?,
+         tobin = ?,
+         qty = ?,
+         notes = ?,
+         synced = 0,
+         updated_at = ?
+     WHERE id = ?`,
+    [
+      frombin.trim(),
+      tobin.trim(),
+      Number(qty),
+      (notes || "").trim(),
+      updatedAt,
+      id,
+    ],
   );
 };
 

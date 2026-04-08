@@ -164,7 +164,7 @@ export default function TransactionsScreen({ username, role }) {
       if (role === "admin") {
         try {
           await checkHealth();
-          const serverRes = await getServerTransactions(1, 500);
+          const serverRes = await getServerTransactions(1, 500, "pending");
           const serverTxs = (serverRes.transactions || []).map((tx) => ({
             id: tx._id,
             item_barcode: tx.Item_Barcode,
@@ -180,21 +180,10 @@ export default function TransactionsScreen({ username, role }) {
             _source: "server",
           }));
 
-          // Merge: keep ALL local + add server-only transactions
-          const localKeys = new Set(
-            localData.map((t) => `${t.item_barcode}-${t.timestamp}`),
-          );
-          const merged = [...localData];
-          for (const stx of serverTxs) {
-            const key = `${stx.item_barcode}-${stx.timestamp}`;
-            if (!localKeys.has(key)) {
-              merged.push(stx);
-            }
-          }
-          merged.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-          setTransactions(merged);
+          serverTxs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+          setTransactions(serverTxs);
         } catch {
-          // Server unreachable, just show local
+          // Server unreachable, show local fallback only
           setTransactions(localData);
         }
       } else {

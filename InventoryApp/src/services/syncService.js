@@ -133,6 +133,8 @@ export const attemptSync = async () => {
 
   // Map SQLite rows to the shape the backend expects
   const payload = pending.map((tx) => ({
+    Client_Tx_Id: tx.client_tx_id,
+    UpdatedAt: tx.updated_at || tx.timestamp,
     Item_Barcode: tx.item_barcode,
     Item_Code: tx.item_code || "",
     Item_Name: tx.item_name,
@@ -158,7 +160,7 @@ export const attemptSync = async () => {
   return { synced, reason: "success", lastSync };
 };
 
-export const startAutoSync = (intervalMs = 30000) => {
+export const startAutoSync = (intervalMs = 15000) => {
   // Delay the first run so the app can finish rendering before hitting the network
   const firstRun = setTimeout(attemptSync, 2000);
   const timer = setInterval(attemptSync, intervalMs);

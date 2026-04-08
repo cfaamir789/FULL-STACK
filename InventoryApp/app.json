@@ -3,7 +3,7 @@
     "name": "Inventory Manager",
     "slug": "inventory-manager",
     "owner": "aamircf",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,17 +11,17 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1565C0"
+      "backgroundColor": "#D9D9D9"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.inventory.manager"
     },
     "android": {
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1565C0"
+        "backgroundColor": "#D9D9D9"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.inventory.manager",

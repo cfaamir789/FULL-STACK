@@ -121,7 +121,7 @@ export default function DashboardScreen() {
           />
           <StatsCard
             icon="swap-horizontal"
-            label="Transactions"
+            label="Local History"
             value={stats.totalTransactions}
             color={Colors.success}
           />
