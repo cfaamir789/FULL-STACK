@@ -593,26 +593,68 @@
           <div id="uploadResult"></div>
         </div>
 
-        <div class="card" style="border: 2px solid #4CAF50; background: #f1f8e9">
+        <div
+          class="card"
+          style="border: 2px solid #4caf50; background: #f1f8e9"
+        >
           <h2 style="color: #2e7d32">&#128225; Push Master to Phones</h2>
           <p style="color: #555; margin-bottom: 12px">
-            After uploading/verifying your item master, click below to push it to all phones.
-            <strong>Phones will NOT auto-sync items</strong> — they only download when admin pushes, or worker manually downloads.
+            After uploading/verifying your item master, click below to push it
+            to all phones.
+            <strong>Phones will NOT auto-sync items</strong> — they only
+            download when admin pushes, or worker manually downloads.
           </p>
-          <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px; flex-wrap:wrap">
-            <div style="background:#fff; border-radius:8px; padding:10px 16px; border:1px solid #c8e6c9">
-              <span style="color:#888; font-size:13px">Server Items</span>
-              <div id="pushItemCount" style="font-size:22px; font-weight:800; color:#2e7d32">-</div>
+          <div
+            style="
+              display: flex;
+              gap: 12px;
+              align-items: center;
+              margin-bottom: 12px;
+              flex-wrap: wrap;
+            "
+          >
+            <div
+              style="
+                background: #fff;
+                border-radius: 8px;
+                padding: 10px 16px;
+                border: 1px solid #c8e6c9;
+              "
+            >
+              <span style="color: #888; font-size: 13px">Server Items</span>
+              <div
+                id="pushItemCount"
+                style="font-size: 22px; font-weight: 800; color: #2e7d32"
+              >
+                -
+              </div>
             </div>
-            <div style="background:#fff; border-radius:8px; padding:10px 16px; border:1px solid #c8e6c9">
-              <span style="color:#888; font-size:13px">Current Version</span>
-              <div id="pushVersion" style="font-size:22px; font-weight:800; color:#1565c0">-</div>
+            <div
+              style="
+                background: #fff;
+                border-radius: 8px;
+                padding: 10px 16px;
+                border: 1px solid #c8e6c9;
+              "
+            >
+              <span style="color: #888; font-size: 13px">Current Version</span>
+              <div
+                id="pushVersion"
+                style="font-size: 22px; font-weight: 800; color: #1565c0"
+              >
+                -
+              </div>
             </div>
           </div>
-          <button class="btn btn-primary" id="pushMasterBtn" onclick="pushMasterToPhones()" style="background:#2e7d32; max-width:320px">
+          <button
+            class="btn btn-primary"
+            id="pushMasterBtn"
+            onclick="pushMasterToPhones()"
+            style="background: #2e7d32; max-width: 320px"
+          >
             &#128640; Push Master Data to All Phones
           </button>
-          <div id="pushResult" style="margin-top:8px"></div>
+          <div id="pushResult" style="margin-top: 8px"></div>
         </div>
 
         <div class="card">
@@ -1017,7 +1059,11 @@
           pageLoaded.dashboard = true;
         }
         if (page === "master" && !pageLoaded.master) {
-          await Promise.allSettled([loadStats(), loadItems(1), loadPushStats()]);
+          await Promise.allSettled([
+            loadStats(),
+            loadItems(1),
+            loadPushStats(),
+          ]);
           pageLoaded.master = true;
         }
         if (page === "workers" && !pageLoaded.workers) {
@@ -1058,26 +1104,45 @@
       async function loadPushStats() {
         try {
           const data = await apiFetch("/items/version");
-          document.getElementById("pushItemCount").textContent = data.totalItems ?? "-";
-          document.getElementById("pushVersion").textContent = "v" + (data.version ?? "-");
-        } catch { }
+          document.getElementById("pushItemCount").textContent =
+            data.totalItems ?? "-";
+          document.getElementById("pushVersion").textContent =
+            "v" + (data.version ?? "-");
+        } catch {}
       }
 
       async function pushMasterToPhones() {
         const btn = document.getElementById("pushMasterBtn");
         const resultDiv = document.getElementById("pushResult");
         const count = document.getElementById("pushItemCount").textContent;
-        if (!confirm("Push " + count + " items to ALL phones?\n\nPhones will download the full master on next manual sync.")) return;
+        if (
+          !confirm(
+            "Push " +
+              count +
+              " items to ALL phones?\n\nPhones will download the full master on next manual sync.",
+          )
+        )
+          return;
         btn.disabled = true;
         btn.textContent = "⏳ Pushing...";
         resultDiv.innerHTML = "";
         try {
           const data = await apiFetch("/items/push-master", { method: "POST" });
-          resultDiv.innerHTML = '<div style="color:#2e7d32;font-weight:600;padding:8px;background:#c8e6c9;border-radius:6px">✅ Pushed! Version: v' + data.version + ' · ' + data.totalItems + ' items ready for phones</div>';
-          document.getElementById("pushVersion").textContent = "v" + data.version;
-          document.getElementById("pushItemCount").textContent = data.totalItems;
+          resultDiv.innerHTML =
+            '<div style="color:#2e7d32;font-weight:600;padding:8px;background:#c8e6c9;border-radius:6px">✅ Pushed! Version: v' +
+            data.version +
+            " · " +
+            data.totalItems +
+            " items ready for phones</div>";
+          document.getElementById("pushVersion").textContent =
+            "v" + data.version;
+          document.getElementById("pushItemCount").textContent =
+            data.totalItems;
         } catch (err) {
-          resultDiv.innerHTML = '<div style="color:#c62828;font-weight:600;padding:8px;background:#ffcdd2;border-radius:6px">❌ ' + esc(err.message || "Push failed") + '</div>';
+          resultDiv.innerHTML =
+            '<div style="color:#c62828;font-weight:600;padding:8px;background:#ffcdd2;border-radius:6px">❌ ' +
+            esc(err.message || "Push failed") +
+            "</div>";
         } finally {
           btn.disabled = false;
           btn.textContent = "🚀 Push Master Data to All Phones";

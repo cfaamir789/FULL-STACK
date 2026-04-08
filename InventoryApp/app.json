@@ -3,7 +3,7 @@
     "name": "Inventory Manager",
     "slug": "inventory-manager",
     "owner": "aamircf",
-    "version": "1.0.4",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",

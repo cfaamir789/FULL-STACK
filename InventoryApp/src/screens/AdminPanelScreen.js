@@ -29,7 +29,11 @@ import {
   getPendingCount,
   getAllTransactions,
 } from "../database/db";
-import { attemptSync, downloadItemMaster, checkItemMasterUpdate } from "../services/syncService";
+import {
+  attemptSync,
+  downloadItemMaster,
+  checkItemMasterUpdate,
+} from "../services/syncService";
 import Colors from "../theme/colors";
 
 const IS_WEB = Platform.OS === "web";
@@ -136,7 +140,10 @@ export default function AdminPanelScreen({ navigation }) {
       setMasterStatus(ms);
       setMasterResult(null);
       if (!ms.updateAvailable) {
-        Alert.alert("Up to Date", `Item master is current (v${ms.serverVersion}, ${ms.serverCount.toLocaleString()} items).`);
+        Alert.alert(
+          "Up to Date",
+          `Item master is current (v${ms.serverVersion}, ${ms.serverCount.toLocaleString()} items).`,
+        );
       }
     } catch (err) {
       Alert.alert("Error", "Could not check server: " + err.message);
@@ -156,8 +163,15 @@ export default function AdminPanelScreen({ navigation }) {
         // Refresh local stats
         const local = await getDashboardStats();
         setLocalStats(local);
-        setMasterStatus((prev) => prev ? { ...prev, localVersion: result.version, updateAvailable: false } : prev);
-        Alert.alert("Success", `Downloaded ${result.count.toLocaleString()} items (v${result.version}).`);
+        setMasterStatus((prev) =>
+          prev
+            ? { ...prev, localVersion: result.version, updateAvailable: false }
+            : prev,
+        );
+        Alert.alert(
+          "Success",
+          `Downloaded ${result.count.toLocaleString()} items (v${result.version}).`,
+        );
       }
     } catch (err) {
       setMasterResult({ success: false, error: err.message });
@@ -562,37 +576,58 @@ export default function AdminPanelScreen({ navigation }) {
           <View style={styles.masterStatsRow}>
             <View style={styles.masterStat}>
               <Text style={styles.masterStatLabel}>Local Items</Text>
-              <Text style={styles.masterStatValue}>{localStats.totalItems.toLocaleString()}</Text>
+              <Text style={styles.masterStatValue}>
+                {localStats.totalItems.toLocaleString()}
+              </Text>
             </View>
             <View style={styles.masterStat}>
               <Text style={styles.masterStatLabel}>Local Version</Text>
               <Text style={styles.masterStatValue}>
-                {masterStatus?.localVersion != null ? "v" + masterStatus.localVersion : "-"}
+                {masterStatus?.localVersion != null
+                  ? "v" + masterStatus.localVersion
+                  : "-"}
               </Text>
             </View>
             <View style={styles.masterStat}>
               <Text style={styles.masterStatLabel}>Server</Text>
               <Text style={styles.masterStatValue}>
-                {masterStatus ? masterStatus.serverCount.toLocaleString() + " (v" + masterStatus.serverVersion + ")" : "-"}
+                {masterStatus
+                  ? masterStatus.serverCount.toLocaleString() +
+                    " (v" +
+                    masterStatus.serverVersion +
+                    ")"
+                  : "-"}
               </Text>
             </View>
           </View>
 
           {masterStatus?.updateAvailable && (
             <View style={styles.masterUpdateBanner}>
-              <MaterialCommunityIcons name="alert-circle" size={16} color="#e65100" />
+              <MaterialCommunityIcons
+                name="alert-circle"
+                size={16}
+                color="#e65100"
+              />
               <Text style={styles.masterUpdateText}>
-                Update available! Server v{masterStatus.serverVersion} vs local v{masterStatus.localVersion ?? "none"}
+                Update available! Server v{masterStatus.serverVersion} vs local
+                v{masterStatus.localVersion ?? "none"}
               </Text>
             </View>
           )}
 
           {masterDownloading && masterProgress && (
             <View style={styles.masterProgressBar}>
-              <View style={[styles.masterProgressFill, { width: masterProgress.percent + "%" }]} />
+              <View
+                style={[
+                  styles.masterProgressFill,
+                  { width: masterProgress.percent + "%" },
+                ]}
+              />
               <Text style={styles.masterProgressText}>
-                {masterProgress.phase === "downloading" ? "Downloading..." : "Saving to phone..."}
-                {" "}{masterProgress.percent}%
+                {masterProgress.phase === "downloading"
+                  ? "Downloading..."
+                  : "Saving to phone..."}{" "}
+                {masterProgress.percent}%
               </Text>
             </View>
           )}
@@ -603,7 +638,11 @@ export default function AdminPanelScreen({ navigation }) {
               onPress={handleCheckMasterUpdate}
               disabled={masterDownloading || !online}
             >
-              <MaterialCommunityIcons name="cloud-search" size={18} color="#fff" />
+              <MaterialCommunityIcons
+                name="cloud-search"
+                size={18}
+                color="#fff"
+              />
               <Text style={styles.masterBtnText}>Check Updates</Text>
             </TouchableOpacity>
 
@@ -615,7 +654,11 @@ export default function AdminPanelScreen({ navigation }) {
               {masterDownloading ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <MaterialCommunityIcons name="cloud-download" size={18} color="#fff" />
+                <MaterialCommunityIcons
+                  name="cloud-download"
+                  size={18}
+                  color="#fff"
+                />
               )}
               <Text style={styles.masterBtnText}>
                 {masterDownloading ? "Downloading..." : "Download from Server"}
@@ -626,7 +669,11 @@ export default function AdminPanelScreen({ navigation }) {
               style={[styles.masterBtn, { backgroundColor: Colors.warning }]}
               onPress={() => navigation.navigate("Import")}
             >
-              <MaterialCommunityIcons name="file-upload" size={18} color="#fff" />
+              <MaterialCommunityIcons
+                name="file-upload"
+                size={18}
+                color="#fff"
+              />
               <Text style={styles.masterBtnText}>Import from File</Text>
             </TouchableOpacity>
           </View>
@@ -1156,7 +1203,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   masterStatLabel: { fontSize: 11, color: Colors.textSecondary },
-  masterStatValue: { fontSize: 16, fontWeight: "800", color: Colors.textPrimary, marginTop: 2 },
+  masterStatValue: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: Colors.textPrimary,
+    marginTop: 2,
+  },
   masterUpdateBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -1166,7 +1218,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginBottom: 10,
   },
-  masterUpdateText: { fontSize: 12, fontWeight: "600", color: "#e65100", flex: 1 },
+  masterUpdateText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#e65100",
+    flex: 1,
+  },
   masterProgressBar: {
     height: 28,
     backgroundColor: "#e0e0e0",

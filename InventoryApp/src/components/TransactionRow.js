@@ -201,7 +201,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   time: { fontSize: 10, color: Colors.textLight, marginTop: 4 },
-  right: { alignItems: "flex-end", justifyContent: "space-between", minWidth: 78 },
+  right: {
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    minWidth: 78,
+  },
   actions: { flexDirection: "row", gap: 4 },
   actionBtn: {
     padding: 5,

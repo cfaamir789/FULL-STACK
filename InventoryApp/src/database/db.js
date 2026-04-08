@@ -288,7 +288,8 @@ export const clearAndReplaceAllItems = async (itemsArray, onProgress) => {
            item_name = excluded.item_name`,
         params,
       );
-      if (onProgress) onProgress({ processed: Math.min(i + CHUNK_SIZE, total), total });
+      if (onProgress)
+        onProgress({ processed: Math.min(i + CHUNK_SIZE, total), total });
     }
   });
   return total;

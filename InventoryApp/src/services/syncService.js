@@ -50,7 +50,12 @@ export const downloadItemMaster = async (onProgress) => {
   const serverVersion = data.version;
 
   if (items.length === 0) {
-    return { success: false, count: 0, version: serverVersion, error: "Server has no items" };
+    return {
+      success: false,
+      count: 0,
+      version: serverVersion,
+      error: "Server has no items",
+    };
   }
 
   onProgress?.({ phase: "downloading", percent: 100 });
@@ -59,7 +64,10 @@ export const downloadItemMaster = async (onProgress) => {
   // 2. Atomically replace local DB (clear + insert in one transaction)
   // If this fails mid-way, SQLite rolls back — previous data stays intact
   await clearAndReplaceAllItems(items, ({ processed, total }) => {
-    onProgress?.({ phase: "saving", percent: Math.round((processed / total) * 100) });
+    onProgress?.({
+      phase: "saving",
+      percent: Math.round((processed / total) * 100),
+    });
   });
 
   // 3. Save version ONLY after successful write
