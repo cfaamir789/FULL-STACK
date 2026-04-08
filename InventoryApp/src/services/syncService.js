@@ -17,6 +17,7 @@ let _onStatusChange = null;
 
 export const setSyncStatusListener = (fn) => {
   _onStatusChange = fn;
+  return () => { _onStatusChange = null; };
 };
 
 const notifyStatus = (status) => {

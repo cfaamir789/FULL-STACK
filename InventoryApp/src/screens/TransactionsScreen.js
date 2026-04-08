@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, Component } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   FlatList,
@@ -13,22 +13,6 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-
-class ErrorBoundary extends Component {
-  state = { error: null };
-  static getDerivedStateFromError(error) { return { error }; }
-  render() {
-    if (this.state.error) {
-      return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <Text style={{ color: 'red', fontSize: 16, fontWeight: 'bold' }}>TransactionsScreen Error:</Text>
-          <Text style={{ color: 'red', marginTop: 10 }}>{String(this.state.error)}</Text>
-        </View>
-      );
-    }
-    return this.props.children;
-  }
-}
 import { useFocusEffect } from "@react-navigation/native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -50,8 +34,7 @@ if (!IS_WEB) {
   backupSvc = require("../services/backupService");
 }
 
-function TransactionsScreenInner({ username, role }) {
-  console.log('[TransactionsScreen] Rendering, role:', role, 'username:', username);
+export default function TransactionsScreen({ username, role }) {
   const queryRef = useRef(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -60,18 +43,21 @@ function TransactionsScreenInner({ username, role }) {
   const [exporting, setExporting] = useState(false);
 
   // Get unique worker names for filter chips
-  const workerNames =
-    role === "admin"
-      ? [
-          ...new Set(
-            transactions
-              .map((tx) => tx.worker_name || "unknown")
-              .filter(Boolean),
-          ),
-        ]
-      : [];
+  const workerNames = useMemo(
+    () =>
+      role === "admin"
+        ? [
+            ...new Set(
+              transactions
+                .map((tx) => tx.worker_name || "unknown")
+                .filter(Boolean),
+            ),
+          ]
+        : [],
+    [transactions, role],
+  );
 
-  const filtered = (() => {
+  const filtered = useMemo(() => {
     let result = transactions;
     // Worker filter (admin only)
     if (workerFilter !== "all") {
@@ -91,7 +77,7 @@ function TransactionsScreenInner({ username, role }) {
       );
     }
     return result;
-  })();
+  }, [transactions, workerFilter, query]);
 
   // Edit modal state
   const [editItem, setEditItem] = useState(null);
@@ -239,6 +225,7 @@ function TransactionsScreenInner({ username, role }) {
   };
 
   const handleSave = async () => {
+    if (saving) return;
     if (!editFrombin.trim() || !editTobin.trim() || !editQty.trim()) {
       setValidationMsg("All fields are required.");
       return;
@@ -456,8 +443,11 @@ function TransactionsScreenInner({ username, role }) {
                 />
               )}
               contentContainerStyle={{ paddingVertical: 8, paddingBottom: 24 }}
-              initialNumToRender={20}
-              removeClippedSubviews
+              initialNumToRender={15}
+              maxToRenderPerBatch={15}
+              windowSize={7}
+              removeClippedSubviews={Platform.OS !== "web"}
+              getItemLayout={(_, index) => ({ length: 120, offset: 120 * index, index })}
             />
           )}
         </>
@@ -684,14 +674,6 @@ function TransactionsScreenInner({ username, role }) {
         </View>
       </Modal>
     </View>
-  );
-}
-
-export default function TransactionsScreen(props) {
-  return (
-    <ErrorBoundary>
-      <TransactionsScreenInner {...props} />
-    </ErrorBoundary>
   );
 }
 

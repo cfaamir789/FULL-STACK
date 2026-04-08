@@ -18,9 +18,14 @@ import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 const IS_WEB = Platform.OS === "web";
 let CameraView, useCameraPermissions;
 if (!IS_WEB) {
-  const cam = require("expo-camera");
-  CameraView = cam.CameraView;
-  useCameraPermissions = cam.useCameraPermissions;
+  try {
+    const cam = require("expo-camera");
+    CameraView = cam.CameraView;
+    useCameraPermissions = cam.useCameraPermissions;
+  } catch {
+    CameraView = null;
+    useCameraPermissions = () => [{ granted: false }, async () => {}];
+  }
 } else {
   useCameraPermissions = () => [{ granted: false }, async () => {}];
 }

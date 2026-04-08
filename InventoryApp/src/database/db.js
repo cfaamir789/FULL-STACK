@@ -1,8 +1,6 @@
 import * as SQLite from "expo-sqlite";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-console.log('[DB] db.js loaded (native SQLite)');
-
 let db;
 
 export const initDB = async () => {

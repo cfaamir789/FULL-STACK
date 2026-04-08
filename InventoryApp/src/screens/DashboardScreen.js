@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -47,16 +47,20 @@ export default function DashboardScreen() {
     setRecent(r);
   }, []);
 
-  const filtered = query.trim()
-    ? recent.filter((tx) => {
-        const q = query.trim().toLowerCase();
-        return (
-          (tx.item_code && tx.item_code.toLowerCase().includes(q)) ||
-          (tx.item_barcode && tx.item_barcode.toLowerCase().includes(q)) ||
-          (tx.item_name && tx.item_name.toLowerCase().includes(q))
-        );
-      })
-    : recent.slice(0, 5);
+  const filtered = useMemo(
+    () =>
+      query.trim()
+        ? recent.filter((tx) => {
+            const q = query.trim().toLowerCase();
+            return (
+              (tx.item_code && tx.item_code.toLowerCase().includes(q)) ||
+              (tx.item_barcode && tx.item_barcode.toLowerCase().includes(q)) ||
+              (tx.item_name && tx.item_name.toLowerCase().includes(q))
+            );
+          })
+        : recent.slice(0, 5),
+    [recent, query],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -65,9 +69,10 @@ export default function DashboardScreen() {
   );
 
   useEffect(() => {
-    setSyncStatusListener((status) => {
+    const unsub = setSyncStatusListener((status) => {
       setSyncStatus(status);
     });
+    return () => { if (typeof unsub === 'function') unsub(); };
   }, []);
 
   const handleSyncNow = async () => {

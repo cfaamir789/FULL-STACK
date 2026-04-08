@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Colors from '../theme/colors';
 
-export default function SyncStatusBanner({ online, lastSync, pendingCount, serverLabel }) {
+export default React.memo(function SyncStatusBanner({ online, lastSync, pendingCount, serverLabel }) {
   const isOnline = online === true;
   return (
     <View style={[styles.banner, { backgroundColor: isOnline ? Colors.success : Colors.error }]}>

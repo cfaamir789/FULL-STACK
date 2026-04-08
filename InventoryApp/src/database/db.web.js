@@ -4,8 +4,6 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-console.log('[DB] db.web.js loaded (web shim)');
-
 // ─── IndexedDB for Items ──────────────────────────────────────────────────────
 
 const IDB_NAME = "inventory_db";

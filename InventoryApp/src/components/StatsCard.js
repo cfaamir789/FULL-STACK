@@ -3,7 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Colors from '../theme/colors';
 
-export default function StatsCard({ icon, label, value, color }) {
+export default React.memo(function StatsCard({ icon, label, value, color }) {
   const iconColor = color || Colors.primary;
   return (
     <View style={styles.card}>

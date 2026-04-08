@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -19,9 +19,14 @@ import Colors from "../theme/colors";
 const IS_WEB = Platform.OS === "web";
 let CameraView, useCameraPermissions;
 if (!IS_WEB) {
-  const cam = require("expo-camera");
-  CameraView = cam.CameraView;
-  useCameraPermissions = cam.useCameraPermissions;
+  try {
+    const cam = require("expo-camera");
+    CameraView = cam.CameraView;
+    useCameraPermissions = cam.useCameraPermissions;
+  } catch {
+    CameraView = null;
+    useCameraPermissions = () => [{ granted: false }, async () => {}];
+  }
 } else {
   useCameraPermissions = () => [{ granted: false }, async () => {}];
 }
@@ -68,7 +73,7 @@ export default function ItemsScreen({ navigation, route }) {
   }, [query]);
 
   // Group raw items by trimmed item_code — one card per unique product
-  const grouped = (() => {
+  const grouped = useMemo(() => {
     const map = new Map();
     for (const i of allItems) {
       const key = (i.item_code || i.item_name).trim().toLowerCase();
@@ -83,7 +88,7 @@ export default function ItemsScreen({ navigation, route }) {
       }
     }
     return Array.from(map.values());
-  })();
+  }, [allItems]);
 
   const items = grouped;
 
@@ -217,8 +222,10 @@ export default function ItemsScreen({ navigation, route }) {
           keyExtractor={(item) => item.item_code || item.item_name}
           renderItem={({ item }) => <ItemCard item={item} />}
           contentContainerStyle={{ paddingBottom: 24 }}
-          initialNumToRender={20}
-          removeClippedSubviews
+          initialNumToRender={15}
+          maxToRenderPerBatch={15}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS !== "web"}
         />
       )}
     </View>

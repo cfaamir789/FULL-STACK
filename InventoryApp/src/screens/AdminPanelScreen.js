@@ -93,7 +93,7 @@ export default function AdminPanelScreen({ navigation }) {
 
   // ─── Load logged-in username ────────────────────────────────────────────────
   useEffect(() => {
-    AsyncStorage.getItem("username").then((u) => {
+    AsyncStorage.getItem("workerName").then((u) => {
       loggedUserRef.current = u || "backup";
     });
   }, []);

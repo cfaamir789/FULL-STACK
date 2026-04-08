@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "../theme/colors";
 
-export default function TransactionRow({
+export default React.memo(function TransactionRow({
   item,
   onEdit,
   onDelete,
