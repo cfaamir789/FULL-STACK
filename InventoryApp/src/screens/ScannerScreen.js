@@ -65,6 +65,8 @@ export default function ScannerScreen() {
   const itemCodeRef = useRef(null);
   const itemNameRef = useRef(null);
 
+  const digitsOnly = (text) => String(text || "").replace(/\D+/g, "");
+
   const focusFromBin = () => setTimeout(() => fromBinRef.current?.focus(), 120);
 
   useFocusEffect(
@@ -110,7 +112,7 @@ export default function ScannerScreen() {
     setScanned(true);
     setShowCamera(false);
     setCameraActive(false);
-    const code = data.trim();
+    const code = digitsOnly(data.trim());
     setBarcode(code);
     if (!IS_WEB) Vibration.vibrate(100);
     const item = await getItemByBarcode(code);
@@ -163,7 +165,8 @@ export default function ScannerScreen() {
     focusFromBin();
   };
 
-  const handleSave = async () => {
+  // directQty is passed from CalcInput's SAVE button to avoid stale React state.
+  const handleSave = async (directQty) => {
     const barcodeVal = barcode.trim() || foundItem?.barcode;
     if (!barcodeVal) {
       Alert.alert("Missing Item", "Please scan or search for an item first.");
@@ -173,11 +176,16 @@ export default function ScannerScreen() {
       Alert.alert("Missing Bins", "From Bin and To Bin are required.");
       return;
     }
-    const qtyNum = parseInt(qty, 10);
-    if (!qty || isNaN(qtyNum) || qtyNum < 1) {
+    // Use directQty if it's a valid numeric string (from CalcInput), else fall back to state
+    const qtyStr =
+      typeof directQty === "string" && /^\d+(\.\d+)?$/.test(directQty)
+        ? directQty
+        : qty;
+    const qtyNum = parseInt(qtyStr, 10);
+    if (!qtyStr || isNaN(qtyNum) || qtyNum < 1) {
       Alert.alert(
         "Invalid Quantity",
-        "Quantity must be a positive number.\nUse the calculator for math: 3x48 = 144",
+        "Tap the quantity field, enter a number, then press SAVE.",
       );
       return;
     }
@@ -257,15 +265,20 @@ export default function ScannerScreen() {
                 ref={barcodeRef}
                 style={styles.inputInner}
                 value={barcode}
-                onChangeText={(t) => setBarcode(t.toUpperCase())}
+                onChangeText={(t) => setBarcode(digitsOnly(t))}
                 placeholder="Scan or type barcode"
-                autoCapitalize="characters"
+                keyboardType={IS_WEB ? "default" : "number-pad"}
                 returnKeyType="search"
                 onSubmitEditing={handleBarcodeSearch}
+                onKeyPress={(e) => {
+                  if (e.nativeEvent.key === "Enter") handleBarcodeSearch();
+                }}
                 blurOnSubmit={false}
               />
               <VoiceMic
-                onResult={(t) => setBarcode(t)}
+                onResult={(t) => setBarcode(digitsOnly(t))}
+                mode="numeric"
+                focusTargetRef={barcodeRef}
                 size={18}
                 style={styles.micInside}
               />
@@ -294,15 +307,20 @@ export default function ScannerScreen() {
                 ref={itemCodeRef}
                 style={styles.inputInner}
                 value={itemCode}
-                onChangeText={(t) => setItemCode(t.toUpperCase())}
+                onChangeText={(t) => setItemCode(digitsOnly(t))}
                 placeholder="Type item code"
-                autoCapitalize="characters"
+                keyboardType={IS_WEB ? "default" : "number-pad"}
                 returnKeyType="search"
                 onSubmitEditing={handleItemCodeSearch}
+                onKeyPress={(e) => {
+                  if (e.nativeEvent.key === "Enter") handleItemCodeSearch();
+                }}
                 blurOnSubmit={false}
               />
               <VoiceMic
-                onResult={(t) => setItemCode(t)}
+                onResult={(t) => setItemCode(digitsOnly(t))}
+                mode="numeric"
+                focusTargetRef={itemCodeRef}
                 size={18}
                 style={styles.micInside}
               />
@@ -336,10 +354,14 @@ export default function ScannerScreen() {
               autoCapitalize="characters"
               returnKeyType="search"
               onSubmitEditing={handleItemNameSearch}
+              onKeyPress={(e) => {
+                if (e.nativeEvent.key === "Enter") handleItemNameSearch();
+              }}
               blurOnSubmit={false}
             />
             <VoiceMic
               onResult={(t) => setItemName(t)}
+              focusTargetRef={itemNameRef}
               size={18}
               style={styles.micInside}
             />
@@ -439,9 +461,17 @@ export default function ScannerScreen() {
           autoCapitalize="characters"
           returnKeyType="next"
           onSubmitEditing={() => toBinRef.current?.focus()}
+          onKeyPress={(e) => {
+            if (e.nativeEvent.key === "Enter") toBinRef.current?.focus();
+          }}
           blurOnSubmit={false}
         />
-        <VoiceMic onResult={(t) => setFrombin(t)} size={18} style={styles.micInside} />
+        <VoiceMic
+          onResult={(t) => setFrombin(t)}
+          focusTargetRef={fromBinRef}
+          size={18}
+          style={styles.micInside}
+        />
       </View>
 
       <Text style={styles.label}>To Bin</Text>
@@ -455,9 +485,17 @@ export default function ScannerScreen() {
           autoCapitalize="characters"
           returnKeyType="next"
           onSubmitEditing={() => qtyRef.current?.focus()}
+          onKeyPress={(e) => {
+            if (e.nativeEvent.key === "Enter") qtyRef.current?.focus();
+          }}
           blurOnSubmit={false}
         />
-        <VoiceMic onResult={(t) => setTobin(t)} size={18} style={styles.micInside} />
+        <VoiceMic
+          onResult={(t) => setTobin(t)}
+          focusTargetRef={toBinRef}
+          size={18}
+          style={styles.micInside}
+        />
       </View>
 
       <Text style={styles.label}>
@@ -465,14 +503,15 @@ export default function ScannerScreen() {
         <Text
           style={{ fontWeight: "400", color: Colors.textLight, fontSize: 11 }}
         >
-          (type math: 3*48 = auto calculates)
+          (tap calculator for math: 3×48 = 144)
         </Text>
       </Text>
       <CalcInput
         ref={qtyRef}
         value={qty}
         onValueChange={setQty}
-        placeholder="Qty (e.g. 3*48)"
+        placeholder="Qty — tap to open calculator"
+        onSubmitEditing={handleSave}
       />
 
       <Text style={styles.label}>
@@ -491,8 +530,16 @@ export default function ScannerScreen() {
           autoCapitalize="characters"
           returnKeyType="done"
           onSubmitEditing={handleSave}
+          onKeyPress={(e) => {
+            if (e.nativeEvent.key === "Enter") handleSave();
+          }}
         />
-        <VoiceMic onResult={(t) => setNotes(t)} size={18} style={styles.micInside} />
+        <VoiceMic
+          onResult={(t) => setNotes(t)}
+          focusTargetRef={notesRef}
+          size={18}
+          style={styles.micInside}
+        />
       </View>
 
       <TouchableOpacity

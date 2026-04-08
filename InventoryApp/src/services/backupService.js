@@ -10,7 +10,7 @@
  *   {Username}_{DD-MM-YYYY}_2        ← third ...
  *   {Username}_{DD-MM-YYYY}-ENTIRE_DAY ← manual end-of-day backup
  */
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Papa from "papaparse";

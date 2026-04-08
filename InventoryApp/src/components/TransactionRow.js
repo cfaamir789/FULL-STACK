@@ -37,7 +37,9 @@ export default function TransactionRow({
                 size={14}
                 color={Colors.primary}
               />
-              <Text style={styles.workerText}>{item.worker_name}</Text>
+              <Text style={styles.workerText} numberOfLines={1}>
+                {item.worker_name}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -138,7 +140,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 3,
   },
-  info: { flex: 1, marginRight: 8 },
+  info: { flex: 1, marginRight: 8, minWidth: 0 },
   topRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -190,10 +192,16 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     gap: 3,
     marginLeft: 8,
+    maxWidth: 124,
   },
-  workerText: { fontSize: 11, fontWeight: "700", color: Colors.primary },
+  workerText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: Colors.primary,
+    flexShrink: 1,
+  },
   time: { fontSize: 10, color: Colors.textLight, marginTop: 4 },
-  right: { alignItems: "flex-end", justifyContent: "space-between" },
+  right: { alignItems: "flex-end", justifyContent: "space-between", minWidth: 78 },
   actions: { flexDirection: "row", gap: 4 },
   actionBtn: {
     padding: 5,

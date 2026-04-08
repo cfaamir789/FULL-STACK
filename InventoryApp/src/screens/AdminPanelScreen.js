@@ -38,7 +38,7 @@ let FileSystem = null;
 let backupSvc = null;
 if (!IS_WEB) {
   Sharing = require("expo-sharing");
-  FileSystem = require("expo-file-system");
+  FileSystem = require("expo-file-system/legacy");
   backupSvc = require("../services/backupService");
 }
 

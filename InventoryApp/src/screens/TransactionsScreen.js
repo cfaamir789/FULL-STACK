@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   FlatList,
@@ -35,6 +35,7 @@ if (!IS_WEB) {
 }
 
 export default function TransactionsScreen({ username, role }) {
+  const queryRef = useRef(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
@@ -270,6 +271,7 @@ export default function TransactionsScreen({ username, role }) {
           style={{ marginRight: 8 }}
         />
         <TextInput
+          ref={queryRef}
           style={styles.searchInput}
           placeholder="Search by item code, barcode or name..."
           value={query}
@@ -278,7 +280,12 @@ export default function TransactionsScreen({ username, role }) {
           clearButtonMode="while-editing"
           returnKeyType="search"
         />
-        <VoiceMic onResult={(t) => setQuery(t)} size={18} style={{ backgroundColor: "transparent", marginRight: 2 }} />
+        <VoiceMic
+          onResult={(t) => setQuery(t)}
+          focusTargetRef={queryRef}
+          size={18}
+          style={{ backgroundColor: "transparent", marginRight: 2 }}
+        />
         {query.length > 0 && (
           <TouchableOpacity onPress={() => setQuery("")}>
             <MaterialCommunityIcons
@@ -659,10 +666,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    minHeight: 56,
+    justifyContent: "center",
   },
   workerFilterContent: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -677,6 +686,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     marginRight: 8,
+    minHeight: 34,
   },
   workerChipActive: {
     backgroundColor: Colors.primary,
@@ -693,7 +703,7 @@ const styles = StyleSheet.create({
   countBar: {
     backgroundColor: Colors.card,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -701,6 +711,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    minHeight: 30,
   },
   countText: { fontSize: 13, color: Colors.textSecondary, fontWeight: "600" },
   exportBtn: {

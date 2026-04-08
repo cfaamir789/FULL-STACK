@@ -19,13 +19,57 @@ import Colors from "../theme/colors";
 
 const IS_WEB = Platform.OS === "web";
 
+const DIGIT_WORDS = {
+  zero: "0",
+  oh: "0",
+  o: "0",
+  one: "1",
+  two: "2",
+  to: "2",
+  too: "2",
+  three: "3",
+  four: "4",
+  for: "4",
+  five: "5",
+  six: "6",
+  seven: "7",
+  eight: "8",
+  ate: "8",
+  nine: "9",
+};
+
+function normalizeNumericSpeech(input) {
+  const raw = String(input || "").toLowerCase();
+  const parts = raw.split(/[^a-z0-9]+/).filter(Boolean);
+  let out = "";
+  for (const p of parts) {
+    if (DIGIT_WORDS[p] != null) {
+      out += DIGIT_WORDS[p];
+      continue;
+    }
+    const digits = p.replace(/\D+/g, "");
+    if (digits) out += digits;
+  }
+  return out;
+}
+
 export default function VoiceMic({
   onResult,
   style,
   size = 20,
   lang = "en-US",
+  mode = "text", // "text" | "numeric"
+  focusTargetRef,
 }) {
   const [listening, setListening] = useState(false);
+
+  const emitResult = (text) => {
+    if (mode === "numeric") {
+      onResult?.(normalizeNumericSpeech(text));
+      return;
+    }
+    onResult?.(String(text || "").toUpperCase());
+  };
 
   const startListening = () => {
     if (IS_WEB) {
@@ -46,18 +90,21 @@ export default function VoiceMic({
       recognition.onstart = () => setListening(true);
       recognition.onresult = (event) => {
         const text = event.results[0][0].transcript;
-        onResult?.(text.toUpperCase());
+        emitResult(text);
         setListening(false);
       };
       recognition.onerror = () => setListening(false);
       recognition.onend = () => setListening(false);
       recognition.start();
     } else {
-      // On native Android/iOS, the keyboard itself provides voice input.
-      // We trigger an alert guiding the user to use the keyboard mic button.
+      // Native: focus the target input so users can use keyboard voice typing.
+      if (focusTargetRef?.current?.focus) {
+        focusTargetRef.current.focus();
+        return;
+      }
       Alert.alert(
         "Voice Input",
-        "Tap the microphone icon on your phone keyboard to speak.\n\nYour phone's built-in voice typing will be used.",
+        "Tap inside the field, then use your keyboard microphone.",
       );
     }
   };

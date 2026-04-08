@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ import VoiceMic from "../components/VoiceMic";
 import Colors from "../theme/colors";
 
 export default function DashboardScreen() {
+  const queryRef = useRef(null);
   const [stats, setStats] = useState({
     totalItems: 0,
     totalTransactions: 0,
@@ -143,6 +144,7 @@ export default function DashboardScreen() {
             style={{ marginRight: 8 }}
           />
           <TextInput
+            ref={queryRef}
             style={styles.searchInput}
             placeholder="Search by item code, barcode or name..."
             value={query}
@@ -152,6 +154,7 @@ export default function DashboardScreen() {
           />
           <VoiceMic
             onResult={(t) => setQuery(t.toUpperCase())}
+            focusTargetRef={queryRef}
             size={18}
             style={{ backgroundColor: "transparent", marginRight: 2 }}
           />
