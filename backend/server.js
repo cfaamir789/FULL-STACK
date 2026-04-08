@@ -85,7 +85,9 @@ app.listen(PORT, "0.0.0.0", () => {
 
   // Keep-alive self-ping every 4 min to prevent Render free tier sleep
   if (process.env.NODE_ENV === "production") {
-    const keepAliveUrl = `https://inventory-backend-fdex.onrender.com/api/health`;
+    const keepAliveUrl = process.env.RENDER_EXTERNAL_URL
+      ? `${process.env.RENDER_EXTERNAL_URL}/api/health`
+      : `https://full-stack-4m9b.onrender.com/api/health`;
     const ping = () => {
       require("https")
         .get(keepAliveUrl, () => {})

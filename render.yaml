@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: inventory-backend
+    name: fullstck
     runtime: node
     region: oregon
     plan: free
