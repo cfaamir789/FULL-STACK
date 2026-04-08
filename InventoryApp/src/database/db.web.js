@@ -2,6 +2,7 @@
  * Web-only database shim using IndexedDB (for items) + localStorage (for transactions).
  * IndexedDB supports large datasets and bulk inserts without size limits.
  */
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ─── IndexedDB for Items ──────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ export const getRecentTransactions = async (limit = 20) => {
   return txs;
 };
 
-export const updateTransaction = async (id, { frombin, tobin, qty, notes }) => {
+export const updateTransaction = async (id, { frombin, tobin, qty, notes }, _username, _role) => {
   saveTx(
     loadTx().map((t) =>
       t.id === id
@@ -227,8 +228,45 @@ export const updateTransaction = async (id, { frombin, tobin, qty, notes }) => {
   );
 };
 
-export const deleteTransaction = async (id) => {
+export const getAllTransactions = async () => {
+  return loadTx().sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+};
+
+export const deleteTransaction = async (id, _username, _role) => {
   saveTx(loadTx().filter((t) => t.id !== id));
+};
+
+// ─── Admin: Clear / Reset ─────────────────────────────────────────────────────
+
+export const clearSyncedTransactions = async () => {
+  const all = loadTx();
+  const kept = all.filter((t) => t.synced === 0);
+  saveTx(kept);
+  return all.length - kept.length;
+};
+
+export const clearAllTransactions = async () => {
+  const count = loadTx().length;
+  saveTx([]);
+  return count;
+};
+
+export const clearAllItems = async () => {
+  _itemsCache = null;
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(ITEMS_STORE, "readwrite");
+    tx.objectStore(ITEMS_STORE).clear();
+    tx.oncomplete = () => {
+      try { AsyncStorage.removeItem("itemsVersion"); } catch (_) {}
+      resolve(0);
+    };
+    tx.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const getPendingCount = async () => {
+  return loadTx().filter((t) => t.synced === 0).length;
 };
 
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────

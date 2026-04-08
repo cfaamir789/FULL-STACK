@@ -92,10 +92,6 @@ export default function TransactionsScreen({ username, role }) {
 
   // ─── Export handler ─────────────────────────────────────────────────────────
   const handleExport = async () => {
-    if (IS_WEB) {
-      Alert.alert("Export", "Use the Admin panel for web exports.");
-      return;
-    }
     setExporting(true);
     try {
       const txns = await getAllTransactions();
@@ -103,17 +99,47 @@ export default function TransactionsScreen({ username, role }) {
         Alert.alert("No Data", "No transactions to export.");
         return;
       }
-      const name = (await AsyncStorage.getItem("workerName")) || "export";
-      const { filename } = await backupSvc.saveAndShareBackup(
-        txns,
-        name,
-        "csv",
-        false,
-      );
-      Alert.alert(
-        "Exported",
-        `${txns.length} transactions saved as:\\n${filename}`,
-      );
+      if (IS_WEB) {
+        // Build CSV in browser and trigger download
+        const header = "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
+        const rows = txns.map((tx) =>
+          [
+            tx.worker_name || "",
+            tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "",
+            tx.item_barcode || "",
+            tx.item_code || "",
+            `"${(tx.item_name || "").replace(/"/g, '""')}"`,
+            tx.frombin || "",
+            tx.tobin || "",
+            tx.qty ?? "",
+            `"${(tx.notes || "").replace(/"/g, '""')}"`,
+            tx.synced ? "Yes" : "No",
+          ].join(",")
+        );
+        const csv = [header, ...rows].join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `transactions_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        Alert.alert("Exported", `${txns.length} transactions downloaded as CSV.`);
+      } else {
+        const name = (await AsyncStorage.getItem("workerName")) || "export";
+        const { filename } = await backupSvc.saveAndShareBackup(
+          txns,
+          name,
+          "csv",
+          false,
+        );
+        Alert.alert(
+          "Exported",
+          `${txns.length} transactions saved as:\n${filename}`,
+        );
+      }
     } catch (err) {
       Alert.alert("Export Failed", err.message);
     } finally {

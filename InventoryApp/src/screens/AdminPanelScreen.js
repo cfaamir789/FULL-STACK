@@ -137,15 +137,48 @@ export default function AdminPanelScreen({ navigation }) {
   };
 
   const doWebExport = async () => {
-    if (!online) {
-      Alert.alert("Offline", "Connect to server to export from the web view.");
-      return;
-    }
     setExporting(true);
     try {
-      const token = await AsyncStorage.getItem("authToken");
-      const url = `${getExportUrl()}?token=${encodeURIComponent(token)}`;
-      window.open(url, "_blank");
+      // Always try local data first so export works offline
+      const txns = await getAllTransactions();
+      if (!txns || txns.length === 0) {
+        // If local is empty and online, try server download
+        if (online) {
+          const token = await AsyncStorage.getItem("authToken");
+          const url = `${getExportUrl()}?token=${encodeURIComponent(token)}`;
+          window.open(url, "_blank");
+          return;
+        }
+        Alert.alert("No Data", "No transactions to export.");
+        return;
+      }
+      // Build CSV and trigger browser download
+      const header = "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
+      const rows = txns.map((tx) =>
+        [
+          tx.worker_name || "",
+          tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "",
+          tx.item_barcode || "",
+          tx.item_code || "",
+          `"${(tx.item_name || "").replace(/"/g, '""')}"`,
+          tx.frombin || "",
+          tx.tobin || "",
+          tx.qty ?? "",
+          `"${(tx.notes || "").replace(/"/g, '""')}"`,
+          tx.synced ? "Yes" : "No",
+        ].join(",")
+      );
+      const csv = [header, ...rows].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `transactions_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      Alert.alert("Exported", `${txns.length} transactions downloaded as CSV.`);
     } catch (err) {
       Alert.alert("Export Failed", err.message);
     } finally {
@@ -183,14 +216,53 @@ export default function AdminPanelScreen({ navigation }) {
   // ─── Entire Day Backup ──────────────────────────────────────────────────────
   const handleEntireDayBackup = () => {
     if (IS_WEB) {
-      Alert.alert(
-        "Not Available",
-        "Entire Day Backup is available on the mobile app.",
-      );
+      // Web: do a browser download with ENTIRE_DAY tag
+      doWebEntireDayBackup();
       return;
     }
     setFormatPickerMode("backup");
     setFormatPickerVisible(true);
+  };
+
+  const doWebEntireDayBackup = async () => {
+    setBackingUp(true);
+    try {
+      const txns = await getAllTransactions();
+      if (!txns || txns.length === 0) {
+        Alert.alert("No Data", "No transactions found to back up.");
+        return;
+      }
+      const header = "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
+      const rows = txns.map((tx) =>
+        [
+          tx.worker_name || "",
+          tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "",
+          tx.item_barcode || "",
+          tx.item_code || "",
+          `"${(tx.item_name || "").replace(/"/g, '""')}"`,
+          tx.frombin || "",
+          tx.tobin || "",
+          tx.qty ?? "",
+          `"${(tx.notes || "").replace(/"/g, '""')}"`,
+          tx.synced ? "Yes" : "No",
+        ].join(",")
+      );
+      const csv = [header, ...rows].join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ENTIRE_DAY_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      Alert.alert("Backup Downloaded", `${txns.length} transactions saved as ENTIRE_DAY CSV.`);
+    } catch (err) {
+      Alert.alert("Backup Failed", err.message);
+    } finally {
+      setBackingUp(false);
+    }
   };
 
   const doEntireDayBackup = async (format) => {
