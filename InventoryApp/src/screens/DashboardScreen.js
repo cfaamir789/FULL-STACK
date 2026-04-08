@@ -11,6 +11,7 @@ import { attemptSync, setSyncStatusListener } from '../services/syncService';
 import StatsCard from '../components/StatsCard';
 import SyncStatusBanner from '../components/SyncStatusBanner';
 import TransactionRow from '../components/TransactionRow';
+import VoiceMic from '../components/VoiceMic';
 import Colors from '../theme/colors';
 
 export default function DashboardScreen() {
@@ -103,10 +104,11 @@ export default function DashboardScreen() {
             style={styles.searchInput}
             placeholder="Search by item code, barcode or name..."
             value={query}
-            onChangeText={setQuery}
-            autoCapitalize="none"
+            onChangeText={(t) => setQuery(t.toUpperCase())}
+            autoCapitalize="characters"
             returnKeyType="search"
           />
+          <VoiceMic onResult={(t) => setQuery(t.toUpperCase())} size={20} style={{ marginRight: 4 }} />
           {query.length > 0 && (
             <TouchableOpacity onPress={() => setQuery('')}>
               <MaterialCommunityIcons name="close-circle" size={18} color={Colors.textLight} />

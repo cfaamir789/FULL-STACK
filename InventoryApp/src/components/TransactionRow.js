@@ -11,21 +11,38 @@ export default function TransactionRow({ item, onEdit, onDelete, canEdit = false
   return (
     <View style={styles.row}>
       <View style={styles.info}>
-        {item.item_code && item.item_code.trim() !== '' ? (
-          <Text style={styles.itemCode}>Item Code: {item.item_code}</Text>
-        ) : null}
-        <Text style={styles.itemName} numberOfLines={1}>
-          {item.item_name}
-        </Text>
+        {/* Top line: item code + worker badge */}
+        <View style={styles.topRow}>
+          <View style={{ flex: 1 }}>
+            {item.item_code && item.item_code.trim() !== '' ? (
+              <Text style={styles.itemCode}>{item.item_code}</Text>
+            ) : null}
+            <Text style={styles.itemName} numberOfLines={1}>
+              {item.item_name}
+            </Text>
+          </View>
+          {item.worker_name && item.worker_name !== 'unknown' ? (
+            <View style={styles.workerBadge}>
+              <MaterialCommunityIcons name="account-circle" size={14} color={Colors.primary} />
+              <Text style={styles.workerText}>{item.worker_name}</Text>
+            </View>
+          ) : null}
+        </View>
+
         <Text style={styles.barcode}>{item.item_barcode}</Text>
-        <Text style={styles.meta}>
-          {item.frombin} → {item.tobin}  •  Qty: {item.qty}
-        </Text>
-        {item.worker_name && item.worker_name !== 'unknown' ? (
-          <Text style={styles.worker}>
-            <MaterialCommunityIcons name="account" size={11} color={Colors.textLight} /> {item.worker_name}
-          </Text>
-        ) : null}
+
+        {/* Bin + Qty row */}
+        <View style={styles.metaRow}>
+          <View style={styles.binPill}>
+            <Text style={styles.binLabel}>{item.frombin}</Text>
+            <MaterialCommunityIcons name="arrow-right" size={12} color={Colors.textSecondary} />
+            <Text style={styles.binLabel}>{item.tobin}</Text>
+          </View>
+          <View style={styles.qtyPill}>
+            <Text style={styles.qtyLabel}>QTY {item.qty}</Text>
+          </View>
+        </View>
+
         <Text style={styles.time}>{timeStr}</Text>
       </View>
 
@@ -38,7 +55,7 @@ export default function TransactionRow({ item, onEdit, onDelete, canEdit = false
               </TouchableOpacity>
             )}
             {canDelete && (
-              <TouchableOpacity style={styles.actionBtn} onPress={() => onDelete && onDelete(item)}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: Colors.error + '10' }]} onPress={() => onDelete && onDelete(item)}>
                 <MaterialCommunityIcons name="trash-can-outline" size={18} color={Colors.error} />
               </TouchableOpacity>
             )}
@@ -47,7 +64,7 @@ export default function TransactionRow({ item, onEdit, onDelete, canEdit = false
         <View style={[styles.badge, { backgroundColor: synced ? Colors.success + '20' : Colors.pending + '20' }]}>
           <MaterialCommunityIcons
             name={synced ? 'check-circle' : 'clock-outline'}
-            size={16}
+            size={14}
             color={synced ? Colors.success : Colors.pending}
           />
           <Text style={[styles.badgeText, { color: synced ? Colors.success : Colors.pending }]}>
@@ -62,9 +79,8 @@ export default function TransactionRow({ item, onEdit, onDelete, canEdit = false
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: Colors.card,
-    borderRadius: 10,
+    borderRadius: 12,
     padding: 12,
     marginHorizontal: 16,
     marginVertical: 4,
@@ -75,17 +91,45 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
   },
   info: { flex: 1, marginRight: 8 },
-  itemCode: { fontSize: 11, fontWeight: '700', color: Colors.primary, marginBottom: 1 },
-  itemName: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
-  barcode: { fontSize: 11, color: Colors.textLight, marginTop: 1, fontFamily: 'monospace' },
-  meta: { fontSize: 12, color: Colors.textSecondary, marginTop: 3 },
-  worker: { fontSize: 11, color: Colors.textLight, marginTop: 2 },
-  time: { fontSize: 11, color: Colors.textLight, marginTop: 2 },
-  right: { alignItems: 'flex-end', gap: 6 },
+  topRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 2 },
+  itemCode: { fontSize: 11, fontWeight: '700', color: Colors.primary, letterSpacing: 0.3 },
+  itemName: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginTop: 1 },
+  barcode: { fontSize: 11, color: Colors.textLight, marginTop: 2, fontFamily: 'monospace' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 8 },
+  binPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    gap: 4,
+  },
+  binLabel: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary },
+  qtyPill: {
+    backgroundColor: Colors.primary + '15',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  qtyLabel: { fontSize: 11, fontWeight: '700', color: Colors.primary },
+  workerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary + '10',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    gap: 3,
+    marginLeft: 8,
+  },
+  workerText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
+  time: { fontSize: 10, color: Colors.textLight, marginTop: 4 },
+  right: { alignItems: 'flex-end', justifyContent: 'space-between' },
   actions: { flexDirection: 'row', gap: 4 },
   actionBtn: {
-    padding: 4,
-    borderRadius: 6,
+    padding: 5,
+    borderRadius: 8,
     backgroundColor: Colors.background,
   },
   badge: {
@@ -93,7 +137,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
-  badgeText: { fontSize: 11, fontWeight: '700', marginLeft: 3 },
+  badgeText: { fontSize: 10, fontWeight: '700', marginLeft: 3 },
 });

@@ -15,20 +15,31 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   getRecentTransactions,
+  getAllTransactions,
   updateTransaction,
   deleteTransaction,
 } from "../database/db";
 import { getServerTransactions, checkHealth } from "../services/api";
 import TransactionRow from "../components/TransactionRow";
+import VoiceMic from "../components/VoiceMic";
+import CalcInput from "../components/CalcInput";
 import Colors from "../theme/colors";
+
+const IS_WEB = Platform.OS === "web";
+let backupSvc = null;
+if (!IS_WEB) {
+  backupSvc = require("../services/backupService");
+}
 
 export default function TransactionsScreen({ username, role }) {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [workerFilter, setWorkerFilter] = useState("all");
+  const [exporting, setExporting] = useState(false);
 
   // Get unique worker names for filter chips
   const workerNames =
@@ -77,6 +88,37 @@ export default function TransactionsScreen({ username, role }) {
   const [deleteItem, setDeleteItem] = useState(null);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // ─── Export handler ─────────────────────────────────────────────────────────
+  const handleExport = async () => {
+    if (IS_WEB) {
+      Alert.alert("Export", "Use the Admin panel for web exports.");
+      return;
+    }
+    setExporting(true);
+    try {
+      const txns = await getAllTransactions();
+      if (!txns || txns.length === 0) {
+        Alert.alert("No Data", "No transactions to export.");
+        return;
+      }
+      const name = (await AsyncStorage.getItem("workerName")) || "export";
+      const { filename } = await backupSvc.saveAndShareBackup(
+        txns,
+        name,
+        "csv",
+        false,
+      );
+      Alert.alert(
+        "Exported",
+        `${txns.length} transactions saved as:\\n${filename}`,
+      );
+    } catch (err) {
+      Alert.alert("Export Failed", err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const loadTransactions = useCallback(async () => {
     setLoading(true);
@@ -221,7 +263,7 @@ export default function TransactionsScreen({ username, role }) {
 
   return (
     <View style={styles.container}>
-      {/* Search bar */}
+      {/* Search bar with voice */}
       <View style={styles.searchBar}>
         <MaterialCommunityIcons
           name="magnify"
@@ -233,8 +275,8 @@ export default function TransactionsScreen({ username, role }) {
           style={styles.searchInput}
           placeholder="Search by item code, barcode or name..."
           value={query}
-          onChangeText={setQuery}
-          autoCapitalize="none"
+          onChangeText={(t) => setQuery(t.toUpperCase())}
+          autoCapitalize="characters"
           clearButtonMode="while-editing"
           returnKeyType="search"
         />
@@ -247,6 +289,7 @@ export default function TransactionsScreen({ username, role }) {
             />
           </TouchableOpacity>
         )}
+        <VoiceMic onResult={(t) => setQuery(t)} style={{ marginLeft: 6 }} />
       </View>
 
       {/* Worker filter chips (admin only) */}
@@ -317,11 +360,30 @@ export default function TransactionsScreen({ username, role }) {
       ) : (
         <>
           <View style={styles.countBar}>
-            <Text style={styles.countText}>
-              {query.trim()
-                ? `${filtered.length} of ${transactions.length} transactions`
-                : `${transactions.length} transaction${transactions.length !== 1 ? "s" : ""}`}
-            </Text>
+            <View style={styles.countRow}>
+              <Text style={styles.countText}>
+                {query.trim()
+                  ? `${filtered.length} of ${transactions.length} transactions`
+                  : `${transactions.length} transaction${transactions.length !== 1 ? "s" : ""}`}
+              </Text>
+              {/* Export button */}
+              <TouchableOpacity
+                style={styles.exportBtn}
+                onPress={handleExport}
+                disabled={exporting}
+              >
+                {exporting ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  <MaterialCommunityIcons
+                    name="download"
+                    size={18}
+                    color={Colors.primary}
+                  />
+                )}
+                <Text style={styles.exportBtnText}>Export</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           {filtered.length === 0 ? (
             <View style={styles.empty}>
@@ -431,12 +493,10 @@ export default function TransactionsScreen({ username, role }) {
               />
 
               <Text style={styles.label}>Quantity</Text>
-              <TextInput
-                style={styles.input}
+              <CalcInput
                 value={editQty}
-                onChangeText={setEditQty}
-                keyboardType="numeric"
-                placeholder="e.g. 10"
+                onValueChange={setEditQty}
+                placeholder="e.g. 10 or 3x48"
               />
 
               <Text style={styles.label}>
@@ -639,7 +699,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
+  countRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   countText: { fontSize: 13, color: Colors.textSecondary, fontWeight: "600" },
+  exportBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.primary + "12",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  exportBtnText: { fontSize: 13, fontWeight: "700", color: Colors.primary },
   empty: {
     flex: 1,
     alignItems: "center",

@@ -13,6 +13,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { getAllItems, searchItems } from "../database/db";
 import ItemCard from "../components/ItemCard";
+import VoiceMic from "../components/VoiceMic";
 import Colors from "../theme/colors";
 
 const IS_WEB = Platform.OS === "web";
@@ -141,11 +142,12 @@ export default function ItemsScreen({ navigation, route }) {
             style={styles.searchInput}
             placeholder="Search by name, item code or barcode..."
             value={query}
-            onChangeText={setQuery}
-            autoCapitalize="none"
+            onChangeText={(t) => setQuery(t.toUpperCase())}
+            autoCapitalize="characters"
             clearButtonMode="while-editing"
             returnKeyType="search"
           />
+          <VoiceMic onResult={(t) => setQuery(t.toUpperCase())} size={20} />
           {query.length > 0 && (
             <TouchableOpacity
               onPress={() => setQuery("")}

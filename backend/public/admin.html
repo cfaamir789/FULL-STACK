@@ -693,9 +693,16 @@
                 class="copy-icon-btn"
                 onclick="downloadTransactionsCSV('xlsx')"
                 title="Download Excel XLSX"
-                style="color:#217346"
+                style="color: #217346"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                   <polyline points="7 10 12 15 17 10"></polyline>
                   <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -740,14 +747,45 @@
               oninput="filterTransactions()"
               style="flex: 1; min-width: 180px"
             />
-            <button class="copy-icon-btn" onclick="toggleColConfig()" title="Configure columns">
+            <button
+              class="copy-icon-btn"
+              onclick="toggleColConfig()"
+              title="Configure columns"
+            >
               &#9881; Columns
             </button>
           </div>
-          <div id="colConfigPanel" style="display:none;background:#f5f7fa;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:13px">
-            <p style="margin-bottom:8px;font-weight:600;color:#555">Drag to reorder columns &mdash; toggle to show/hide</p>
-            <div id="colConfigList" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-            <button class="btn-sm" style="margin-top:10px;background:#1565c0;color:#fff;border-radius:6px;border:none" onclick="resetColConfig()">Reset to Default</button>
+          <div
+            id="colConfigPanel"
+            style="
+              display: none;
+              background: #f5f7fa;
+              border-radius: 8px;
+              padding: 12px 16px;
+              margin-bottom: 12px;
+              font-size: 13px;
+            "
+          >
+            <p style="margin-bottom: 8px; font-weight: 600; color: #555">
+              Drag to reorder columns &mdash; toggle to show/hide
+            </p>
+            <div
+              id="colConfigList"
+              style="display: flex; flex-wrap: wrap; gap: 8px"
+            ></div>
+            <button
+              class="btn-sm"
+              style="
+                margin-top: 10px;
+                background: #1565c0;
+                color: #fff;
+                border-radius: 6px;
+                border: none;
+              "
+              onclick="resetColConfig()"
+            >
+              Reset to Default
+            </button>
           </div>
           <div id="txContainer"><div class="loading">Loading...</div></div>
         </div>
@@ -1151,57 +1189,78 @@
 
       // ─── Column Config ────────────────────────────────────────────────────────────
       const DEFAULT_TX_COLS = [
-        { key: 'Item_Code',    label: 'Item Code',  vis: true },
-        { key: 'Item_Barcode', label: 'Barcode',    vis: true },
-        { key: 'Item_Name',    label: 'Item Name',  vis: true },
-        { key: 'Frombin',      label: 'From Bin',   vis: true },
-        { key: 'Tobin',        label: 'To Bin',     vis: true },
-        { key: 'Qty',          label: 'Qty',        vis: true },
-        { key: 'Worker_Name',  label: 'Worker',     vis: true },
-        { key: 'Notes',        label: 'Notes',      vis: true },
-        { key: 'Timestamp',    label: 'Date/Time',  vis: true },
+        { key: "Item_Code", label: "Item Code", vis: true },
+        { key: "Item_Barcode", label: "Barcode", vis: true },
+        { key: "Item_Name", label: "Item Name", vis: true },
+        { key: "Frombin", label: "From Bin", vis: true },
+        { key: "Tobin", label: "To Bin", vis: true },
+        { key: "Qty", label: "Qty", vis: true },
+        { key: "Worker_Name", label: "Worker", vis: true },
+        { key: "Notes", label: "Notes", vis: true },
+        { key: "Timestamp", label: "Date/Time", vis: true },
       ];
 
       let txCols = (() => {
         try {
-          const saved = localStorage.getItem('txColConfig');
+          const saved = localStorage.getItem("txColConfig");
           if (saved) return JSON.parse(saved);
         } catch {}
-        return DEFAULT_TX_COLS.map(c => ({...c}));
+        return DEFAULT_TX_COLS.map((c) => ({ ...c }));
       })();
 
       function saveTxCols() {
-        localStorage.setItem('txColConfig', JSON.stringify(txCols));
+        localStorage.setItem("txColConfig", JSON.stringify(txCols));
       }
 
       let colConfigOpen = false;
       function toggleColConfig() {
         colConfigOpen = !colConfigOpen;
-        const panel = document.getElementById('colConfigPanel');
-        panel.style.display = colConfigOpen ? 'block' : 'none';
+        const panel = document.getElementById("colConfigPanel");
+        panel.style.display = colConfigOpen ? "block" : "none";
         if (colConfigOpen) renderColConfig();
       }
 
       function renderColConfig() {
-        const list = document.getElementById('colConfigList');
-        list.innerHTML = '';
+        const list = document.getElementById("colConfigList");
+        list.innerHTML = "";
         txCols.forEach((col, idx) => {
-          const item = document.createElement('div');
+          const item = document.createElement("div");
           item.draggable = true;
           item.dataset.idx = idx;
-          item.style = 'display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px 10px;cursor:grab;user-select:none';
+          item.style =
+            "display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px 10px;cursor:grab;user-select:none";
           item.innerHTML =
             '<span style="color:#aaa;font-size:16px;cursor:grab">&#8801;</span>' +
-            '<input type="checkbox" id="col_' + idx + '" ' + (col.vis ? 'checked' : '') + ' onchange="toggleColVis(' + idx + ')">' +
-            '<label for="col_' + idx + '" style="cursor:pointer;font-weight:600">' + esc(col.label) + '</label>';
-          item.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', idx); item.style.opacity='0.4'; });
-          item.addEventListener('dragend', () => { item.style.opacity='1'; });
-          item.addEventListener('dragover', (e) => { e.preventDefault(); item.style.borderColor='#1565c0'; });
-          item.addEventListener('dragleave', () => { item.style.borderColor='#ddd'; });
-          item.addEventListener('drop', (e) => {
+            '<input type="checkbox" id="col_' +
+            idx +
+            '" ' +
+            (col.vis ? "checked" : "") +
+            ' onchange="toggleColVis(' +
+            idx +
+            ')">' +
+            '<label for="col_' +
+            idx +
+            '" style="cursor:pointer;font-weight:600">' +
+            esc(col.label) +
+            "</label>";
+          item.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("text/plain", idx);
+            item.style.opacity = "0.4";
+          });
+          item.addEventListener("dragend", () => {
+            item.style.opacity = "1";
+          });
+          item.addEventListener("dragover", (e) => {
             e.preventDefault();
-            item.style.borderColor='#ddd';
-            const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+            item.style.borderColor = "#1565c0";
+          });
+          item.addEventListener("dragleave", () => {
+            item.style.borderColor = "#ddd";
+          });
+          item.addEventListener("drop", (e) => {
+            e.preventDefault();
+            item.style.borderColor = "#ddd";
+            const fromIdx = parseInt(e.dataTransfer.getData("text/plain"));
             const toIdx = parseInt(item.dataset.idx);
             if (fromIdx === toIdx) return;
             const moved = txCols.splice(fromIdx, 1)[0];
@@ -1221,7 +1280,7 @@
       }
 
       function resetColConfig() {
-        txCols = DEFAULT_TX_COLS.map(c => ({...c}));
+        txCols = DEFAULT_TX_COLS.map((c) => ({ ...c }));
         saveTxCols();
         renderColConfig();
         filterTransactions();
@@ -1311,11 +1370,16 @@
       }
 
       function txCellValue(tx, key) {
-        if (key === 'Timestamp') {
-          return tx.Timestamp ? '<td style="white-space:nowrap">' + esc(new Date(tx.Timestamp).toLocaleString()) + '</td>' : '<td></td>';
+        if (key === "Timestamp") {
+          return tx.Timestamp
+            ? '<td style="white-space:nowrap">' +
+                esc(new Date(tx.Timestamp).toLocaleString()) +
+                "</td>"
+            : "<td></td>";
         }
-        if (key === 'Qty') return '<td>' + (tx.Qty !== undefined ? tx.Qty : '') + '</td>';
-        return '<td>' + esc(tx[key] || '') + '</td>';
+        if (key === "Qty")
+          return "<td>" + (tx.Qty !== undefined ? tx.Qty : "") + "</td>";
+        return "<td>" + esc(tx[key] || "") + "</td>";
       }
 
       function renderTransactions(txs) {
@@ -1325,7 +1389,7 @@
             '<div class="loading">No transactions found.</div>';
           return;
         }
-        const visibleCols = txCols.filter(c => c.vis);
+        const visibleCols = txCols.filter((c) => c.vis);
         const pageSize = 50;
         const pages = Math.ceil(txs.length / pageSize);
         let page = 1;
@@ -1335,18 +1399,23 @@
           let html =
             '<div class="preview-count" style="display:flex;justify-content:space-between;align-items:center">Showing ' +
             (start + 1) +
-            '–' +
+            "–" +
             (start + slice.length) +
-            ' of ' +
+            " of " +
             txs.length +
-            ' transactions</div>';
-          html += '<div style="overflow-x:auto"><table id="txTable"><thead><tr>';
-          visibleCols.forEach(c => { html += '<th>' + esc(c.label) + '</th>'; });
-          html += '<th>Copy</th><th>Delete</th></tr></thead><tbody>';
+            " transactions</div>";
+          html +=
+            '<div style="overflow-x:auto"><table id="txTable"><thead><tr>';
+          visibleCols.forEach((c) => {
+            html += "<th>" + esc(c.label) + "</th>";
+          });
+          html += "<th>Copy</th><th>Delete</th></tr></thead><tbody>";
           slice.forEach((tx, i) => {
             const idx = start + i;
-            html += '<tr>';
-            visibleCols.forEach(c => { html += txCellValue(tx, c.key); });
+            html += "<tr>";
+            visibleCols.forEach((c) => {
+              html += txCellValue(tx, c.key);
+            });
             html +=
               '<td><button class="copy-icon-btn" onclick="copyRow(' +
               idx +
@@ -1355,26 +1424,26 @@
               '<td><button class="copy-icon-btn" style="color:#d32f2f;border-color:#f3c1c1" onclick="deleteTxRow(' +
               idx +
               ', this)" title="Delete this row">Delete</button></td>';
-            html += '</tr>';
+            html += "</tr>";
           });
-          html += '</tbody></table></div>';
+          html += "</tbody></table></div>";
           if (pages > 1) {
             html += '<div class="pagination">';
             html +=
-              '<button ' +
-              (page <= 1 ? 'disabled' : '') +
+              "<button " +
+              (page <= 1 ? "disabled" : "") +
               ' onclick="txPage(' +
               (page - 1) +
               ')">Prev</button>';
             html +=
-              '<span style="padding:6px;">' + page + ' / ' + pages + '</span>';
+              '<span style="padding:6px;">' + page + " / " + pages + "</span>";
             html +=
-              '<button ' +
-              (page >= pages ? 'disabled' : '') +
+              "<button " +
+              (page >= pages ? "disabled" : "") +
               ' onclick="txPage(' +
               (page + 1) +
               ')">Next</button>';
-            html += '</div>';
+            html += "</div>";
           }
           container.innerHTML = html;
         }
@@ -1388,11 +1457,16 @@
       function copyRow(idx, btnEl) {
         const tx = filteredTransactions[idx];
         if (!tx) return;
-        const visibleCols = txCols.filter(c => c.vis);
-        const text = visibleCols.map(c => {
-          if (c.key === 'Timestamp') return tx.Timestamp ? new Date(tx.Timestamp).toLocaleString() : '';
-          return String(tx[c.key] !== undefined ? tx[c.key] : '');
-        }).join('\t');
+        const visibleCols = txCols.filter((c) => c.vis);
+        const text = visibleCols
+          .map((c) => {
+            if (c.key === "Timestamp")
+              return tx.Timestamp
+                ? new Date(tx.Timestamp).toLocaleString()
+                : "";
+            return String(tx[c.key] !== undefined ? tx[c.key] : "");
+          })
+          .join("\t");
         copyToClip(text);
         flashCopyBtn(btnEl);
       }
@@ -1517,13 +1591,19 @@
           alert("No transactions to copy.");
           return;
         }
-        const visibleCols = txCols.filter(c => c.vis);
-        let text = visibleCols.map(c => c.label).join('\t') + '\n';
+        const visibleCols = txCols.filter((c) => c.vis);
+        let text = visibleCols.map((c) => c.label).join("\t") + "\n";
         txs.forEach((tx) => {
-          text += visibleCols.map(c => {
-            if (c.key === 'Timestamp') return tx.Timestamp ? new Date(tx.Timestamp).toLocaleString() : '';
-            return String(tx[c.key] !== undefined ? tx[c.key] : '');
-          }).join('\t') + '\n';
+          text +=
+            visibleCols
+              .map((c) => {
+                if (c.key === "Timestamp")
+                  return tx.Timestamp
+                    ? new Date(tx.Timestamp).toLocaleString()
+                    : "";
+                return String(tx[c.key] !== undefined ? tx[c.key] : "");
+              })
+              .join("\t") + "\n";
         });
         copyToClip(text);
         flashCopyBtn(document.getElementById("copyAllBtn"));
@@ -1557,25 +1637,46 @@
 
         if (format === "xlsx" && typeof XLSX !== "undefined") {
           // Fetch JSON rows then build XLSX in the browser
-          fetch(url + (workerFilter ? "&json=1" : "?json=1"),
-            { headers: { Authorization: "Bearer " + authToken } })
+          fetch(url + (workerFilter ? "&json=1" : "?json=1"), {
+            headers: { Authorization: "Bearer " + authToken },
+          })
             .then((r) => r.json())
             .then((data) => {
               // data may be [{...}] or {transactions:[...]}
-              const rows = Array.isArray(data) ? data : (data.transactions || []);
-              if (!rows.length) { alert("No transactions to export."); return; }
-              const headers = ["Worker","Date","Barcode","ItemCode","ItemName","From","To","Qty","Notes"];
-              const aoa = [headers, ...rows.map(r => [
-                r.Worker_Name || r.worker_name || "",
-                r.Timestamp ? new Date(r.Timestamp).toLocaleString() : (r.timestamp ? new Date(r.timestamp).toLocaleString() : ""),
-                r.Item_Barcode || r.item_barcode || "",
-                r.Item_Code || r.item_code || "",
-                r.Item_Name || r.item_name || "",
-                r.Frombin || r.frombin || "",
-                r.Tobin || r.tobin || "",
-                r.Qty ?? r.qty ?? "",
-                r.Notes || r.notes || "",
-              ])];
+              const rows = Array.isArray(data) ? data : data.transactions || [];
+              if (!rows.length) {
+                alert("No transactions to export.");
+                return;
+              }
+              const headers = [
+                "Worker",
+                "Date",
+                "Barcode",
+                "ItemCode",
+                "ItemName",
+                "From",
+                "To",
+                "Qty",
+                "Notes",
+              ];
+              const aoa = [
+                headers,
+                ...rows.map((r) => [
+                  r.Worker_Name || r.worker_name || "",
+                  r.Timestamp
+                    ? new Date(r.Timestamp).toLocaleString()
+                    : r.timestamp
+                      ? new Date(r.timestamp).toLocaleString()
+                      : "",
+                  r.Item_Barcode || r.item_barcode || "",
+                  r.Item_Code || r.item_code || "",
+                  r.Item_Name || r.item_name || "",
+                  r.Frombin || r.frombin || "",
+                  r.Tobin || r.tobin || "",
+                  r.Qty ?? r.qty ?? "",
+                  r.Notes || r.notes || "",
+                ]),
+              ];
               const ws = XLSX.utils.aoa_to_sheet(aoa);
               const wb = XLSX.utils.book_new();
               XLSX.utils.book_append_sheet(wb, ws, "Transactions");

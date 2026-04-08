@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  Vibration,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
@@ -32,6 +33,8 @@ import {
   insertTransaction,
 } from "../database/db";
 import { attemptSync } from "../services/syncService";
+import CalcInput from "../components/CalcInput";
+import VoiceMic from "../components/VoiceMic";
 import Colors from "../theme/colors";
 
 export default function ScannerScreen() {
@@ -52,6 +55,7 @@ export default function ScannerScreen() {
   const [searching, setSearching] = useState(false);
   const [itemName, setItemName] = useState("");
   const [nameResults, setNameResults] = useState([]);
+  const [lastSaved, setLastSaved] = useState(null);
 
   const fromBinRef = useRef(null);
   const toBinRef = useRef(null);
@@ -63,7 +67,6 @@ export default function ScannerScreen() {
 
   const focusFromBin = () => setTimeout(() => fromBinRef.current?.focus(), 120);
 
-  // Deactivate camera when leaving screen — prevents black screen on other tabs
   useFocusEffect(
     useCallback(() => {
       if (mode === "barcode" && showCamera) setCameraActive(true);
@@ -109,6 +112,7 @@ export default function ScannerScreen() {
     setCameraActive(false);
     const code = data.trim();
     setBarcode(code);
+    if (!IS_WEB) Vibration.vibrate(100);
     const item = await getItemByBarcode(code);
     setFoundItem(item);
     focusFromBin();
@@ -162,16 +166,19 @@ export default function ScannerScreen() {
   const handleSave = async () => {
     const barcodeVal = barcode.trim() || foundItem?.barcode;
     if (!barcodeVal) {
-      Alert.alert("Error", "Please search for an item first.");
+      Alert.alert("Missing Item", "Please scan or search for an item first.");
       return;
     }
     if (!frombin.trim() || !tobin.trim()) {
-      Alert.alert("Error", "From Bin and To Bin are required.");
+      Alert.alert("Missing Bins", "From Bin and To Bin are required.");
       return;
     }
     const qtyNum = parseInt(qty, 10);
     if (!qty || isNaN(qtyNum) || qtyNum < 1) {
-      Alert.alert("Error", "Quantity must be a positive number.");
+      Alert.alert(
+        "Invalid Quantity",
+        "Quantity must be a positive number.\nUse the calculator for math: 3x48 = 144",
+      );
       return;
     }
     setSaving(true);
@@ -188,7 +195,12 @@ export default function ScannerScreen() {
         worker_name: workerName,
         notes: notes.trim().toUpperCase(),
       });
-      // Reset form immediately — sync in background (don't block UI)
+      setLastSaved({
+        name: foundItem?.item_name || "Unknown Item",
+        qty: qtyNum,
+        from: frombin.trim().toUpperCase(),
+        to: tobin.trim().toUpperCase(),
+      });
       resetForm();
       setSaving(false);
       attemptSync().catch(() => {});
@@ -205,116 +217,106 @@ export default function ScannerScreen() {
 
   const uc = (setter) => (text) => setter(text.toUpperCase());
 
-  // ─── Reusable pieces ───────────────────────────────────────────────────────
+  // ─── Reusable UI pieces ─────────────────────────────────────────────────────
 
   const renderTabs = () => (
     <View style={styles.tabRow}>
-      <TouchableOpacity
-        style={[styles.tab, mode === "barcode" && styles.tabActive]}
-        onPress={() => switchMode("barcode")}
-      >
-        <MaterialCommunityIcons
-          name="barcode-scan"
-          size={18}
-          color={mode === "barcode" ? "#fff" : Colors.textSecondary}
-        />
-        <Text
-          style={[styles.tabText, mode === "barcode" && styles.tabTextActive]}
+      {[
+        { key: "barcode", icon: "barcode-scan", label: "Barcode" },
+        { key: "itemcode", icon: "pound-box", label: "Item Code" },
+        { key: "itemname", icon: "text-search", label: "Item Name" },
+      ].map((t) => (
+        <TouchableOpacity
+          key={t.key}
+          style={[styles.tab, mode === t.key && styles.tabActive]}
+          onPress={() => switchMode(t.key)}
         >
-          Barcode
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.tab, mode === "itemcode" && styles.tabActive]}
-        onPress={() => switchMode("itemcode")}
-      >
-        <MaterialCommunityIcons
-          name="pound-box"
-          size={18}
-          color={mode === "itemcode" ? "#fff" : Colors.textSecondary}
-        />
-        <Text
-          style={[styles.tabText, mode === "itemcode" && styles.tabTextActive]}
-        >
-          Item Code
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.tab, mode === "itemname" && styles.tabActive]}
-        onPress={() => switchMode("itemname")}
-      >
-        <MaterialCommunityIcons
-          name="text-search"
-          size={18}
-          color={mode === "itemname" ? "#fff" : Colors.textSecondary}
-        />
-        <Text
-          style={[styles.tabText, mode === "itemname" && styles.tabTextActive]}
-        >
-          Item Name
-        </Text>
-      </TouchableOpacity>
+          <MaterialCommunityIcons
+            name={t.icon}
+            size={18}
+            color={mode === t.key ? "#fff" : Colors.textSecondary}
+          />
+          <Text
+            style={[styles.tabText, mode === t.key && styles.tabTextActive]}
+          >
+            {t.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 
-  const renderSearchInput = () =>
-    mode === "barcode" ? (
-      <>
-        <Text style={styles.label}>Barcode</Text>
-        <View style={styles.searchRow}>
-          <TextInput
-            ref={barcodeRef}
-            style={[styles.input, { flex: 1 }]}
-            value={barcode}
-            onChangeText={setBarcode}
-            placeholder="Scan or type barcode"
-            autoCapitalize="none"
-            keyboardType="number-pad"
-            returnKeyType="search"
-            onSubmitEditing={handleBarcodeSearch}
-            blurOnSubmit={false}
-          />
-          <TouchableOpacity
-            style={styles.searchBtn}
-            onPress={handleBarcodeSearch}
-          >
-            {searching ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
-            )}
-          </TouchableOpacity>
-        </View>
-      </>
-    ) : mode === "itemcode" ? (
-      <>
-        <Text style={styles.label}>Item Code</Text>
-        <View style={styles.searchRow}>
-          <TextInput
-            ref={itemCodeRef}
-            style={[styles.input, { flex: 1 }]}
-            value={itemCode}
-            onChangeText={setItemCode}
-            placeholder="Type item code"
-            autoCapitalize="none"
-            keyboardType="number-pad"
-            returnKeyType="search"
-            onSubmitEditing={handleItemCodeSearch}
-            blurOnSubmit={false}
-          />
-          <TouchableOpacity
-            style={styles.searchBtn}
-            onPress={handleItemCodeSearch}
-          >
-            {searching ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
-            )}
-          </TouchableOpacity>
-        </View>
-      </>
-    ) : (
+  const renderSearchInput = () => {
+    if (mode === "barcode") {
+      return (
+        <>
+          <Text style={styles.label}>Barcode</Text>
+          <View style={styles.searchRow}>
+            <TextInput
+              ref={barcodeRef}
+              style={[styles.input, { flex: 1 }]}
+              value={barcode}
+              onChangeText={(t) => setBarcode(t.toUpperCase())}
+              placeholder="Scan or type barcode"
+              autoCapitalize="characters"
+              returnKeyType="search"
+              onSubmitEditing={handleBarcodeSearch}
+              blurOnSubmit={false}
+            />
+            <VoiceMic
+              onResult={(t) => setBarcode(t)}
+              style={{ marginLeft: 4 }}
+            />
+            <TouchableOpacity
+              style={styles.searchBtn}
+              onPress={handleBarcodeSearch}
+            >
+              {searching ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </>
+      );
+    }
+    if (mode === "itemcode") {
+      return (
+        <>
+          <Text style={styles.label}>Item Code</Text>
+          <View style={styles.searchRow}>
+            <TextInput
+              ref={itemCodeRef}
+              style={[styles.input, { flex: 1 }]}
+              value={itemCode}
+              onChangeText={(t) => setItemCode(t.toUpperCase())}
+              placeholder="Type item code"
+              autoCapitalize="characters"
+              returnKeyType="search"
+              onSubmitEditing={handleItemCodeSearch}
+              blurOnSubmit={false}
+            />
+            <VoiceMic
+              onResult={(t) => setItemCode(t)}
+              style={{ marginLeft: 4 }}
+            />
+            <TouchableOpacity
+              style={styles.searchBtn}
+              onPress={handleItemCodeSearch}
+            >
+              {searching ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </>
+      );
+    }
+    // itemname mode
+    return (
       <>
         <Text style={styles.label}>Item Name</Text>
         <View style={styles.searchRow}>
@@ -322,12 +324,16 @@ export default function ScannerScreen() {
             ref={itemNameRef}
             style={[styles.input, { flex: 1 }]}
             value={itemName}
-            onChangeText={setItemName}
-            placeholder="Type part of item name…"
+            onChangeText={(t) => setItemName(t.toUpperCase())}
+            placeholder="Type part of item name..."
             autoCapitalize="characters"
             returnKeyType="search"
             onSubmitEditing={handleItemNameSearch}
             blurOnSubmit={false}
+          />
+          <VoiceMic
+            onResult={(t) => setItemName(t)}
+            style={{ marginLeft: 4 }}
           />
           <TouchableOpacity
             style={styles.searchBtn}
@@ -348,9 +354,7 @@ export default function ScannerScreen() {
                 style={styles.nameResultItem}
                 onPress={() => handleNameResultSelect(r)}
               >
-                <Text style={styles.nameResultCode}>
-                  Item Code: {r.item_code}
-                </Text>
+                <Text style={styles.nameResultCode}>{r.item_code}</Text>
                 <Text style={styles.nameResultName} numberOfLines={1}>
                   {r.item_name}
                 </Text>
@@ -361,90 +365,105 @@ export default function ScannerScreen() {
         {nameResults.length === 0 &&
           itemName.trim().length > 0 &&
           !searching &&
-          scanned === false && (
+          !scanned && (
             <Text style={styles.nameHint}>
               Press search to find matching items
             </Text>
           )}
       </>
     );
+  };
 
-  const renderItemBanner = () =>
-    scanned ? (
+  const renderItemBanner = () => {
+    if (!scanned) return null;
+    const found = !!foundItem;
+    return (
       <View
         style={[
           styles.itemBanner,
-          {
-            backgroundColor: foundItem
-              ? Colors.success + "18"
-              : Colors.warning + "18",
-          },
+          { backgroundColor: found ? "#E8F5E9" : "#FFF8E1" },
         ]}
       >
         <MaterialCommunityIcons
-          name={foundItem ? "check-circle" : "alert-circle"}
-          size={18}
-          color={foundItem ? Colors.success : Colors.warning}
+          name={found ? "check-circle" : "alert-circle"}
+          size={24}
+          color={found ? Colors.success : "#F57F17"}
         />
-        <View style={{ marginLeft: 8, flex: 1 }}>
+        <View style={{ marginLeft: 10, flex: 1 }}>
           <Text
             style={[
-              styles.itemBannerText,
-              { color: foundItem ? Colors.success : Colors.warning },
+              styles.itemBannerTitle,
+              { color: found ? "#2E7D32" : "#F57F17" },
             ]}
           >
-            {foundItem
+            {found
               ? foundItem.item_name
               : "Item not found — will still be recorded"}
           </Text>
-          {foundItem && (
-            <Text style={styles.itemSubText}>
-              Item Code: {foundItem.item_code} | Barcode: {foundItem.barcode}
-            </Text>
+          {found && (
+            <>
+              <Text style={styles.itemBannerDetail}>
+                <Text style={{ fontWeight: "700" }}>Code: </Text>
+                {foundItem.item_code}
+              </Text>
+              <Text style={styles.itemBannerDetail}>
+                <Text style={{ fontWeight: "700" }}>Barcode: </Text>
+                {foundItem.barcode}
+              </Text>
+            </>
           )}
         </View>
       </View>
-    ) : null;
+    );
+  };
 
   const renderBinQtyFields = () => (
     <>
       <Text style={styles.label}>From Bin</Text>
-      <TextInput
-        ref={fromBinRef}
-        style={styles.input}
-        value={frombin}
-        onChangeText={uc(setFrombin)}
-        placeholder="e.g. A-01"
-        autoCapitalize="characters"
-        returnKeyType="next"
-        onSubmitEditing={() => toBinRef.current?.focus()}
-        blurOnSubmit={false}
-      />
+      <View style={styles.fieldRow}>
+        <TextInput
+          ref={fromBinRef}
+          style={[styles.input, { flex: 1 }]}
+          value={frombin}
+          onChangeText={uc(setFrombin)}
+          placeholder="e.g. A-01"
+          autoCapitalize="characters"
+          returnKeyType="next"
+          onSubmitEditing={() => toBinRef.current?.focus()}
+          blurOnSubmit={false}
+        />
+        <VoiceMic onResult={(t) => setFrombin(t)} style={{ marginLeft: 4 }} />
+      </View>
 
       <Text style={styles.label}>To Bin</Text>
-      <TextInput
-        ref={toBinRef}
-        style={styles.input}
-        value={tobin}
-        onChangeText={uc(setTobin)}
-        placeholder="e.g. B-03"
-        autoCapitalize="characters"
-        returnKeyType="next"
-        onSubmitEditing={() => qtyRef.current?.focus()}
-        blurOnSubmit={false}
-      />
+      <View style={styles.fieldRow}>
+        <TextInput
+          ref={toBinRef}
+          style={[styles.input, { flex: 1 }]}
+          value={tobin}
+          onChangeText={uc(setTobin)}
+          placeholder="e.g. B-03"
+          autoCapitalize="characters"
+          returnKeyType="next"
+          onSubmitEditing={() => qtyRef.current?.focus()}
+          blurOnSubmit={false}
+        />
+        <VoiceMic onResult={(t) => setTobin(t)} style={{ marginLeft: 4 }} />
+      </View>
 
-      <Text style={styles.label}>Quantity</Text>
-      <TextInput
+      <Text style={styles.label}>
+        Quantity{" "}
+        <Text
+          style={{ fontWeight: "400", color: Colors.textLight, fontSize: 11 }}
+        >
+          (tap calculator for math: 3x48 = 144)
+        </Text>
+      </Text>
+      <CalcInput
         ref={qtyRef}
-        style={styles.input}
         value={qty}
-        onChangeText={setQty}
-        placeholder="Enter quantity"
-        keyboardType="numeric"
-        returnKeyType="done"
-        onSubmitEditing={handleSave}
-        blurOnSubmit={true}
+        onValueChange={setQty}
+        placeholder="Qty - tap calculator icon"
       />
 
       <Text style={styles.label}>
@@ -453,16 +472,19 @@ export default function ScannerScreen() {
           (optional)
         </Text>
       </Text>
-      <TextInput
-        ref={notesRef}
-        style={styles.input}
-        value={notes}
-        onChangeText={uc(setNotes)}
-        placeholder="e.g. DAMAGE, EXPIRY 2026-12"
-        autoCapitalize="characters"
-        returnKeyType="done"
-        onSubmitEditing={handleSave}
-      />
+      <View style={styles.fieldRow}>
+        <TextInput
+          ref={notesRef}
+          style={[styles.input, { flex: 1 }]}
+          value={notes}
+          onChangeText={uc(setNotes)}
+          placeholder="e.g. DAMAGE, EXPIRY 2026-12"
+          autoCapitalize="characters"
+          returnKeyType="done"
+          onSubmitEditing={handleSave}
+        />
+        <VoiceMic onResult={(t) => setNotes(t)} style={{ marginLeft: 4 }} />
+      </View>
 
       <TouchableOpacity
         style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
@@ -472,16 +494,30 @@ export default function ScannerScreen() {
         {saving ? (
           <ActivityIndicator color="#fff" size="small" />
         ) : (
-          <MaterialCommunityIcons name="content-save" size={20} color="#fff" />
+          <MaterialCommunityIcons name="content-save" size={22} color="#fff" />
         )}
         <Text style={styles.saveBtnText}>
           {saving ? "Saving..." : "Save Transaction"}
         </Text>
       </TouchableOpacity>
+
+      {lastSaved && (
+        <View style={styles.lastSavedBanner}>
+          <MaterialCommunityIcons
+            name="check-circle"
+            size={16}
+            color={Colors.success}
+          />
+          <Text style={styles.lastSavedText} numberOfLines={1}>
+            Saved: {lastSaved.name} | Qty {lastSaved.qty} | {lastSaved.from} to{" "}
+            {lastSaved.to}
+          </Text>
+        </View>
+      )}
     </>
   );
 
-  // ─── Web ──────────────────────────────────────────────────────────────────
+  // ─── Web version ──────────────────────────────────────────────────────────
   if (IS_WEB) {
     return (
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
@@ -529,7 +565,7 @@ export default function ScannerScreen() {
   // ─── Native ───────────────────────────────────────────────────────────────
   return (
     <SafeAreaView
-      style={{ flex: 1, backgroundColor: Colors.primary }}
+      style={{ flex: 1, backgroundColor: "#0D47A1" }}
       edges={["top"]}
     >
       <KeyboardAvoidingView
@@ -539,7 +575,6 @@ export default function ScannerScreen() {
         <View style={styles.container}>
           {renderTabs()}
 
-          {/* Camera — only mounted when tab is focused, barcode mode, and camera active */}
           {isFocused && mode === "barcode" && showCamera && cameraActive && (
             <View style={styles.cameraWrap}>
               <CameraView
@@ -558,8 +593,21 @@ export default function ScannerScreen() {
                 }}
               />
               <View style={styles.overlay}>
-                <View style={styles.scanFrame} />
-                <Text style={styles.scanHint}>Point camera at barcode</Text>
+                <View style={styles.overlayDark} />
+                <View style={styles.scanRow}>
+                  <View style={styles.overlayDark} />
+                  <View style={styles.scanFrame}>
+                    <View style={[styles.corner, styles.cornerTL]} />
+                    <View style={[styles.corner, styles.cornerTR]} />
+                    <View style={[styles.corner, styles.cornerBL]} />
+                    <View style={[styles.corner, styles.cornerBR]} />
+                    <View style={styles.scanLine} />
+                  </View>
+                  <View style={styles.overlayDark} />
+                </View>
+                <View style={styles.overlayDark}>
+                  <Text style={styles.scanHint}>Point camera at barcode</Text>
+                </View>
               </View>
             </View>
           )}
@@ -572,9 +620,9 @@ export default function ScannerScreen() {
             {!showCamera && mode === "barcode" && (
               <TouchableOpacity style={styles.rescanBtn} onPress={resetForm}>
                 <MaterialCommunityIcons
-                  name="barcode-scan"
-                  size={18}
-                  color={Colors.primary}
+                  name="camera-retake"
+                  size={20}
+                  color="#fff"
                 />
                 <Text style={styles.rescanText}>Scan Again</Text>
               </TouchableOpacity>
@@ -602,106 +650,171 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 12,
     marginBottom: 16,
+    fontSize: 15,
   },
   permBtn: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
   },
-  permBtnText: { color: "#fff", fontWeight: "700" },
+  permBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+
   tabRow: {
     flexDirection: "row",
-    margin: 12,
-    borderRadius: 10,
+    marginHorizontal: 12,
+    marginVertical: 10,
+    borderRadius: 12,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.border,
     overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   tab: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     gap: 6,
   },
   tabActive: { backgroundColor: Colors.primary },
-  tabText: { fontSize: 14, fontWeight: "600", color: Colors.textSecondary },
+  tabText: { fontSize: 13, fontWeight: "700", color: Colors.textSecondary },
   tabTextActive: { color: "#fff" },
-  cameraWrap: { height: 200, overflow: "hidden", backgroundColor: "#000" },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
+
+  cameraWrap: { height: 240, overflow: "hidden", backgroundColor: "#000" },
+  overlay: { ...StyleSheet.absoluteFillObject },
+  overlayDark: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
     alignItems: "center",
     justifyContent: "center",
   },
-  scanFrame: {
-    width: 200,
-    height: 100,
-    borderWidth: 2,
-    borderColor: "#fff",
-    borderRadius: 12,
+  scanRow: { flexDirection: "row", height: 140 },
+  scanFrame: { width: 260, height: 140, position: "relative" },
+  corner: {
+    position: "absolute",
+    width: 28,
+    height: 28,
+    borderColor: "#00E676",
+    borderWidth: 3,
   },
-  scanHint: { color: "#fff", marginTop: 10, fontWeight: "600", fontSize: 13 },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 8,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+    borderTopRightRadius: 8,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 8,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderBottomRightRadius: 8,
+  },
+  scanLine: {
+    position: "absolute",
+    top: "50%",
+    left: 10,
+    right: 10,
+    height: 2,
+    backgroundColor: "#00E676",
+    borderRadius: 1,
+  },
+  scanHint: { color: "#fff", fontWeight: "700", fontSize: 14, marginTop: 8 },
+
   form: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
-  rescanBtn: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
-  rescanText: {
-    color: Colors.primary,
-    fontWeight: "600",
-    marginLeft: 6,
-    fontSize: 14,
+  rescanBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginBottom: 8,
+    gap: 8,
+    elevation: 2,
   },
+  rescanText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+
   label: {
     fontSize: 13,
-    fontWeight: "600",
-    color: Colors.textSecondary,
+    fontWeight: "700",
+    color: Colors.textPrimary,
     marginBottom: 4,
-    marginTop: 10,
+    marginTop: 12,
+    letterSpacing: 0.3,
   },
   input: {
     backgroundColor: Colors.card,
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 10,
+    borderWidth: 1.5,
     borderColor: Colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontWeight: "600",
     color: Colors.textPrimary,
   },
   searchRow: { flexDirection: "row", alignItems: "center" },
+  fieldRow: { flexDirection: "row", alignItems: "center" },
   searchBtn: {
     backgroundColor: Colors.primary,
-    borderRadius: 8,
-    padding: 11,
-    marginLeft: 8,
+    borderRadius: 10,
+    padding: 12,
+    marginLeft: 6,
+    elevation: 2,
   },
+
   itemBanner: {
     flexDirection: "row",
     alignItems: "flex-start",
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 8,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 10,
+    elevation: 1,
   },
-  itemBannerText: { fontSize: 13, fontWeight: "600", flex: 1 },
-  itemSubText: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  itemBannerTitle: { fontSize: 15, fontWeight: "800" },
+  itemBannerDetail: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+
   nameResultsList: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 8,
+    borderRadius: 10,
     marginTop: 6,
     overflow: "hidden",
     backgroundColor: Colors.card,
+    maxHeight: 200,
   },
   nameResultItem: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  nameResultCode: { fontSize: 11, fontWeight: "700", color: Colors.primary },
+  nameResultCode: { fontSize: 12, fontWeight: "800", color: Colors.primary },
   nameResultName: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
     color: Colors.textPrimary,
     marginTop: 1,
@@ -712,22 +825,39 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
+
   saveBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 14,
-    marginTop: 20,
-    marginBottom: 30,
-    elevation: 2,
+    borderRadius: 12,
+    paddingVertical: 16,
+    marginTop: 24,
+    marginBottom: 8,
+    elevation: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    gap: 10,
   },
-  saveBtnDisabled: { backgroundColor: Colors.textLight },
-  saveBtnText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
-    marginLeft: 8,
+  saveBtnDisabled: { backgroundColor: Colors.textLight, elevation: 0 },
+  saveBtnText: { color: "#fff", fontWeight: "800", fontSize: 17 },
+
+  lastSavedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.success + "15",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+    gap: 8,
+  },
+  lastSavedText: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.success,
+    fontWeight: "600",
   },
 });

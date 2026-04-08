@@ -163,7 +163,12 @@ export default function AdminPanelScreen({ navigation }) {
         Alert.alert("No Data", "No transactions found to export.");
         return;
       }
-      const { filename } = await backupSvc.saveAndShareBackup(txns, username, format, false);
+      const { filename } = await backupSvc.saveAndShareBackup(
+        txns,
+        username,
+        format,
+        false,
+      );
       Alert.alert(
         "Export Saved",
         `${txns.length} transactions saved as:\n${filename}\n\nIn InventoryManager folder.`,
@@ -178,7 +183,10 @@ export default function AdminPanelScreen({ navigation }) {
   // ─── Entire Day Backup ──────────────────────────────────────────────────────
   const handleEntireDayBackup = () => {
     if (IS_WEB) {
-      Alert.alert("Not Available", "Entire Day Backup is available on the mobile app.");
+      Alert.alert(
+        "Not Available",
+        "Entire Day Backup is available on the mobile app.",
+      );
       return;
     }
     setFormatPickerMode("backup");
@@ -195,7 +203,12 @@ export default function AdminPanelScreen({ navigation }) {
         Alert.alert("No Data", "No transactions found to back up.");
         return;
       }
-      const { filename } = await backupSvc.saveAndShareBackup(txns, username, format, true);
+      const { filename } = await backupSvc.saveAndShareBackup(
+        txns,
+        username,
+        format,
+        true,
+      );
       Alert.alert(
         "Entire Day Backup Saved",
         `${txns.length} transactions backed up as:\n${filename}\n\nIn InventoryManager folder on this phone.`,
@@ -220,7 +233,8 @@ export default function AdminPanelScreen({ navigation }) {
         return;
       }
       const safeWorker = workerName.replace(/[^a-zA-Z0-9]/g, "_");
-      const fileUri = FileSystem.documentDirectory + `transactions_${safeWorker}.csv`;
+      const fileUri =
+        FileSystem.documentDirectory + `transactions_${safeWorker}.csv`;
       const download = await FileSystem.downloadAsync(
         `${getExportUrl()}?worker=${encodeURIComponent(workerName)}`,
         fileUri,
@@ -489,10 +503,7 @@ export default function AdminPanelScreen({ navigation }) {
             disabled={backingUp}
           >
             <View
-              style={[
-                styles.actionIcon,
-                { backgroundColor: "#00BCD4" + "15" },
-              ]}
+              style={[styles.actionIcon, { backgroundColor: "#00BCD4" + "15" }]}
             >
               {backingUp ? (
                 <ActivityIndicator size="small" color="#00BCD4" />
@@ -636,7 +647,6 @@ export default function AdminPanelScreen({ navigation }) {
             </Text>
           </View>
         )}
-
       </ScrollView>
 
       {/* Format Picker Modal */}
@@ -653,7 +663,9 @@ export default function AdminPanelScreen({ navigation }) {
         >
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>
-              {formatPickerMode === "backup" ? "Entire Day Backup" : "Export Transactions"}
+              {formatPickerMode === "backup"
+                ? "Entire Day Backup"
+                : "Export Transactions"}
             </Text>
             <Text style={styles.modalSub}>Choose file format</Text>
             <TouchableOpacity
@@ -664,7 +676,11 @@ export default function AdminPanelScreen({ navigation }) {
                   : doMobileExport("csv")
               }
             >
-              <MaterialCommunityIcons name="file-delimited" size={22} color={Colors.primary} />
+              <MaterialCommunityIcons
+                name="file-delimited"
+                size={22}
+                color={Colors.primary}
+              />
               <Text style={styles.modalBtnText}>CSV (.csv)</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -675,7 +691,11 @@ export default function AdminPanelScreen({ navigation }) {
                   : doMobileExport("xlsx")
               }
             >
-              <MaterialCommunityIcons name="microsoft-excel" size={22} color="#217346" />
+              <MaterialCommunityIcons
+                name="microsoft-excel"
+                size={22}
+                color="#217346"
+              />
               <Text style={styles.modalBtnText}>Excel (.xlsx)</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -687,7 +707,6 @@ export default function AdminPanelScreen({ navigation }) {
           </View>
         </TouchableOpacity>
       </Modal>
-
     </View>
   );
 }
@@ -864,7 +883,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.success + "12",
     borderRadius: 8,
   },
-  autoBackupText: { flex: 1, fontSize: 12, color: Colors.success, fontWeight: "500" },
+  autoBackupText: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.success,
+    fontWeight: "500",
+  },
   // Modal
   modalOverlay: {
     flex: 1,
@@ -883,7 +907,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
   },
-  modalTitle: { fontSize: 17, fontWeight: "800", color: Colors.textPrimary, marginBottom: 4 },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
   modalSub: { fontSize: 13, color: Colors.textSecondary, marginBottom: 16 },
   modalBtn: {
     flexDirection: "row",
@@ -897,5 +926,9 @@ const styles = StyleSheet.create({
   },
   modalBtnText: { fontSize: 15, fontWeight: "600", color: Colors.textPrimary },
   modalCancelBtn: { alignItems: "center", paddingVertical: 10, marginTop: 4 },
-  modalCancelText: { fontSize: 14, color: Colors.textSecondary, fontWeight: "500" },
+  modalCancelText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: "500",
+  },
 });

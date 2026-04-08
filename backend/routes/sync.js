@@ -214,7 +214,9 @@ router.get("/export", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { worker, json } = req.query;
     const query = worker ? { Worker_Name: worker } : {};
-    const transactions = await Transaction.find(query).sort({ Timestamp: -1 }).lean();
+    const transactions = await Transaction.find(query)
+      .sort({ Timestamp: -1 })
+      .lean();
 
     // JSON format for XLSX generation in the browser
     if (json === "1") {

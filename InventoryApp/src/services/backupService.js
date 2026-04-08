@@ -80,7 +80,18 @@ async function getXLSX() {
 async function transactionsToXLSX(transactions) {
   const XLSX = await getXLSX();
   const rows = [
-    ["Worker", "Date", "Barcode", "ItemCode", "ItemName", "From", "To", "Qty", "Notes", "Synced"],
+    [
+      "Worker",
+      "Date",
+      "Barcode",
+      "ItemCode",
+      "ItemName",
+      "From",
+      "To",
+      "Qty",
+      "Notes",
+      "Synced",
+    ],
     ...transactions.map((tx) => [
       tx.worker_name || "",
       tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "",
@@ -110,7 +121,12 @@ async function transactionsToXLSX(transactions) {
  * @param {boolean} isEntireDay - true = ENTIRE_DAY suffix
  * @returns {Promise<{uri: string, filename: string}>}
  */
-export async function saveBackup(transactions, username, format = "csv", isEntireDay = false) {
+export async function saveBackup(
+  transactions,
+  username,
+  format = "csv",
+  isEntireDay = false,
+) {
   await ensureBackupDir();
   const baseName = await nextFilename(username, isEntireDay);
   const ext = format === "xlsx" ? "xlsx" : "csv";
@@ -135,14 +151,28 @@ export async function saveBackup(transactions, username, format = "csv", isEntir
 /**
  * Save backup then immediately share/open it.
  */
-export async function saveAndShareBackup(transactions, username, format = "csv", isEntireDay = false) {
-  const { uri, filename } = await saveBackup(transactions, username, format, isEntireDay);
-  const mimeType = format === "xlsx"
-    ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    : "text/csv";
+export async function saveAndShareBackup(
+  transactions,
+  username,
+  format = "csv",
+  isEntireDay = false,
+) {
+  const { uri, filename } = await saveBackup(
+    transactions,
+    username,
+    format,
+    isEntireDay,
+  );
+  const mimeType =
+    format === "xlsx"
+      ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      : "text/csv";
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
-    await Sharing.shareAsync(uri, { mimeType, dialogTitle: `Save ${filename}` });
+    await Sharing.shareAsync(uri, {
+      mimeType,
+      dialogTitle: `Save ${filename}`,
+    });
   }
   return { uri, filename };
 }
@@ -154,7 +184,12 @@ export async function saveAndShareBackup(transactions, username, format = "csv",
 export async function silentAutoBackup(transactions, username) {
   if (!transactions || transactions.length === 0) return null;
   try {
-    const { uri, filename } = await saveBackup(transactions, username, "csv", false);
+    const { uri, filename } = await saveBackup(
+      transactions,
+      username,
+      "csv",
+      false,
+    );
     return { uri, filename };
   } catch (err) {
     console.warn("Auto-backup failed:", err.message);
