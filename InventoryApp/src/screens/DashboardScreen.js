@@ -1,29 +1,47 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from "react";
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, FlatList, ActivityIndicator, RefreshControl,
-} from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import { getDashboardStats, getRecentTransactions } from '../database/db';
-import { getDisplayUrl } from '../services/api';
-import { attemptSync, setSyncStatusListener } from '../services/syncService';
-import StatsCard from '../components/StatsCard';
-import SyncStatusBanner from '../components/SyncStatusBanner';
-import TransactionRow from '../components/TransactionRow';
-import VoiceMic from '../components/VoiceMic';
-import Colors from '../theme/colors';
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { getDashboardStats, getRecentTransactions } from "../database/db";
+import { getDisplayUrl } from "../services/api";
+import { attemptSync, setSyncStatusListener } from "../services/syncService";
+import StatsCard from "../components/StatsCard";
+import SyncStatusBanner from "../components/SyncStatusBanner";
+import TransactionRow from "../components/TransactionRow";
+import VoiceMic from "../components/VoiceMic";
+import Colors from "../theme/colors";
 
 export default function DashboardScreen() {
-  const [stats, setStats] = useState({ totalItems: 0, totalTransactions: 0, pendingSync: 0 });
+  const [stats, setStats] = useState({
+    totalItems: 0,
+    totalTransactions: 0,
+    pendingSync: 0,
+  });
   const [recent, setRecent] = useState([]);
-  const [syncStatus, setSyncStatus] = useState({ online: null, lastSync: null, pendingCount: 0 });
+  const [syncStatus, setSyncStatus] = useState({
+    online: null,
+    lastSync: null,
+    pendingCount: 0,
+  });
   const [syncing, setSyncing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
 
   const loadData = useCallback(async () => {
-    const [s, r] = await Promise.all([getDashboardStats(), getRecentTransactions(200)]);
+    const [s, r] = await Promise.all([
+      getDashboardStats(),
+      getRecentTransactions(200),
+    ]);
     setStats(s);
     setRecent(r);
   }, []);
@@ -42,7 +60,7 @@ export default function DashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [loadData])
+    }, [loadData]),
   );
 
   useEffect(() => {
@@ -75,13 +93,30 @@ export default function DashboardScreen() {
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         <Text style={styles.sectionTitle}>Overview</Text>
         <View style={styles.statsRow}>
-          <StatsCard icon="package-variant" label="Total Items" value={stats.totalItems} color={Colors.primary} />
-          <StatsCard icon="swap-horizontal" label="Transactions" value={stats.totalTransactions} color={Colors.success} />
-          <StatsCard icon="cloud-sync" label="Pending Sync" value={stats.pendingSync} color={stats.pendingSync > 0 ? Colors.pending : Colors.success} />
+          <StatsCard
+            icon="package-variant"
+            label="Total Items"
+            value={stats.totalItems}
+            color={Colors.primary}
+          />
+          <StatsCard
+            icon="swap-horizontal"
+            label="Transactions"
+            value={stats.totalTransactions}
+            color={Colors.success}
+          />
+          <StatsCard
+            icon="cloud-sync"
+            label="Pending Sync"
+            value={stats.pendingSync}
+            color={stats.pendingSync > 0 ? Colors.pending : Colors.success}
+          />
         </View>
 
         <TouchableOpacity
@@ -94,12 +129,19 @@ export default function DashboardScreen() {
           ) : (
             <MaterialCommunityIcons name="sync" size={20} color="#fff" />
           )}
-          <Text style={styles.syncBtnText}>{syncing ? 'Syncing...' : 'Sync Now'}</Text>
+          <Text style={styles.syncBtnText}>
+            {syncing ? "Syncing..." : "Sync Now"}
+          </Text>
         </TouchableOpacity>
 
         {/* Search Bar */}
         <View style={styles.searchBar}>
-          <MaterialCommunityIcons name="magnify" size={20} color={Colors.textSecondary} style={{ marginRight: 8 }} />
+          <MaterialCommunityIcons
+            name="magnify"
+            size={20}
+            color={Colors.textSecondary}
+            style={{ marginRight: 8 }}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by item code, barcode or name..."
@@ -108,21 +150,37 @@ export default function DashboardScreen() {
             autoCapitalize="characters"
             returnKeyType="search"
           />
-          <VoiceMic onResult={(t) => setQuery(t.toUpperCase())} size={20} style={{ marginRight: 4 }} />
+          <VoiceMic
+            onResult={(t) => setQuery(t.toUpperCase())}
+            size={20}
+            style={{ marginRight: 4 }}
+          />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery('')}>
-              <MaterialCommunityIcons name="close-circle" size={18} color={Colors.textLight} />
+            <TouchableOpacity onPress={() => setQuery("")}>
+              <MaterialCommunityIcons
+                name="close-circle"
+                size={18}
+                color={Colors.textLight}
+              />
             </TouchableOpacity>
           )}
         </View>
 
         <Text style={styles.sectionTitle}>
-          {query.trim() ? `${filtered.length} result${filtered.length !== 1 ? 's' : ''}` : 'Recent Transactions'}
+          {query.trim()
+            ? `${filtered.length} result${filtered.length !== 1 ? "s" : ""}`
+            : "Recent Transactions"}
         </Text>
         {filtered.length === 0 ? (
           <View style={styles.empty}>
-            <MaterialCommunityIcons name={query.trim() ? 'magnify-close' : 'history'} size={40} color={Colors.textLight} />
-            <Text style={styles.emptyText}>{query.trim() ? 'No matches found' : 'No transactions yet'}</Text>
+            <MaterialCommunityIcons
+              name={query.trim() ? "magnify-close" : "history"}
+              size={40}
+              color={Colors.textLight}
+            />
+            <Text style={styles.emptyText}>
+              {query.trim() ? "No matches found" : "No transactions yet"}
+            </Text>
           </View>
         ) : (
           filtered.map((tx) => <TransactionRow key={tx.id} item={tx} />)
@@ -137,20 +195,20 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: 24 },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     color: Colors.textPrimary,
     marginHorizontal: 16,
     marginTop: 20,
     marginBottom: 10,
   },
   statsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginHorizontal: 12,
   },
   syncBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: Colors.primary,
     borderRadius: 10,
     paddingVertical: 12,
@@ -159,12 +217,17 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   syncBtnDisabled: { backgroundColor: Colors.textLight },
-  syncBtnText: { color: '#fff', fontWeight: '700', fontSize: 15, marginLeft: 8 },
-  empty: { alignItems: 'center', paddingVertical: 32 },
+  syncBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
+    marginLeft: 8,
+  },
+  empty: { alignItems: "center", paddingVertical: 32 },
   emptyText: { color: Colors.textLight, marginTop: 8 },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: Colors.card,
     borderRadius: 10,
     paddingHorizontal: 12,
@@ -172,7 +235,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 16,
     elevation: 1,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
