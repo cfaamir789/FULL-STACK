@@ -104,7 +104,8 @@ export default function TransactionsScreen({ username, role }) {
       }
       if (IS_WEB) {
         // Build CSV in browser and trigger download
-        const header = "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
+        const header =
+          "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
         const rows = txns.map((tx) =>
           [
             tx.worker_name || "",
@@ -117,7 +118,7 @@ export default function TransactionsScreen({ username, role }) {
             tx.qty ?? "",
             `"${(tx.notes || "").replace(/"/g, '""')}"`,
             tx.synced ? "Yes" : "No",
-          ].join(",")
+          ].join(","),
         );
         const csv = [header, ...rows].join("\n");
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -129,7 +130,10 @@ export default function TransactionsScreen({ username, role }) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        Alert.alert("Exported", `${txns.length} transactions downloaded as CSV.`);
+        Alert.alert(
+          "Exported",
+          `${txns.length} transactions downloaded as CSV.`,
+        );
       } else {
         const name = (await AsyncStorage.getItem("workerName")) || "export";
         const { filename } = await backupSvc.saveAndShareBackup(
@@ -447,7 +451,11 @@ export default function TransactionsScreen({ username, role }) {
               maxToRenderPerBatch={15}
               windowSize={7}
               removeClippedSubviews={Platform.OS !== "web"}
-              getItemLayout={(_, index) => ({ length: 120, offset: 120 * index, index })}
+              getItemLayout={(_, index) => ({
+                length: 120,
+                offset: 120 * index,
+                index,
+              })}
             />
           )}
         </>

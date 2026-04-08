@@ -153,7 +153,8 @@ export default function AdminPanelScreen({ navigation }) {
         return;
       }
       // Build CSV and trigger browser download
-      const header = "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
+      const header =
+        "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
       const rows = txns.map((tx) =>
         [
           tx.worker_name || "",
@@ -166,7 +167,7 @@ export default function AdminPanelScreen({ navigation }) {
           tx.qty ?? "",
           `"${(tx.notes || "").replace(/"/g, '""')}"`,
           tx.synced ? "Yes" : "No",
-        ].join(",")
+        ].join(","),
       );
       const csv = [header, ...rows].join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -232,7 +233,8 @@ export default function AdminPanelScreen({ navigation }) {
         Alert.alert("No Data", "No transactions found to back up.");
         return;
       }
-      const header = "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
+      const header =
+        "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
       const rows = txns.map((tx) =>
         [
           tx.worker_name || "",
@@ -245,7 +247,7 @@ export default function AdminPanelScreen({ navigation }) {
           tx.qty ?? "",
           `"${(tx.notes || "").replace(/"/g, '""')}"`,
           tx.synced ? "Yes" : "No",
-        ].join(",")
+        ].join(","),
       );
       const csv = [header, ...rows].join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -257,7 +259,10 @@ export default function AdminPanelScreen({ navigation }) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      Alert.alert("Backup Downloaded", `${txns.length} transactions saved as ENTIRE_DAY CSV.`);
+      Alert.alert(
+        "Backup Downloaded",
+        `${txns.length} transactions saved as ENTIRE_DAY CSV.`,
+      );
     } catch (err) {
       Alert.alert("Backup Failed", err.message);
     } finally {

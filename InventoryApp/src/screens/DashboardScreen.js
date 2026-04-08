@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import {
   View,
   Text,
@@ -72,7 +78,9 @@ export default function DashboardScreen() {
     const unsub = setSyncStatusListener((status) => {
       setSyncStatus(status);
     });
-    return () => { if (typeof unsub === 'function') unsub(); };
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
   }, []);
 
   const handleSyncNow = async () => {

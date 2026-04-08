@@ -14,7 +14,7 @@ export default React.memo(function StatsCard({ icon, label, value, color }) {
       <Text style={styles.label}>{label}</Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

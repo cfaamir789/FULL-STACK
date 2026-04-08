@@ -211,7 +211,12 @@ export const getRecentTransactions = async (limit = 20) => {
   return txs;
 };
 
-export const updateTransaction = async (id, { frombin, tobin, qty, notes }, _username, _role) => {
+export const updateTransaction = async (
+  id,
+  { frombin, tobin, qty, notes },
+  _username,
+  _role,
+) => {
   saveTx(
     loadTx().map((t) =>
       t.id === id
@@ -258,7 +263,9 @@ export const clearAllItems = async () => {
     const tx = db.transaction(ITEMS_STORE, "readwrite");
     tx.objectStore(ITEMS_STORE).clear();
     tx.oncomplete = () => {
-      try { AsyncStorage.removeItem("itemsVersion"); } catch (_) {}
+      try {
+        AsyncStorage.removeItem("itemsVersion");
+      } catch (_) {}
       resolve(0);
     };
     tx.onerror = (e) => reject(e.target.error);

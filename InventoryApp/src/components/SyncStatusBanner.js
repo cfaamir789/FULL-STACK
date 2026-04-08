@@ -22,7 +22,7 @@ export default React.memo(function SyncStatusBanner({ online, lastSync, pendingC
       {serverLabel ? <Text style={styles.serverText}>Server: {serverLabel}</Text> : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   banner: {

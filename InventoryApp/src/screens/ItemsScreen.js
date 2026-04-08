@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
@@ -152,7 +158,11 @@ export default function ItemsScreen({ navigation, route }) {
             clearButtonMode="while-editing"
             returnKeyType="search"
           />
-          <VoiceMic onResult={(t) => setQuery(t.toUpperCase())} size={18} style={{ backgroundColor: "transparent", marginRight: 2 }} />
+          <VoiceMic
+            onResult={(t) => setQuery(t.toUpperCase())}
+            size={18}
+            style={{ backgroundColor: "transparent", marginRight: 2 }}
+          />
           {query.length > 0 && (
             <TouchableOpacity
               onPress={() => setQuery("")}

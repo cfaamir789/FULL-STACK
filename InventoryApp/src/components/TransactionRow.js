@@ -124,7 +124,7 @@ export default React.memo(function TransactionRow({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {
