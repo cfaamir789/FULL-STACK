@@ -77,28 +77,30 @@ app.use((err, req, res, next) => {
 });
 
 // Connect to MongoDB, but start listening regardless
-connectDB().catch((err) => {
-  console.error("MongoDB connection failed, server starting without DB:", err?.message);
-}).finally(() => {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
-    console.log(`Health check: http://localhost:${PORT}/api/health`);
-    console.log(`Admin panel:  http://localhost:${PORT}/admin`);
+// Start listening IMMEDIATELY so Render sees the port open
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+  console.log(`Health check: http://localhost:${PORT}/api/health`);
+  console.log(`Admin panel:  http://localhost:${PORT}/admin`);
 
-    // Keep-alive self-ping every 14 min to prevent Render free tier sleep
-    if (process.env.NODE_ENV === "production") {
-      const keepAliveUrl = `https://inventory-backend-fdex.onrender.com/api/health`;
-      setInterval(
-        () => {
-          require("https")
-            .get(keepAliveUrl, () => {})
-            .on("error", () => {});
-        },
-        14 * 60 * 1000,
-      );
-      console.log("Keep-alive ping enabled (every 14 min)");
-    }
-  });
+  // Keep-alive self-ping every 14 min to prevent Render free tier sleep
+  if (process.env.NODE_ENV === "production") {
+    const keepAliveUrl = `https://inventory-backend-fdex.onrender.com/api/health`;
+    setInterval(
+      () => {
+        require("https")
+          .get(keepAliveUrl, () => {})
+          .on("error", () => {});
+      },
+      14 * 60 * 1000,
+    );
+    console.log("Keep-alive ping enabled (every 14 min)");
+  }
+});
+
+// Connect to MongoDB in the background (don't block server start)
+connectDB().catch((err) => {
+  console.error("MongoDB connection failed:", err?.message);
 });
 
 
