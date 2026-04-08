@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, Component } from "react";
 import {
   View,
   FlatList,
@@ -13,6 +13,22 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
+
+class ErrorBoundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <Text style={{ color: 'red', fontSize: 16, fontWeight: 'bold' }}>TransactionsScreen Error:</Text>
+          <Text style={{ color: 'red', marginTop: 10 }}>{String(this.state.error)}</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { useFocusEffect } from "@react-navigation/native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -34,7 +50,8 @@ if (!IS_WEB) {
   backupSvc = require("../services/backupService");
 }
 
-export default function TransactionsScreen({ username, role }) {
+function TransactionsScreenInner({ username, role }) {
+  console.log('[TransactionsScreen] Rendering, role:', role, 'username:', username);
   const queryRef = useRef(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -670,6 +687,14 @@ export default function TransactionsScreen({ username, role }) {
   );
 }
 
+export default function TransactionsScreen(props) {
+  return (
+    <ErrorBoundary>
+      <TransactionsScreenInner {...props} />
+    </ErrorBoundary>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
@@ -693,13 +718,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
     minHeight: 56,
-    justifyContent: "center",
   },
   workerFilterContent: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
   },
   workerChip: {
     flexDirection: "row",
