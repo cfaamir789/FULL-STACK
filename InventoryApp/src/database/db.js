@@ -108,7 +108,6 @@ export const initDB = async () => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_transactions_synced ON transactions(synced);
-    CREATE INDEX IF NOT EXISTS idx_transactions_client_tx_id ON transactions(client_tx_id);
   `);
 
   // Migration 1: add item_code column if it doesn't exist yet (for existing DBs)
@@ -144,6 +143,15 @@ export const initDB = async () => {
     );
   } catch (_) {
     // Column already exists — safe to ignore
+  }
+
+  // Create client_tx_id index AFTER the migration ensures the column exists
+  try {
+    await db.execAsync(
+      `CREATE INDEX IF NOT EXISTS idx_transactions_client_tx_id ON transactions(client_tx_id)`,
+    );
+  } catch (_) {
+    // Index already exists — safe to ignore
   }
 
   try {
