@@ -2623,16 +2623,29 @@
             html += '</div>';
             html += '</div>';
             html += '<div class="user-card-actions">';
-            html += '<button class="btn-sm" style="background:#e3f2fd;color:#1565c0" onclick="openPinModal(\'' + esc(u.username).replace(/'/g, "\\'") + '\')">&#128273; Reset PIN</button>';
-            html += '<button class="btn-sm" style="background:#fff3e0;color:#e65100" onclick="deleteUserDataOnly(\'' + esc(u.username).replace(/'/g, "\\'") + '\')">&#128451; Archive Data</button>';
+            html += '<button class="btn-sm btn-pin-reset" data-user="' + esc(u.username) + '" style="background:#e3f2fd;color:#1565c0">&#128273; Reset PIN</button>';
+            html += '<button class="btn-sm btn-archive" data-user="' + esc(u.username) + '" style="background:#fff3e0;color:#e65100">&#128451; Archive Data</button>';
             if (u.role !== 'admin') {
-              html += '<button class="btn-sm" style="background:#fce4ec;color:#c62828" onclick="deleteUserOnly(\'' + esc(u.username).replace(/'/g, "\\'") + '\')">&#128100; Delete User</button>';
-              html += '<button class="btn-sm" style="background:#d32f2f;color:#fff" onclick="deleteUserAndData(\'' + esc(u.username).replace(/'/g, "\\'") + '\')">&#128465; Delete User + Data</button>';
+              html += '<button class="btn-sm btn-del-user" data-user="' + esc(u.username) + '" style="background:#fce4ec;color:#c62828">&#128100; Delete User</button>';
+              html += '<button class="btn-sm btn-del-all" data-user="' + esc(u.username) + '" style="background:#d32f2f;color:#fff">&#128465; Delete User + Data</button>';
             }
             html += '</div>';
             html += '</div>';
           });
           container.innerHTML = html;
+          // Bind events via addEventListener (more reliable than inline onclick)
+          container.querySelectorAll('.btn-pin-reset').forEach(function(btn) {
+            btn.addEventListener('click', function() { openPinModal(this.dataset.user); });
+          });
+          container.querySelectorAll('.btn-archive').forEach(function(btn) {
+            btn.addEventListener('click', function() { deleteUserDataOnly(this.dataset.user); });
+          });
+          container.querySelectorAll('.btn-del-user').forEach(function(btn) {
+            btn.addEventListener('click', function() { deleteUserOnly(this.dataset.user); });
+          });
+          container.querySelectorAll('.btn-del-all').forEach(function(btn) {
+            btn.addEventListener('click', function() { deleteUserAndData(this.dataset.user); });
+          });
         } catch (err) {
           container.innerHTML =
             '<div class="alert alert-error">' + err.message + "</div>";
@@ -2640,20 +2653,26 @@
       }
 
       function openPinModal(username) {
-        pinResetTargetUser = username;
-        document.getElementById('pinModalUser').textContent = username;
-        document.getElementById('pinModalUser2').textContent = username;
-        document.getElementById('pinConfirmCheck').checked = false;
-        document.getElementById('pinConfirmBtn').disabled = true;
-        document.getElementById('pinNewInput').value = '';
-        document.getElementById('pinConfirmInput').value = '';
-        document.getElementById('pinResultMsg').innerHTML = '';
-        document.getElementById('pinSaveBtn').disabled = false;
-        document.getElementById('pinStep1').classList.add('active');
-        document.getElementById('pinStep2').classList.remove('active');
-        document.getElementById('pinFooterStep1').style.display = 'flex';
-        document.getElementById('pinFooterStep2').style.display = 'none';
-        document.getElementById('pinResetOverlay').classList.add('open');
+        try {
+          pinResetTargetUser = username;
+          var overlay = document.getElementById('pinResetOverlay');
+          if (!overlay) { alert('Error: PIN modal not found in page'); return; }
+          document.getElementById('pinModalUser').textContent = username;
+          document.getElementById('pinModalUser2').textContent = username;
+          document.getElementById('pinConfirmCheck').checked = false;
+          document.getElementById('pinConfirmBtn').disabled = true;
+          document.getElementById('pinNewInput').value = '';
+          document.getElementById('pinConfirmInput').value = '';
+          document.getElementById('pinResultMsg').innerHTML = '';
+          document.getElementById('pinSaveBtn').disabled = false;
+          document.getElementById('pinStep1').classList.add('active');
+          document.getElementById('pinStep2').classList.remove('active');
+          document.getElementById('pinFooterStep1').style.display = 'flex';
+          document.getElementById('pinFooterStep2').style.display = 'none';
+          overlay.classList.add('open');
+        } catch (e) {
+          alert('PIN modal error: ' + e.message);
+        }
       }
 
       function closePinModal() {
