@@ -205,6 +205,36 @@ public class DbHelper extends SQLiteOpenHelper {
         }
     }
 
+    public TransactionRecord getTransactionById(long id) {
+        Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT * FROM transactions WHERE id = ?", new String[]{String.valueOf(id)});
+        try {
+            if (cursor.moveToFirst()) return fromCursor(cursor);
+            return null;
+        } finally {
+            cursor.close();
+        }
+    }
+
+    public void updateTransaction(long id, String barcode, String itemCode, String itemName,
+                                  String fromBin, String toBin, int qty, String notes) {
+        ContentValues values = new ContentValues();
+        values.put("item_barcode", safe(barcode));
+        values.put("item_code", safe(itemCode));
+        values.put("item_name", safe(itemName));
+        values.put("frombin", safe(fromBin));
+        values.put("tobin", safe(toBin));
+        values.put("qty", qty);
+        values.put("notes", safe(notes));
+        values.put("synced", 0);
+        values.put("updated_at", IsoClock.now());
+        getWritableDatabase().update("transactions", values, "id = ?", new String[]{String.valueOf(id)});
+    }
+
+    public void deleteTransaction(long id) {
+        getWritableDatabase().delete("transactions", "id = ?", new String[]{String.valueOf(id)});
+    }
+
     private List<TransactionRecord> queryTransactions(String sql) {
         List<TransactionRecord> records = new ArrayList<>();
         Cursor cursor = getReadableDatabase().rawQuery(sql, null);

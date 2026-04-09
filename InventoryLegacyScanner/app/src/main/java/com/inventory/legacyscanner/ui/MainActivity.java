@@ -11,6 +11,8 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -44,6 +46,7 @@ import java.util.concurrent.Executors;
 public class MainActivity extends AppCompatActivity {
     private static final int RC_CAMERA = 1001;
     private static final int RC_SCAN = 2001;
+    private static final int RC_TX = 3002;
 
     private TextView tvWorker, tvServer, tvPendingCount, tvItemCount, tvLastSync, tvStatus;
     private Button btnScan, btnSync, btnRefreshItems, btnLogout, btnManualEntry, btnBackup;
@@ -183,13 +186,17 @@ public class MainActivity extends AppCompatActivity {
             if (!TextUtils.isEmpty(barcode)) {
                 openTransactionScreen(barcode);
             }
+        } else if (requestCode == RC_TX && resultCode == RESULT_OK) {
+            // Transaction saved from scan mode — re-open scanner for next item
+            refreshUI();
+            launchScan();
         }
     }
 
     private void openTransactionScreen(String barcode) {
         Intent intent = new Intent(this, TransactionActivity.class);
         intent.putExtra("barcode", barcode);
-        startActivity(intent);
+        startActivityForResult(intent, RC_TX);
     }
 
     private void doSync() {
@@ -267,11 +274,14 @@ public class MainActivity extends AppCompatActivity {
         recentList.removeAllViews();
         List<TransactionRecord> recent = db.getRecentTransactions(10);
         LayoutInflater inflater = LayoutInflater.from(this);
-        for (TransactionRecord tx : recent) {
+        for (final TransactionRecord tx : recent) {
             View row = inflater.inflate(R.layout.item_recent_transaction, recentList, false);
             TextView tvName = row.findViewById(R.id.tvItemName);
             TextView tvDetail = row.findViewById(R.id.tvDetail);
             TextView tvSyncStatus = row.findViewById(R.id.tvSyncStatus);
+            final Button btnEdit = row.findViewById(R.id.btnEdit);
+            final Button btnDelete = row.findViewById(R.id.btnDelete);
+            final CheckBox cbConfirm = row.findViewById(R.id.cbConfirmDelete);
 
             tvName.setText(tx.itemName);
             tvDetail.setText(tx.fromBin + " → " + tx.toBin + " | Qty: " + tx.qty);
@@ -282,6 +292,35 @@ public class MainActivity extends AppCompatActivity {
                 tvSyncStatus.setText("● Pending");
                 tvSyncStatus.setTextColor(ContextCompat.getColor(this, R.color.brand_primary));
             }
+
+            // Edit button
+            btnEdit.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(MainActivity.this, TransactionActivity.class);
+                    intent.putExtra("edit_tx_id", tx.id);
+                    startActivity(intent);
+                }
+            });
+
+            // Delete: checkbox must be ticked first
+            cbConfirm.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                    btnDelete.setEnabled(isChecked);
+                    btnDelete.setTextColor(ContextCompat.getColor(MainActivity.this,
+                            isChecked ? R.color.brand_primary : R.color.text_secondary));
+                }
+            });
+            btnDelete.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    DbHelper.getInstance(MainActivity.this).deleteTransaction(tx.id);
+                    Toast.makeText(MainActivity.this, "Deleted", Toast.LENGTH_SHORT).show();
+                    refreshUI();
+                }
+            });
+
             recentList.addView(row);
         }
     }

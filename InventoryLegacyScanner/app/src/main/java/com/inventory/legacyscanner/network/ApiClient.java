@@ -26,8 +26,14 @@ public final class ApiClient {
     private static final Gson GSON = new Gson();
 
     private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build();
+
+    private static final OkHttpClient BULK_CLIENT = new OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .build();
 
@@ -134,11 +140,19 @@ public final class ApiClient {
                 .addHeader("Authorization", "Bearer " + token)
                 .get()
                 .build();
-        Response response = CLIENT.newCall(request).execute();
-        String responseBody = response.body() != null ? response.body().string() : "{}";
-        if (!response.isSuccessful()) {
-            throw new IOException("Fetch items failed: " + response.code());
+        IOException lastError = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                Response response = BULK_CLIENT.newCall(request).execute();
+                String responseBody = response.body() != null ? response.body().string() : "{}";
+                if (!response.isSuccessful()) {
+                    throw new IOException("Fetch items failed: " + response.code());
+                }
+                return new JsonParser().parse(responseBody).getAsJsonObject();
+            } catch (IOException e) {
+                lastError = e;
+            }
         }
-        return new JsonParser().parse(responseBody).getAsJsonObject();
+        throw lastError;
     }
 }

@@ -36,4 +36,44 @@
         android:textColor="@color/text_secondary"
         android:textSize="12sp" />
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnEdit"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:text="Edit"
+            android:textColor="@color/brand_secondary"
+            android:textSize="12sp"
+            android:minWidth="0dp"
+            android:padding="4dp" />
+
+        <CheckBox
+            android:id="@+id/cbConfirmDelete"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginStart="8dp"
+            android:text=""
+            android:textSize="11sp"
+            android:buttonTint="@color/brand_primary" />
+
+        <Button
+            android:id="@+id/btnDelete"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:enabled="false"
+            android:text="Delete"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp"
+            android:minWidth="0dp"
+            android:padding="4dp" />
+    </LinearLayout>
+
 </LinearLayout>
