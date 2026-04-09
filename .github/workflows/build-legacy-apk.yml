@@ -25,21 +25,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x InventoryLegacyScanner/gradlew
 
-      - name: Build Release APK
-        working-directory: InventoryLegacyScanner
-        run: ./gradlew assembleRelease --no-daemon
-
-      - name: Build Debug APK (fallback installable)
+      - name: Build Debug APK (installable)
         working-directory: InventoryLegacyScanner
         run: ./gradlew assembleDebug --no-daemon
-
-      - name: Upload Release APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: InventoryLegacyScanner-release
-          path: InventoryLegacyScanner/app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
-          retention-days: 90
 
       - name: Upload Debug APK artifact
         uses: actions/upload-artifact@v4
