@@ -1191,46 +1191,6 @@
         </div>
       </div>
 
-      <!-- PIN Reset Modal -->
-      <div class="pin-overlay" id="pinResetOverlay" onclick="if(event.target===this) closePinModal()">
-        <div class="pin-modal">
-          <div class="pin-modal-header">
-            <h3>&#128273; Reset PIN</h3>
-            <button class="pin-modal-close" onclick="closePinModal()">&times;</button>
-          </div>
-          <div class="pin-modal-body">
-            <div class="step active" id="pinStep1">
-              <div class="pin-confirm-box">
-                <p>&#9888;&#65039; You are about to reset the PIN for <strong id="pinModalUser"></strong>. The old PIN will stop working immediately.</p>
-                <label class="pin-confirm-check">
-                  <input type="checkbox" id="pinConfirmCheck" onchange="document.getElementById('pinConfirmBtn').disabled = !this.checked" />
-                  I understand, reset this user's PIN
-                </label>
-              </div>
-            </div>
-            <div class="step" id="pinStep2">
-              <div class="pin-input-group">
-                <label>Enter new PIN for <strong id="pinModalUser2"></strong></label>
-                <input type="password" id="pinNewInput" placeholder="&#8226;&#8226;&#8226;&#8226;" maxlength="8" />
-              </div>
-              <div class="pin-input-group">
-                <label>Confirm new PIN</label>
-                <input type="password" id="pinConfirmInput" placeholder="&#8226;&#8226;&#8226;&#8226;" maxlength="8" />
-              </div>
-            </div>
-          </div>
-          <div class="pin-result" id="pinResultMsg"></div>
-          <div class="pin-modal-footer" id="pinFooterStep1">
-            <button class="btn-sm" style="background:#eee;color:#555" onclick="closePinModal()">Cancel</button>
-            <button class="btn-sm" style="background:#1565c0;color:#fff" id="pinConfirmBtn" disabled onclick="goToPinStep2()">Continue</button>
-          </div>
-          <div class="pin-modal-footer" id="pinFooterStep2" style="display:none">
-            <button class="btn-sm" style="background:#eee;color:#555" onclick="closePinModal()">Cancel</button>
-            <button class="btn-sm" style="background:#2e7d32;color:#fff" id="pinSaveBtn" onclick="savePinReset()">&#10003; Save New PIN</button>
-          </div>
-        </div>
-      </div>
-
       <div style="text-align: center; padding: 16px">
         <button
           class="btn"
@@ -1239,6 +1199,46 @@
         >
           &#128682; Logout
         </button>
+      </div>
+    </div>
+
+    <!-- PIN Reset Modal (outside mainPanel for proper overlay) -->
+    <div class="pin-overlay" id="pinResetOverlay" onclick="if(event.target===this) closePinModal()">
+      <div class="pin-modal">
+        <div class="pin-modal-header">
+          <h3>&#128273; Reset PIN</h3>
+          <button class="pin-modal-close" onclick="closePinModal()">&times;</button>
+        </div>
+        <div class="pin-modal-body">
+          <div class="step active" id="pinStep1">
+            <div class="pin-confirm-box">
+              <p>&#9888;&#65039; You are about to reset the PIN for <strong id="pinModalUser"></strong>. The old PIN will stop working immediately.</p>
+              <label class="pin-confirm-check">
+                <input type="checkbox" id="pinConfirmCheck" onchange="document.getElementById('pinConfirmBtn').disabled = !this.checked" />
+                I understand, reset this user's PIN
+              </label>
+            </div>
+          </div>
+          <div class="step" id="pinStep2">
+            <div class="pin-input-group">
+              <label>Enter new PIN for <strong id="pinModalUser2"></strong></label>
+              <input type="password" id="pinNewInput" placeholder="&#8226;&#8226;&#8226;&#8226;" maxlength="8" />
+            </div>
+            <div class="pin-input-group">
+              <label>Confirm new PIN</label>
+              <input type="password" id="pinConfirmInput" placeholder="&#8226;&#8226;&#8226;&#8226;" maxlength="8" />
+            </div>
+          </div>
+        </div>
+        <div class="pin-result" id="pinResultMsg"></div>
+        <div class="pin-modal-footer" id="pinFooterStep1">
+          <button class="btn-sm" style="background:#eee;color:#555" onclick="closePinModal()">Cancel</button>
+          <button class="btn-sm" style="background:#1565c0;color:#fff" id="pinConfirmBtn" disabled onclick="goToPinStep2()">Continue</button>
+        </div>
+        <div class="pin-modal-footer" id="pinFooterStep2" style="display:none">
+          <button class="btn-sm" style="background:#eee;color:#555" onclick="closePinModal()">Cancel</button>
+          <button class="btn-sm" style="background:#2e7d32;color:#fff" id="pinSaveBtn" onclick="savePinReset()">&#10003; Save New PIN</button>
+        </div>
       </div>
     </div>
 
@@ -2623,11 +2623,11 @@
             html += '</div>';
             html += '</div>';
             html += '<div class="user-card-actions">';
-            html += '<button class="btn-sm" style="background:#e3f2fd;color:#1565c0" onclick="openPinModal(' + JSON.stringify(u.username) + ')">&#128273; Reset PIN</button>';
-            html += '<button class="btn-sm" style="background:#fff3e0;color:#e65100" onclick="deleteUserDataOnly(' + JSON.stringify(u.username) + ')">&#128451; Archive Data</button>';
+            html += '<button class="btn-sm" style="background:#e3f2fd;color:#1565c0" onclick="openPinModal(\'' + esc(u.username).replace(/'/g, "\\'") + '\')">&#128273; Reset PIN</button>';
+            html += '<button class="btn-sm" style="background:#fff3e0;color:#e65100" onclick="deleteUserDataOnly(\'' + esc(u.username).replace(/'/g, "\\'") + '\')">&#128451; Archive Data</button>';
             if (u.role !== 'admin') {
-              html += '<button class="btn-sm" style="background:#fce4ec;color:#c62828" onclick="deleteUserOnly(' + JSON.stringify(u.username) + ')">&#128100; Delete User</button>';
-              html += '<button class="btn-sm" style="background:#d32f2f;color:#fff" onclick="deleteUserAndData(' + JSON.stringify(u.username) + ')">&#128465; Delete User + Data</button>';
+              html += '<button class="btn-sm" style="background:#fce4ec;color:#c62828" onclick="deleteUserOnly(\'' + esc(u.username).replace(/'/g, "\\'") + '\')">&#128100; Delete User</button>';
+              html += '<button class="btn-sm" style="background:#d32f2f;color:#fff" onclick="deleteUserAndData(\'' + esc(u.username).replace(/'/g, "\\'") + '\')">&#128465; Delete User + Data</button>';
             }
             html += '</div>';
             html += '</div>';
