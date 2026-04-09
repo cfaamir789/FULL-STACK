@@ -104,5 +104,3 @@ app.listen(PORT, "0.0.0.0", () => {
 connectDB().catch((err) => {
   console.error("MongoDB connection failed:", err?.message);
 });
-
-

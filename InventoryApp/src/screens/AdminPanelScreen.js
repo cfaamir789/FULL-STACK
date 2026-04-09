@@ -800,10 +800,7 @@ export default function AdminPanelScreen({ navigation }) {
             onPress={() => navigation.navigate("BackupRestore")}
           >
             <View
-              style={[
-                styles.actionIcon,
-                { backgroundColor: "#5D4037" + "15" },
-              ]}
+              style={[styles.actionIcon, { backgroundColor: "#5D4037" + "15" }]}
             >
               <MaterialCommunityIcons
                 name="backup-restore"

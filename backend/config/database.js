@@ -25,7 +25,9 @@ const connectDB = async (retries = 5) => {
     }
   }
   console.error(
-    "WARNING: Could not connect to MongoDB after " + retries + " attempts. Server will start without DB.",
+    "WARNING: Could not connect to MongoDB after " +
+      retries +
+      " attempts. Server will start without DB.",
   );
 };
 

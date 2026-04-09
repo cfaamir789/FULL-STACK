@@ -174,7 +174,11 @@ export default function BackupRestoreScreen() {
           {working ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <MaterialCommunityIcons name="content-save" size={18} color="#fff" />
+            <MaterialCommunityIcons
+              name="content-save"
+              size={18}
+              color="#fff"
+            />
           )}
           <Text style={styles.primaryBtnText}>Create Backup Now</Text>
         </TouchableOpacity>

@@ -281,9 +281,10 @@ const parseBackupDate = (...values) => {
 
 const normalizeBackupRow = (row) => {
   const qty = Number(
-    String(
-      getRowValue(row, ["Qty", "Quantity", "qty", "quantity"]),
-    ).replace(/,/g, ""),
+    String(getRowValue(row, ["Qty", "Quantity", "qty", "quantity"])).replace(
+      /,/g,
+      "",
+    ),
   );
 
   return {
@@ -306,9 +307,7 @@ const normalizeBackupRow = (row) => {
     frombin: String(
       getRowValue(row, ["From", "Frombin", "From_Bin", "frombin"]),
     ).trim(),
-    tobin: String(
-      getRowValue(row, ["To", "Tobin", "To_Bin", "tobin"]),
-    ).trim(),
+    tobin: String(getRowValue(row, ["To", "Tobin", "To_Bin", "tobin"])).trim(),
     qty,
     notes: String(getRowValue(row, ["Notes", "notes"])).trim(),
     synced: parseTruthy(getRowValue(row, ["Synced", "synced"])),

@@ -1976,9 +1976,7 @@
                 headers,
                 ...rows.map((r) => [
                   r.syncStatus || "pending",
-                  r.processedAt
-                    ? new Date(r.processedAt).toLocaleString()
-                    : "",
+                  r.processedAt ? new Date(r.processedAt).toLocaleString() : "",
                   r.processedBy || "",
                   r.erpDocument || "",
                   r.erpBatch || "",

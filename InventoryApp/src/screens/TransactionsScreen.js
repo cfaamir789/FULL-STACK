@@ -180,7 +180,9 @@ export default function TransactionsScreen({ username, role }) {
             _source: "server",
           }));
 
-          serverTxs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+          serverTxs.sort(
+            (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
+          );
           setTransactions(serverTxs);
         } catch {
           // Server unreachable, show local fallback only

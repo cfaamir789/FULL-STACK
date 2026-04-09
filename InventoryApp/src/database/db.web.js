@@ -218,7 +218,9 @@ export const getItemByItemCode = async (itemCode) => {
 
 export const searchItemsByItemCode = async (query, limit = 50) => {
   const items = await getItemsCache();
-  const q = String(query || "").trim().toLowerCase();
+  const q = String(query || "")
+    .trim()
+    .toLowerCase();
   if (!q) return [];
 
   const scoreItem = (itemCode) => {
@@ -427,7 +429,9 @@ export const restoreTransactions = async (
     }
 
     const nextId =
-      nextRows.length > 0 ? Math.max(...nextRows.map((row) => row.id || 0)) + 1 : 1;
+      nextRows.length > 0
+        ? Math.max(...nextRows.map((row) => row.id || 0)) + 1
+        : 1;
     nextRows.push({ id: nextId, ...tx });
     inserted += 1;
   });

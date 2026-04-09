@@ -262,7 +262,7 @@ export default function ScannerScreen() {
       setTimeout(() => {
         if (mode === "barcode") barcodeRef.current?.focus();
         else if (mode === "itemcode") itemCodeRef.current?.focus();
-          else if (mode === "quickcode") quickCodeRef.current?.focus();
+        else if (mode === "quickcode") quickCodeRef.current?.focus();
         else if (mode === "itemname") itemNameRef.current?.focus();
       }, 50);
     } catch (err) {
@@ -280,7 +280,7 @@ export default function ScannerScreen() {
       {[
         { key: "barcode", icon: "barcode-scan", label: "Barcode" },
         { key: "itemcode", icon: "pound-box", label: "Item Code" },
-          { key: "quickcode", icon: "dialpad", label: "Quick Code" },
+        { key: "quickcode", icon: "dialpad", label: "Quick Code" },
         { key: "itemname", icon: "text-search", label: "Item Name" },
       ].map((t) => (
         <TouchableOpacity
