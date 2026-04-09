@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Inventory Legacy Scanner</string>
+    <string name="login_title">Legacy Device Scanner</string>
+    <string name="login_subtitle">Same backend, same login, same sync flow for Android 4.4 and 6.</string>
+    <string name="server_hint">Server URL or IP</string>
+    <string name="username_hint">Username</string>
+    <string name="pin_hint">PIN</string>
+    <string name="login_button">Login</string>
+    <string name="worker_label">Worker</string>
+    <string name="server_label">Server</string>
+    <string name="pending_label">Pending Transactions</string>
+    <string name="items_label">Local Items</string>
+    <string name="last_sync_label">Last Sync</string>
+    <string name="scan_button">Scan Barcode</string>
+    <string name="sync_button">Sync Pending Now</string>
+    <string name="refresh_items_button">Refresh Item Master</string>
+    <string name="logout_button">Logout</string>
+    <string name="recent_label">Recent Local Transactions</string>
+    <string name="scan_prompt">Scan a product barcode</string>
+    <string name="transaction_title">Capture Transaction</string>
+    <string name="barcode_label">Barcode</string>
+    <string name="item_code_label">Item Code</string>
+    <string name="item_name_label">Item Name</string>
+    <string name="from_bin_label">From Bin</string>
+    <string name="to_bin_label">To Bin</string>
+    <string name="qty_label">Qty</string>
+    <string name="notes_label">Notes</string>
+    <string name="submit_button">Save And Try Sync</string>
+    <string name="status_ready">Ready</string>
+    <string name="not_available">Not available</string>
+</resources>

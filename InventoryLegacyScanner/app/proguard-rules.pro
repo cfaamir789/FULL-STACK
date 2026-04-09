@@ -1,0 +1,4 @@
+-keep class com.journeyapps.** { *; }
+-keep class com.google.zxing.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
