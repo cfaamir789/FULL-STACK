@@ -17,6 +17,7 @@ import com.inventory.legacyscanner.config.AppConfig;
 import com.inventory.legacyscanner.data.PrefsStore;
 import com.inventory.legacyscanner.model.AuthSession;
 import com.inventory.legacyscanner.network.ApiClient;
+import com.inventory.legacyscanner.network.NetworkUtils;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -73,6 +74,19 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
+        // Offline login: validate against cached PIN hash
+        if (!NetworkUtils.isOnline(this)) {
+            if (PrefsStore.checkPinHash(this, username, pin)) {
+                PrefsStore.setServerAddress(this, server);
+                Toast.makeText(this, "Offline mode — data will sync when reconnected", Toast.LENGTH_LONG).show();
+                startActivity(new Intent(this, MainActivity.class));
+                finish();
+            } else {
+                showError("No network. Login online first at least once to enable offline access.");
+            }
+            return;
+        }
+
         setLoading(true);
         tvError.setVisibility(View.GONE);
 
@@ -85,6 +99,7 @@ public class LoginActivity extends AppCompatActivity {
                         @Override
                         public void run() {
                             PrefsStore.saveSession(LoginActivity.this, session);
+                            PrefsStore.savePinHash(LoginActivity.this, username, pin);
                             Toast.makeText(LoginActivity.this, "Welcome " + session.username, Toast.LENGTH_SHORT).show();
                             startActivity(new Intent(LoginActivity.this, MainActivity.class));
                             finish();

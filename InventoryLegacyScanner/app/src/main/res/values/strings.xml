@@ -29,4 +29,7 @@
     <string name="submit_button">Save And Try Sync</string>
     <string name="status_ready">Ready</string>
     <string name="not_available">Not available</string>
+    <string name="manual_entry_button">Manual Entry</string>
+    <string name="backup_button">Backup CSV to Downloads</string>
+    <string name="lookup_button">Look Up Item</string>
 </resources>

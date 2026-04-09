@@ -25,7 +25,7 @@ import java.util.TimeZone;
 
 public class TransactionActivity extends AppCompatActivity {
     private EditText etBarcode, etItemCode, etItemName, etFromBin, etToBin, etQty, etNotes;
-    private Button btnSubmit;
+    private Button btnSubmit, btnLookup;
     private ProgressBar progressTx;
     private TextView tvTxStatus;
 
@@ -49,14 +49,30 @@ public class TransactionActivity extends AppCompatActivity {
         etQty = findViewById(R.id.etQty);
         etNotes = findViewById(R.id.etNotes);
         btnSubmit = findViewById(R.id.btnSubmit);
+        btnLookup = findViewById(R.id.btnLookup);
         progressTx = findViewById(R.id.progressTx);
         tvTxStatus = findViewById(R.id.tvTxStatus);
 
         String barcode = getIntent().getStringExtra("barcode");
         if (!TextUtils.isEmpty(barcode)) {
             etBarcode.setText(barcode);
-            lookupItem(barcode);
+            lookupItem(barcode, null);
         }
+
+        btnLookup.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String bc = etBarcode.getText().toString().trim();
+                String ic = etItemCode.getText().toString().trim();
+                if (!TextUtils.isEmpty(bc)) {
+                    lookupItem(bc, null);
+                } else if (!TextUtils.isEmpty(ic)) {
+                    lookupItem(null, ic);
+                } else {
+                    tvTxStatus.setText("Enter barcode or item code first");
+                }
+            }
+        });
 
         btnSubmit.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -66,28 +82,40 @@ public class TransactionActivity extends AppCompatActivity {
         });
     }
 
-    private void lookupItem(String barcode) {
-        ItemRecord item = DbHelper.getInstance(this).findItemByBarcode(barcode);
+    private void lookupItem(String barcode, String itemCode) {
+        ItemRecord item = null;
+        if (!TextUtils.isEmpty(barcode)) {
+            item = DbHelper.getInstance(this).findItemByBarcode(barcode);
+        }
+        if (item == null && !TextUtils.isEmpty(itemCode)) {
+            item = DbHelper.getInstance(this).findItemByCode(itemCode);
+        }
         if (item != null) {
+            etBarcode.setText(item.barcode);
             etItemCode.setText(item.itemCode);
             etItemName.setText(item.itemName);
+            tvTxStatus.setText("Item found — fill bins and qty");
         } else {
-            etItemCode.setText("");
-            etItemName.setText("");
-            tvTxStatus.setText("Item not found locally — fill manually");
+            tvTxStatus.setText("Item not found in local DB — fill manually");
         }
     }
 
     private void saveTransaction() {
         String barcode = etBarcode.getText().toString().trim();
+        String itemCode = etItemCode.getText().toString().trim();
         String itemName = etItemName.getText().toString().trim();
         String fromBin = etFromBin.getText().toString().trim();
         String toBin = etToBin.getText().toString().trim();
         String qtyStr = etQty.getText().toString().trim();
 
+        // Barcode is optional for manual entry; fall back to item code
+        if (TextUtils.isEmpty(barcode)) {
+            barcode = itemCode;
+        }
+
         if (TextUtils.isEmpty(barcode) || TextUtils.isEmpty(itemName) ||
                 TextUtils.isEmpty(fromBin) || TextUtils.isEmpty(toBin) || TextUtils.isEmpty(qtyStr)) {
-            Toast.makeText(this, "Please fill all required fields", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Fill barcode/item code, item name, bins and qty", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -101,7 +129,7 @@ public class TransactionActivity extends AppCompatActivity {
 
         TransactionRecord tx = new TransactionRecord();
         tx.itemBarcode = barcode;
-        tx.itemCode = etItemCode.getText().toString().trim();
+        tx.itemCode = itemCode;
         tx.itemName = itemName;
         tx.fromBin = fromBin;
         tx.toBin = toBin;

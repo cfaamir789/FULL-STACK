@@ -31,10 +31,21 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:background="@drawable/panel_background"
-            android:enabled="false"
+            android:hint="Scan or type barcode"
+            android:inputType="text"
             android:padding="12dp"
             android:textColor="@color/text_primary"
             android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/btnLookup"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
+            android:backgroundTint="@color/panel_outline"
+            android:text="@string/lookup_button"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp" />
 
         <TextView
             android:layout_width="wrap_content"
@@ -49,7 +60,8 @@
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:background="@drawable/panel_background"
-            android:enabled="false"
+            android:hint="Or type item code here"
+            android:inputType="text"
             android:padding="12dp"
             android:textColor="@color/text_primary"
             android:textSize="15sp" />

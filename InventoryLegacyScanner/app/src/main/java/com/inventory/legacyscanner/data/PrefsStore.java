@@ -14,6 +14,7 @@ public final class PrefsStore {
     private static final String KEY_ROLE = "role";
     private static final String KEY_ITEMS_VERSION = "items_version";
     private static final String KEY_LAST_SYNC = "last_sync";
+    private static final String KEY_PIN_HASH = "cached_pin_hash";
 
     private PrefsStore() {
     }
@@ -75,5 +76,29 @@ public final class PrefsStore {
 
     public static void setLastSync(Context context, String lastSync) {
         prefs(context).edit().putString(KEY_LAST_SYNC, lastSync).apply();
+    }
+
+    /** Store a hashed PIN so offline login can be validated without network. */
+    public static void savePinHash(Context context, String username, String pin) {
+        prefs(context).edit().putString(KEY_PIN_HASH, sha256(username + ":" + pin)).apply();
+    }
+
+    /** Returns true if the given credentials match the locally cached hash. */
+    public static boolean checkPinHash(Context context, String username, String pin) {
+        String stored = prefs(context).getString(KEY_PIN_HASH, "");
+        if (android.text.TextUtils.isEmpty(stored)) return false;
+        return stored.equals(sha256(username + ":" + pin));
+    }
+
+    private static String sha256(String input) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] bytes = md.digest(input.getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : bytes) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return input;
+        }
     }
 }

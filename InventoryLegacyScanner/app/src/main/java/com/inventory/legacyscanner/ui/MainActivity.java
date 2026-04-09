@@ -46,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int RC_SCAN = 2001;
 
     private TextView tvWorker, tvServer, tvPendingCount, tvItemCount, tvLastSync, tvStatus;
-    private Button btnScan, btnSync, btnRefreshItems, btnLogout;
+    private Button btnScan, btnSync, btnRefreshItems, btnLogout, btnManualEntry, btnBackup;
     private ProgressBar progressMain;
     private LinearLayout recentList;
     private final ExecutorService exec = Executors.newSingleThreadExecutor();
@@ -68,6 +68,8 @@ public class MainActivity extends AppCompatActivity {
         btnSync = findViewById(R.id.btnSync);
         btnRefreshItems = findViewById(R.id.btnRefreshItems);
         btnLogout = findViewById(R.id.btnLogout);
+        btnManualEntry = findViewById(R.id.btnManualEntry);
+        btnBackup = findViewById(R.id.btnBackup);
         progressMain = findViewById(R.id.progressMain);
         recentList = findViewById(R.id.recentList);
 
@@ -78,6 +80,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 openScanner();
+            }
+        });
+
+        btnManualEntry.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, TransactionActivity.class));
             }
         });
 
@@ -92,6 +101,13 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 refreshItemMaster();
+            }
+        });
+
+        btnBackup.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                doBackup();
             }
         });
 
@@ -147,7 +163,9 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == RC_CAMERA && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             launchScan();
-        } else {
+        } else if (requestCode == 3001 && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            doBackup();
+        } else if (requestCode == RC_CAMERA) {
             Toast.makeText(this, "Camera permission required for scanning", Toast.LENGTH_SHORT).show();
         }
     }
@@ -227,8 +245,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void refreshUI() {
-        DbHelper db = DbHelper.getInstance(this);
-        tvPendingCount.setText(String.valueOf(db.getPendingCount()));
+        DbHelper db = DbHelper.getInstance(this);        tvPendingCount.setText(String.valueOf(db.getPendingCount()));
         tvItemCount.setText(String.valueOf(db.getItemCount()));
 
         String lastSync = PrefsStore.getLastSync(this);
@@ -267,5 +284,75 @@ public class MainActivity extends AppCompatActivity {
             }
             recentList.addView(row);
         }
+    }
+
+    private void doBackup() {
+        if (android.os.Build.VERSION.SDK_INT < 29 &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 3001);
+            return;
+        }
+        progressMain.setVisibility(View.VISIBLE);
+        tvStatus.setText("Backing up...");
+        final SimpleDateFormat fileSdf = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US);
+        exec.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    List<TransactionRecord> all = DbHelper.getInstance(MainActivity.this).getAllTransactions();
+                    StringBuilder csv = new StringBuilder();
+                    csv.append("ID,Timestamp,ItemBarcode,ItemCode,ItemName,FromBin,ToBin,Qty,Worker,Synced,Notes\n");
+                    for (TransactionRecord tx : all) {
+                        csv.append(tx.id).append(',')
+                                .append(escapeCsv(tx.timestamp)).append(',')
+                                .append(escapeCsv(tx.itemBarcode)).append(',')
+                                .append(escapeCsv(tx.itemCode)).append(',')
+                                .append(escapeCsv(tx.itemName)).append(',')
+                                .append(escapeCsv(tx.fromBin)).append(',')
+                                .append(escapeCsv(tx.toBin)).append(',')
+                                .append(tx.qty).append(',')
+                                .append(escapeCsv(tx.workerName)).append(',')
+                                .append(tx.synced).append(',')
+                                .append(escapeCsv(tx.notes)).append('\n');
+                    }
+                    final String filename = "inventory_backup_" + fileSdf.format(new java.util.Date()) + ".csv";
+                    java.io.File dir = android.os.Environment.getExternalStoragePublicDirectory(
+                            android.os.Environment.DIRECTORY_DOWNLOADS);
+                    dir.mkdirs();
+                    java.io.File file = new java.io.File(dir, filename);
+                    java.io.FileWriter writer = new java.io.FileWriter(file);
+                    writer.write(csv.toString());
+                    writer.close();
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            progressMain.setVisibility(View.GONE);
+                            tvStatus.setText("Backup saved: " + filename);
+                            Toast.makeText(MainActivity.this,
+                                    "Backup saved to Downloads/" + filename,
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                } catch (final Exception e) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            progressMain.setVisibility(View.GONE);
+                            tvStatus.setText("Backup failed: " + e.getMessage());
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    private String escapeCsv(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }

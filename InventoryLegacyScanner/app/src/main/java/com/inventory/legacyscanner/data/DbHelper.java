@@ -116,6 +116,28 @@ public class DbHelper extends SQLiteOpenHelper {
         }
     }
 
+    public ItemRecord findItemByCode(String itemCode) {
+        Cursor cursor = getReadableDatabase().query(
+                "items",
+                new String[]{"item_code", "barcode", "item_name"},
+                "item_code = ?",
+                new String[]{itemCode},
+                null, null, null, "1"
+        );
+        try {
+            if (cursor.moveToFirst()) {
+                return new ItemRecord(
+                        cursor.getString(0),
+                        cursor.getString(1),
+                        cursor.getString(2)
+                );
+            }
+            return null;
+        } finally {
+            cursor.close();
+        }
+    }
+
     public long insertTransaction(TransactionRecord transactionRecord) {
         SQLiteDatabase db = getWritableDatabase();
         if (TextUtils.isEmpty(transactionRecord.timestamp)) {
@@ -146,6 +168,10 @@ public class DbHelper extends SQLiteOpenHelper {
 
     public List<TransactionRecord> getPendingTransactions() {
         return queryTransactions("SELECT * FROM transactions WHERE synced = 0 ORDER BY timestamp ASC");
+    }
+
+    public List<TransactionRecord> getAllTransactions() {
+        return queryTransactions("SELECT * FROM transactions ORDER BY timestamp DESC");
     }
 
     public List<TransactionRecord> getRecentTransactions(int limit) {
