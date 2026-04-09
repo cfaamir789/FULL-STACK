@@ -6,6 +6,14 @@ android {
     namespace 'com.inventory.legacyscanner'
     compileSdk 34
 
+    signingConfigs {
+        release {
+            // Temporary signing so CI artifacts are installable on devices.
+            // Replace with a private keystore before Play Store distribution.
+            initWith signingConfigs.debug
+        }
+    }
+
     defaultConfig {
         applicationId "com.inventory.legacyscanner"
         minSdk 19
@@ -21,6 +29,7 @@ android {
             versionNameSuffix "-debug"
         }
         release {
+            signingConfig signingConfigs.release
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
