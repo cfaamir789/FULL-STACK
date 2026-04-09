@@ -818,7 +818,7 @@
             <select id="txWorkerFilter" onchange="filterTransactions()">
               <option value="">All Workers</option>
             </select>
-            <select id="txStatusFilter" onchange="loadTransactions(1)">
+            <select id="txStatusFilter" onchange="loadTransactions()">
               <option value="pending">Pending Queue</option>
               <option value="processed">Processed History</option>
               <option value="archived">Archived</option>
@@ -990,6 +990,8 @@
       let currentItemsPage = 1;
       let currentItemsPages = 1;
       let liveRefreshTimer = null;
+      let currentPage = "dashboard";
+      let workerRefreshInFlight = false;
 
       // ─── Auth ────────────────────────────────────────────────────────────────────
       async function apiFetch(path, opts = {}) {
@@ -1118,14 +1120,19 @@
         liveRefreshTimer = setInterval(() => {
           if (document.hidden || !authToken) return;
           const tasks = [loadStats()];
-          if (pageLoaded.workers) {
-            tasks.push(loadWorkerStatus(), loadTransactions());
+          if (currentPage === "workers" && pageLoaded.workers) {
+            if (workerRefreshInFlight) return;
+            workerRefreshInFlight = true;
+            tasks.push(loadWorkerStatus(true), loadTransactions(true));
           }
-          Promise.allSettled(tasks);
+          Promise.allSettled(tasks).finally(() => {
+            workerRefreshInFlight = false;
+          });
         }, 60000);
       }
 
       async function switchPage(page) {
+        currentPage = page;
         const pages = ["dashboard", "master", "workers", "users"];
         pages.forEach((p) => {
           document
@@ -1345,9 +1352,11 @@
       }
 
       // ─── Worker Sync Status ──────────────────────────────────────────────────────
-      async function loadWorkerStatus() {
+      async function loadWorkerStatus(silent = false) {
         const container = document.getElementById("workerStatusContainer");
-        container.innerHTML = '<div class="loading">Loading...</div>';
+        if (!silent) {
+          container.innerHTML = '<div class="loading">Loading...</div>';
+        }
         try {
           const data = await apiFetch("/sync/worker-status");
           const workers = data.workers || [];
@@ -1720,10 +1729,12 @@
         await bulkSetTransactionStatus(ids, worker, worker, "processed");
       }
 
-      async function loadTransactions() {
+      async function loadTransactions(silent = false) {
         const container = document.getElementById("txContainer");
-        container.innerHTML =
-          '<div class="loading">Loading transactions...</div>';
+        if (!silent) {
+          container.innerHTML =
+            '<div class="loading">Loading transactions...</div>';
+        }
         try {
           const status =
             document.getElementById("txStatusFilter")?.value || "pending";
