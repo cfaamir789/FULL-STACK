@@ -293,40 +293,191 @@
         color: #1565c0;
       }
       .user-card {
+        background: #fff;
+        border: 1px solid #e8eaed;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 12px;
+        transition: box-shadow 0.2s, border-color 0.2s;
+      }
+      .user-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        border-color: #c8d0d8;
+      }
+      .user-card-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      .user-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 16px;
+        color: #fff;
+        flex-shrink: 0;
+      }
+      .user-avatar.admin-av { background: linear-gradient(135deg, #1565c0, #1e88e5); }
+      .user-avatar.worker-av { background: linear-gradient(135deg, #2e7d32, #43a047); }
+      .user-info { flex: 1; }
+      .user-info .name {
+        font-weight: 700;
+        font-size: 16px;
+        color: #1a1a2e;
+        letter-spacing: 0.3px;
+      }
+      .user-info .meta {
+        font-size: 12px;
+        color: #999;
+        margin-top: 2px;
+      }
+      .role-badge {
+        font-size: 11px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+      }
+      .role-badge.admin { background: #e3f2fd; color: #1565c0; }
+      .role-badge.worker { background: #e8f5e9; color: #2e7d32; }
+      .user-card-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      /* PIN reset modal */
+      .pin-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.45);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+      .pin-overlay.open { display: flex; }
+      .pin-modal {
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+        width: 400px;
+        max-width: 92vw;
+        overflow: hidden;
+        animation: modalPop 0.2s ease-out;
+      }
+      @keyframes modalPop {
+        from { opacity: 0; transform: scale(0.92) translateY(10px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      .pin-modal-header {
+        background: #f5f7fa;
+        padding: 18px 24px;
+        border-bottom: 1px solid #e8eaed;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        background: #f5f7fa;
-        border-radius: 8px;
-        padding: 12px 16px;
+      }
+      .pin-modal-header h3 {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a1a2e;
+        margin: 0;
+      }
+      .pin-modal-close {
+        background: none;
+        border: none;
+        font-size: 22px;
+        cursor: pointer;
+        color: #888;
+        padding: 0;
+        line-height: 1;
+      }
+      .pin-modal-close:hover { color: #333; }
+      .pin-modal-body { padding: 24px; }
+      .pin-modal-body .step { display: none; }
+      .pin-modal-body .step.active { display: block; }
+      .pin-confirm-box {
+        background: #fff8e1;
+        border: 1px solid #ffe082;
+        border-radius: 10px;
+        padding: 16px;
+      }
+      .pin-confirm-box p {
+        font-size: 14px;
+        color: #5d4037;
+        margin: 0 0 12px 0;
+      }
+      .pin-confirm-check {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #333;
+        user-select: none;
+      }
+      .pin-confirm-check input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: #1565c0;
+        cursor: pointer;
+      }
+      .pin-input-group { margin-bottom: 16px; }
+      .pin-input-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #555;
         margin-bottom: 8px;
       }
-      .user-card .name {
-        font-weight: 600;
-        font-size: 15px;
+      .pin-input-group input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1.5px solid #d0d5dd;
+        border-radius: 10px;
+        font-size: 18px;
+        font-family: 'Courier New', monospace;
+        letter-spacing: 4px;
+        text-align: center;
+        transition: border-color 0.2s;
       }
-      .user-card .role {
-        font-size: 12px;
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-weight: 600;
+      .pin-input-group input:focus {
+        outline: none;
+        border-color: #1565c0;
+        box-shadow: 0 0 0 3px rgba(21,101,192,0.1);
       }
-      .user-card .role.admin {
-        background: #e3f2fd;
-        color: #1565c0;
+      .pin-modal-footer {
+        padding: 0 24px 24px;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
       }
-      .user-card .role.worker {
-        background: #e8f5e9;
-        color: #2e7d32;
+      .pin-result {
+        padding: 0 24px;
+        margin-bottom: 12px;
+        font-size: 13px;
       }
       .btn-sm {
-        padding: 6px 14px;
+        padding: 8px 16px;
         font-size: 13px;
-        border-radius: 6px;
+        border-radius: 8px;
         border: none;
         cursor: pointer;
         font-weight: 600;
+        transition: all 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
       }
+      .btn-sm:hover { opacity: 0.85; }
       .btn-copy {
         background: #e3f2fd;
         color: #1565c0;
@@ -1025,6 +1176,7 @@
 
         <div class="card">
           <h2>&#128101; Users</h2>
+          <p style="color:#888;margin-bottom:14px;font-size:13px">Manage users, reset PINs, and control access.</p>
           <div id="usersContainer"><div class="loading">Loading...</div></div>
         </div>
 
@@ -1036,6 +1188,46 @@
             reset directly in the database (MongoDB Atlas) or deploy a temporary
             recovery script.
           </p>
+        </div>
+      </div>
+
+      <!-- PIN Reset Modal -->
+      <div class="pin-overlay" id="pinResetOverlay" onclick="if(event.target===this) closePinModal()">
+        <div class="pin-modal">
+          <div class="pin-modal-header">
+            <h3>&#128273; Reset PIN</h3>
+            <button class="pin-modal-close" onclick="closePinModal()">&times;</button>
+          </div>
+          <div class="pin-modal-body">
+            <div class="step active" id="pinStep1">
+              <div class="pin-confirm-box">
+                <p>&#9888;&#65039; You are about to reset the PIN for <strong id="pinModalUser"></strong>. The old PIN will stop working immediately.</p>
+                <label class="pin-confirm-check">
+                  <input type="checkbox" id="pinConfirmCheck" onchange="document.getElementById('pinConfirmBtn').disabled = !this.checked" />
+                  I understand, reset this user's PIN
+                </label>
+              </div>
+            </div>
+            <div class="step" id="pinStep2">
+              <div class="pin-input-group">
+                <label>Enter new PIN for <strong id="pinModalUser2"></strong></label>
+                <input type="password" id="pinNewInput" placeholder="&#8226;&#8226;&#8226;&#8226;" maxlength="8" />
+              </div>
+              <div class="pin-input-group">
+                <label>Confirm new PIN</label>
+                <input type="password" id="pinConfirmInput" placeholder="&#8226;&#8226;&#8226;&#8226;" maxlength="8" />
+              </div>
+            </div>
+          </div>
+          <div class="pin-result" id="pinResultMsg"></div>
+          <div class="pin-modal-footer" id="pinFooterStep1">
+            <button class="btn-sm" style="background:#eee;color:#555" onclick="closePinModal()">Cancel</button>
+            <button class="btn-sm" style="background:#1565c0;color:#fff" id="pinConfirmBtn" disabled onclick="goToPinStep2()">Continue</button>
+          </div>
+          <div class="pin-modal-footer" id="pinFooterStep2" style="display:none">
+            <button class="btn-sm" style="background:#eee;color:#555" onclick="closePinModal()">Cancel</button>
+            <button class="btn-sm" style="background:#2e7d32;color:#fff" id="pinSaveBtn" onclick="savePinReset()">&#10003; Save New PIN</button>
+          </div>
         </div>
       </div>
 
@@ -2405,6 +2597,8 @@
       }
 
       // ─── Users ────────────────────────────────────────────────────────────────────
+      let pinResetTargetUser = '';
+
       async function loadUsers() {
         const container = document.getElementById("usersContainer");
         container.innerHTML = '<div class="loading">Loading users...</div>';
@@ -2417,42 +2611,91 @@
           }
           let html = "";
           users.forEach((u) => {
-            html +=
-              '<div class="user-card"><div><span class="name">' +
-              esc(u.username) +
-              '</span> <span class="role ' +
-              u.role +
-              '">' +
-              u.role.toUpperCase() +
-              "</span></div>";
-            html +=
-              '<div style="font-size:12px;color:#888">' +
-              (u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "") +
-              '</div></div><div style="display:flex;gap:8px;flex-wrap:wrap">';
-            html +=
-              '<button class="btn-sm btn-primary" style="background:#e3f2fd;color:#1565c0" onclick="resetUserPin(' +
-              JSON.stringify(u.username) +
-              ')">Reset PIN</button>';
-            html +=
-              '<button class="btn-sm btn-danger" onclick="deleteUserDataOnly(' +
-              JSON.stringify(u.username) +
-              ')">Archive Data</button>';
-            if (u.role !== "admin") {
-              html +=
-                '<button class="btn-sm btn-danger" onclick="deleteUserOnly(' +
-                JSON.stringify(u.username) +
-                ')">Delete User</button>';
-              html +=
-                '<button class="btn-sm btn-danger" onclick="deleteUserAndData(' +
-                JSON.stringify(u.username) +
-                ')">Delete User + Archive Data</button>';
+            const initials = u.username.substring(0, 2).toUpperCase();
+            const avClass = u.role === 'admin' ? 'admin-av' : 'worker-av';
+            const dateStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '';
+            html += '<div class="user-card">';
+            html += '<div class="user-card-header">';
+            html += '<div class="user-avatar ' + avClass + '">' + esc(initials) + '</div>';
+            html += '<div class="user-info">';
+            html += '<div class="name">' + esc(u.username) + ' <span class="role-badge ' + u.role + '">' + u.role.toUpperCase() + '</span></div>';
+            html += '<div class="meta">Joined ' + dateStr + '</div>';
+            html += '</div>';
+            html += '</div>';
+            html += '<div class="user-card-actions">';
+            html += '<button class="btn-sm" style="background:#e3f2fd;color:#1565c0" onclick="openPinModal(' + JSON.stringify(u.username) + ')">&#128273; Reset PIN</button>';
+            html += '<button class="btn-sm" style="background:#fff3e0;color:#e65100" onclick="deleteUserDataOnly(' + JSON.stringify(u.username) + ')">&#128451; Archive Data</button>';
+            if (u.role !== 'admin') {
+              html += '<button class="btn-sm" style="background:#fce4ec;color:#c62828" onclick="deleteUserOnly(' + JSON.stringify(u.username) + ')">&#128100; Delete User</button>';
+              html += '<button class="btn-sm" style="background:#d32f2f;color:#fff" onclick="deleteUserAndData(' + JSON.stringify(u.username) + ')">&#128465; Delete User + Data</button>';
             }
-            html += "</div></div>";
+            html += '</div>';
+            html += '</div>';
           });
           container.innerHTML = html;
         } catch (err) {
           container.innerHTML =
             '<div class="alert alert-error">' + err.message + "</div>";
+        }
+      }
+
+      function openPinModal(username) {
+        pinResetTargetUser = username;
+        document.getElementById('pinModalUser').textContent = username;
+        document.getElementById('pinModalUser2').textContent = username;
+        document.getElementById('pinConfirmCheck').checked = false;
+        document.getElementById('pinConfirmBtn').disabled = true;
+        document.getElementById('pinNewInput').value = '';
+        document.getElementById('pinConfirmInput').value = '';
+        document.getElementById('pinResultMsg').innerHTML = '';
+        document.getElementById('pinSaveBtn').disabled = false;
+        document.getElementById('pinStep1').classList.add('active');
+        document.getElementById('pinStep2').classList.remove('active');
+        document.getElementById('pinFooterStep1').style.display = 'flex';
+        document.getElementById('pinFooterStep2').style.display = 'none';
+        document.getElementById('pinResetOverlay').classList.add('open');
+      }
+
+      function closePinModal() {
+        document.getElementById('pinResetOverlay').classList.remove('open');
+        pinResetTargetUser = '';
+      }
+
+      function goToPinStep2() {
+        document.getElementById('pinStep1').classList.remove('active');
+        document.getElementById('pinStep2').classList.add('active');
+        document.getElementById('pinFooterStep1').style.display = 'none';
+        document.getElementById('pinFooterStep2').style.display = 'flex';
+        document.getElementById('pinResultMsg').innerHTML = '';
+        setTimeout(function() { document.getElementById('pinNewInput').focus(); }, 100);
+      }
+
+      async function savePinReset() {
+        const pin = (document.getElementById('pinNewInput').value || '').trim();
+        const confirmPin = (document.getElementById('pinConfirmInput').value || '').trim();
+        const msg = document.getElementById('pinResultMsg');
+        msg.innerHTML = '';
+        if (!pin || pin.length < 4) {
+          msg.innerHTML = '<span style="color:#c62828">&#9888; PIN must be at least 4 digits.</span>';
+          document.getElementById('pinNewInput').focus();
+          return;
+        }
+        if (pin !== confirmPin) {
+          msg.innerHTML = '<span style="color:#c62828">&#9888; PINs do not match. Please re-enter.</span>';
+          document.getElementById('pinConfirmInput').focus();
+          return;
+        }
+        document.getElementById('pinSaveBtn').disabled = true;
+        try {
+          await apiFetch(
+            "/auth/users/" + encodeURIComponent(pinResetTargetUser) + "/reset-pin",
+            { method: "POST", body: JSON.stringify({ pin }) },
+          );
+          msg.innerHTML = '<span style="color:#2e7d32">&#10004; PIN reset successfully for <strong>' + esc(pinResetTargetUser) + '</strong>!</span>';
+          setTimeout(function() { closePinModal(); }, 1500);
+        } catch (err) {
+          msg.innerHTML = '<span style="color:#c62828">&#9888; ' + esc(err.message) + '</span>';
+          document.getElementById('pinSaveBtn').disabled = false;
         }
       }
 
@@ -2489,29 +2732,6 @@
         } catch (err) {
           result.innerHTML =
             '<div class="alert alert-error">' + esc(err.message) + "</div>";
-        }
-      }
-
-      async function resetUserPin(username) {
-        const pin = prompt(
-          "Enter new PIN for " + username + " (min 4 digits):",
-        );
-        if (!pin) return;
-        if (String(pin).trim().length < 4) {
-          alert("PIN must be at least 4 digits.");
-          return;
-        }
-        try {
-          await apiFetch(
-            "/auth/users/" + encodeURIComponent(username) + "/reset-pin",
-            {
-              method: "POST",
-              body: JSON.stringify({ pin: String(pin).trim() }),
-            },
-          );
-          alert("PIN reset successfully for " + username + ".");
-        } catch (err) {
-          alert("PIN reset failed: " + err.message);
         }
       }
 

@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Inventory Manager",
-    "slug": "inventory-manager",
-    "owner": "aamircf",
+    "slug": "newfullstack",
+    "owner": "aamirksa",
     "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -54,14 +54,14 @@
       "expo-font"
     ],
     "updates": {
-      "url": "https://u.expo.dev/e38f8ee8-1b02-4452-b109-b9ad8465236c",
+      "url": "https://u.expo.dev/cff8e8a6-b732-42e2-ae2c-068893f7296c",
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 5000
     },
     "runtimeVersion": "inventory-launch-v1",
     "extra": {
       "eas": {
-        "projectId": "e38f8ee8-1b02-4452-b109-b9ad8465236c"
+        "projectId": "cff8e8a6-b732-42e2-ae2c-068893f7296c"
       }
     }
   }
