@@ -518,7 +518,12 @@ export default function TransactionsScreen({ username, role }) {
 
               {/* ERP fields (server transactions only) */}
               {editItem?.erp_document ? (
-                <View style={[styles.readonlyBox, { marginTop: 4, backgroundColor: "#e8f5e9" }]}>
+                <View
+                  style={[
+                    styles.readonlyBox,
+                    { marginTop: 4, backgroundColor: "#e8f5e9" },
+                  ]}
+                >
                   <MaterialCommunityIcons
                     name="file-document-outline"
                     size={16}
@@ -531,7 +536,12 @@ export default function TransactionsScreen({ username, role }) {
                 </View>
               ) : null}
               {editItem?.sync_status && editItem.sync_status !== "pending" ? (
-                <View style={[styles.readonlyBox, { marginTop: 4, backgroundColor: "#e3f2fd" }]}>
+                <View
+                  style={[
+                    styles.readonlyBox,
+                    { marginTop: 4, backgroundColor: "#e3f2fd" },
+                  ]}
+                >
                   <MaterialCommunityIcons
                     name="check-circle-outline"
                     size={16}

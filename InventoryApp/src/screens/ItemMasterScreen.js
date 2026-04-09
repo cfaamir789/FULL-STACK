@@ -89,9 +89,7 @@ export default function ItemMasterScreen() {
       const hasNew =
         firstRow && "Barcode" in firstRow && "Item_Name" in firstRow;
       const hasOld =
-        firstRow &&
-        "Barcode No." in firstRow &&
-        "Item Description" in firstRow;
+        firstRow && "Barcode No." in firstRow && "Item Description" in firstRow;
       if (!firstRow || (!hasNew && !hasOld)) {
         Alert.alert(
           "Invalid CSV",
@@ -110,7 +108,9 @@ export default function ItemMasterScreen() {
             ? r["Item No."] || r["Barcode No."]
             : r.ItemCode || r.Barcode,
           Barcode: String(hasOld ? r["Barcode No."] : r.Barcode).trim(),
-          Item_Name: String(hasOld ? r["Item Description"] : r.Item_Name).trim(),
+          Item_Name: String(
+            hasOld ? r["Item Description"] : r.Item_Name,
+          ).trim(),
         }));
       if (!items.length) {
         Alert.alert("Empty CSV", "No valid rows found in the file.");
@@ -119,7 +119,10 @@ export default function ItemMasterScreen() {
       await upsertItems(items);
       const stats = await getDashboardStats();
       setLocalCount(stats.totalItems);
-      Alert.alert("Imported", `${items.length} items updated in local database.`);
+      Alert.alert(
+        "Imported",
+        `${items.length} items updated in local database.`,
+      );
     } catch (err) {
       Alert.alert("Import Failed", err.message);
     } finally {
@@ -146,10 +149,9 @@ export default function ItemMasterScreen() {
         copyToCacheDirectory: true,
       });
       if (picked.canceled) return;
-      const content = await FileSystem.readAsStringAsync(
-        picked.assets[0].uri,
-        { encoding: "utf8" },
-      );
+      const content = await FileSystem.readAsStringAsync(picked.assets[0].uri, {
+        encoding: "utf8",
+      });
       await processCSV(content);
     } catch (err) {
       Alert.alert("Error", err.message);
@@ -193,7 +195,11 @@ export default function ItemMasterScreen() {
       {/* Status row */}
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
-          <MaterialCommunityIcons name="database" size={24} color={Colors.primary} />
+          <MaterialCommunityIcons
+            name="database"
+            size={24}
+            color={Colors.primary}
+          />
           <Text style={styles.statNum}>{localCount ?? "…"}</Text>
           <Text style={styles.statLabel}>Local Items</Text>
         </View>
@@ -261,21 +267,30 @@ export default function ItemMasterScreen() {
           </>
         )}
         <TouchableOpacity
-          style={[styles.primaryBtn, (!online || downloading) && styles.btnDisabled]}
+          style={[
+            styles.primaryBtn,
+            (!online || downloading) && styles.btnDisabled,
+          ]}
           onPress={handleDownload}
           disabled={!online || downloading}
         >
           {downloading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <MaterialCommunityIcons name="cloud-download" size={18} color="#fff" />
+            <MaterialCommunityIcons
+              name="cloud-download"
+              size={18}
+              color="#fff"
+            />
           )}
           <Text style={styles.primaryBtnText}>
             {downloading ? "Downloading…" : "Download Item Master"}
           </Text>
         </TouchableOpacity>
         {!online && (
-          <Text style={[styles.hint, { marginTop: 6 }]}>⚠ Not connected to server</Text>
+          <Text style={[styles.hint, { marginTop: 6 }]}>
+            ⚠ Not connected to server
+          </Text>
         )}
       </View>
 
@@ -283,8 +298,8 @@ export default function ItemMasterScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Import from CSV File</Text>
         <Text style={styles.hint}>
-          Import items from a local CSV file. Existing barcodes are updated;
-          new ones are added. No server connection needed.
+          Import items from a local CSV file. Existing barcodes are updated; new
+          ones are added. No server connection needed.
         </Text>
         <TouchableOpacity
           style={[styles.secondaryBtn, importing && styles.btnDisabled]}
@@ -294,7 +309,11 @@ export default function ItemMasterScreen() {
           {importing ? (
             <ActivityIndicator color={Colors.primary} size="small" />
           ) : (
-            <MaterialCommunityIcons name="file-upload-outline" size={18} color={Colors.primary} />
+            <MaterialCommunityIcons
+              name="file-upload-outline"
+              size={18}
+              color={Colors.primary}
+            />
           )}
           <Text style={styles.secondaryBtnText}>
             {importing ? "Importing…" : "Import from CSV"}

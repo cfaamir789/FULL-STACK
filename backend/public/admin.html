@@ -699,16 +699,63 @@
 
         <div class="card">
           <h2>&#128228; Worker End-of-Day Export</h2>
-          <p style="color:#888;margin-bottom:12px;font-size:13px">Select a worker to download their pending transactions as CSV/XLSX and mark them as done in one click.</p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <select id="eodWorkerSelect" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-width:180px">
+          <p style="color: #888; margin-bottom: 12px; font-size: 13px">
+            Select a worker to download their pending transactions as CSV/XLSX
+            and mark them as done in one click.
+          </p>
+          <div
+            style="
+              display: flex;
+              gap: 8px;
+              flex-wrap: wrap;
+              align-items: center;
+            "
+          >
+            <select
+              id="eodWorkerSelect"
+              style="
+                padding: 8px 12px;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                font-size: 13px;
+                min-width: 180px;
+              "
+            >
               <option value="">-- Select Worker --</option>
             </select>
-            <button class="btn-sm btn-export" onclick="downloadWorkerEOD('csv')" title="Download CSV and mark as done">&#8659; CSV + Mark Done</button>
-            <button class="btn-sm" style="background:#217346;color:#fff;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer" onclick="downloadWorkerEOD('xlsx')" title="Download XLSX and mark as done">&#8659; XLSX + Mark Done</button>
-            <button class="btn-sm btn-copy" onclick="markWorkerDoneOnly()" title="Mark done without downloading">&#10003; Mark Done Only</button>
+            <button
+              class="btn-sm btn-export"
+              onclick="downloadWorkerEOD('csv')"
+              title="Download CSV and mark as done"
+            >
+              &#8659; CSV + Mark Done
+            </button>
+            <button
+              class="btn-sm"
+              style="
+                background: #217346;
+                color: #fff;
+                border-radius: 6px;
+                padding: 6px 14px;
+                font-size: 13px;
+                font-weight: 600;
+                border: none;
+                cursor: pointer;
+              "
+              onclick="downloadWorkerEOD('xlsx')"
+              title="Download XLSX and mark as done"
+            >
+              &#8659; XLSX + Mark Done
+            </button>
+            <button
+              class="btn-sm btn-copy"
+              onclick="markWorkerDoneOnly()"
+              title="Mark done without downloading"
+            >
+              &#10003; Mark Done Only
+            </button>
           </div>
-          <div id="eodResult" style="margin-top:8px"></div>
+          <div id="eodResult" style="margin-top: 8px"></div>
         </div>
 
         <div class="card">
@@ -871,11 +918,63 @@
               Reset to Default
             </button>
           </div>
-          <div id="txBulkBar" style="display:none;background:#1565c0;color:#fff;border-radius:8px;padding:10px 16px;margin-bottom:8px;align-items:center;gap:10px;flex-wrap:wrap">
-            <span id="txBulkCount" style="font-weight:700;flex:1"></span>
-            <button style="background:#fff;color:#1565c0;font-weight:700;border-radius:6px;border:none;padding:6px 14px;cursor:pointer" onclick="markSelectedDone()">&#10003; Mark Done</button>
-            <button style="background:#e3f2fd;color:#0d47a1;font-weight:700;border-radius:6px;border:none;padding:6px 14px;cursor:pointer" onclick="reopenSelected()">&#8617; Reopen</button>
-            <button style="background:rgba(255,255,255,0.2);color:#fff;font-weight:600;border-radius:6px;border:none;padding:6px 14px;cursor:pointer" onclick="clearTxSelection()">&#10005; Clear</button>
+          <div
+            id="txBulkBar"
+            style="
+              display: none;
+              background: #1565c0;
+              color: #fff;
+              border-radius: 8px;
+              padding: 10px 16px;
+              margin-bottom: 8px;
+              align-items: center;
+              gap: 10px;
+              flex-wrap: wrap;
+            "
+          >
+            <span id="txBulkCount" style="font-weight: 700; flex: 1"></span>
+            <button
+              style="
+                background: #fff;
+                color: #1565c0;
+                font-weight: 700;
+                border-radius: 6px;
+                border: none;
+                padding: 6px 14px;
+                cursor: pointer;
+              "
+              onclick="markSelectedDone()"
+            >
+              &#10003; Mark Done
+            </button>
+            <button
+              style="
+                background: #e3f2fd;
+                color: #0d47a1;
+                font-weight: 700;
+                border-radius: 6px;
+                border: none;
+                padding: 6px 14px;
+                cursor: pointer;
+              "
+              onclick="reopenSelected()"
+            >
+              &#8617; Reopen
+            </button>
+            <button
+              style="
+                background: rgba(255, 255, 255, 0.2);
+                color: #fff;
+                font-weight: 600;
+                border-radius: 6px;
+                border: none;
+                padding: 6px 14px;
+                cursor: pointer;
+              "
+              onclick="clearTxSelection()"
+            >
+              &#10005; Clear
+            </button>
           </div>
           <div id="txContainer"><div class="loading">Loading...</div></div>
         </div>
@@ -1646,7 +1745,17 @@
         if (erpDetails === null) return;
         const filename = nextExportFilename(worker) + "." + format;
         if (format === "xlsx" && typeof XLSX !== "undefined") {
-          const headers = ["Worker","Date","Barcode","ItemCode","ItemName","From","To","Qty","Notes"];
+          const headers = [
+            "Worker",
+            "Date",
+            "Barcode",
+            "ItemCode",
+            "ItemName",
+            "From",
+            "To",
+            "Qty",
+            "Notes",
+          ];
           const aoa = [
             headers,
             ...workerTxs.map((r) => [
@@ -1906,7 +2015,9 @@
         function render() {
           const start = (page - 1) * pageSize;
           const slice = txs.slice(start, start + pageSize);
-          window._txCurPage = slice.map((tx) => String(tx._id || "")).filter(Boolean);
+          window._txCurPage = slice
+            .map((tx) => String(tx._id || ""))
+            .filter(Boolean);
           let html =
             '<div class="preview-count" style="display:flex;justify-content:space-between;align-items:center">Showing ' +
             (start + 1) +
@@ -1933,9 +2044,9 @@
               txId +
               '" ' +
               (isChecked ? "checked" : "") +
-              ' onchange="toggleTxRow(\'' +
+              " onchange=\"toggleTxRow('" +
               txId.replace(/'/g, "") +
-              '\',this.checked)"></td>';
+              "',this.checked)\"></td>";
             visibleCols.forEach((c) => {
               html += txCellValue(tx, c.key);
             });
