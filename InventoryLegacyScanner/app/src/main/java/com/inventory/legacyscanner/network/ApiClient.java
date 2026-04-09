@@ -25,21 +25,21 @@ public final class ApiClient {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final Gson GSON = new Gson();
 
-    private static final OkHttpClient CLIENT = new OkHttpClient.Builder()
+    private static final OkHttpClient CLIENT = Tls12SocketFactory.apply(new OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS))
             .build();
 
-    private static final OkHttpClient BULK_CLIENT = new OkHttpClient.Builder()
+    private static final OkHttpClient BULK_CLIENT = Tls12SocketFactory.apply(new OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS))
             .build();
 
-    private static final OkHttpClient HEALTH_CLIENT = new OkHttpClient.Builder()
+    private static final OkHttpClient HEALTH_CLIENT = Tls12SocketFactory.apply(new OkHttpClient.Builder()
             .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS))
             .build();
 
     private ApiClient() {
