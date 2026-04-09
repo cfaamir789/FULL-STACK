@@ -16,6 +16,7 @@ import LoginScreen from "../screens/LoginScreen";
 import AdminScreen from "../screens/AdminScreen";
 import AdminPanelScreen from "../screens/AdminPanelScreen";
 import BackupRestoreScreen from "../screens/BackupRestoreScreen";
+import ItemMasterScreen from "../screens/ItemMasterScreen";
 import Colors from "../theme/colors";
 import { loadServerUrl } from "../services/api";
 import { attemptSync } from "../services/syncService";
@@ -42,6 +43,11 @@ const ItemsStackNavigator = ({ role }) => (
       name="Import"
       component={ImportScreen}
       options={{ title: "Import CSV" }}
+    />
+    <ItemsStack.Screen
+      name="ItemMaster"
+      component={ItemMasterScreen}
+      options={{ title: "Item Master" }}
     />
   </ItemsStack.Navigator>
 );
@@ -73,6 +79,11 @@ const AdminStackNavigator = ({ username }) => (
       name="BackupRestore"
       component={BackupRestoreScreen}
       options={{ title: "Backup & Restore" }}
+    />
+    <AdminStack.Screen
+      name="ItemMaster"
+      component={ItemMasterScreen}
+      options={{ title: "Item Master" }}
     />
     <AdminStack.Screen
       name="AdminTransactions"

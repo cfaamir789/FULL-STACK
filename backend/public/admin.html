@@ -698,6 +698,20 @@
         </div>
 
         <div class="card">
+          <h2>&#128228; Worker End-of-Day Export</h2>
+          <p style="color:#888;margin-bottom:12px;font-size:13px">Select a worker to download their pending transactions as CSV/XLSX and mark them as done in one click.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <select id="eodWorkerSelect" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-width:180px">
+              <option value="">-- Select Worker --</option>
+            </select>
+            <button class="btn-sm btn-export" onclick="downloadWorkerEOD('csv')" title="Download CSV and mark as done">&#8659; CSV + Mark Done</button>
+            <button class="btn-sm" style="background:#217346;color:#fff;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer" onclick="downloadWorkerEOD('xlsx')" title="Download XLSX and mark as done">&#8659; XLSX + Mark Done</button>
+            <button class="btn-sm btn-copy" onclick="markWorkerDoneOnly()" title="Mark done without downloading">&#10003; Mark Done Only</button>
+          </div>
+          <div id="eodResult" style="margin-top:8px"></div>
+        </div>
+
+        <div class="card">
           <div class="tx-header">
             <h2>&#128196; ERP Queue (Shared Server Data)</h2>
             <div class="tx-actions">
@@ -856,6 +870,12 @@
             >
               Reset to Default
             </button>
+          </div>
+          <div id="txBulkBar" style="display:none;background:#1565c0;color:#fff;border-radius:8px;padding:10px 16px;margin-bottom:8px;align-items:center;gap:10px;flex-wrap:wrap">
+            <span id="txBulkCount" style="font-weight:700;flex:1"></span>
+            <button style="background:#fff;color:#1565c0;font-weight:700;border-radius:6px;border:none;padding:6px 14px;cursor:pointer" onclick="markSelectedDone()">&#10003; Mark Done</button>
+            <button style="background:#e3f2fd;color:#0d47a1;font-weight:700;border-radius:6px;border:none;padding:6px 14px;cursor:pointer" onclick="reopenSelected()">&#8617; Reopen</button>
+            <button style="background:rgba(255,255,255,0.2);color:#fff;font-weight:600;border-radius:6px;border:none;padding:6px 14px;cursor:pointer" onclick="clearTxSelection()">&#10005; Clear</button>
           </div>
           <div id="txContainer"><div class="loading">Loading...</div></div>
         </div>
@@ -1102,7 +1122,7 @@
             tasks.push(loadWorkerStatus(), loadTransactions());
           }
           Promise.allSettled(tasks);
-        }, 5000);
+        }, 60000);
       }
 
       async function switchPage(page) {
@@ -1475,6 +1495,230 @@
       // ─── Transactions ────────────────────────────────────────────────────────────
       let allTransactions = [];
       let filteredTransactions = [];
+      let selectedIds = new Set();
+
+      function updateSelectionBar() {
+        const bar = document.getElementById("txBulkBar");
+        const countEl = document.getElementById("txBulkCount");
+        if (!bar) return;
+        if (selectedIds.size > 0) {
+          bar.style.display = "flex";
+          countEl.textContent =
+            selectedIds.size +
+            " row" +
+            (selectedIds.size !== 1 ? "s" : "") +
+            " selected";
+        } else {
+          bar.style.display = "none";
+        }
+      }
+
+      function toggleTxRow(id, checked) {
+        if (checked) selectedIds.add(id);
+        else selectedIds.delete(id);
+        updateSelectionBar();
+        const sa = document.getElementById("txSelectAll");
+        if (sa) {
+          const curIds = window._txCurPage || [];
+          sa.checked =
+            curIds.length > 0 && curIds.every((x) => selectedIds.has(x));
+          sa.indeterminate =
+            !sa.checked && curIds.some((x) => selectedIds.has(x));
+        }
+      }
+
+      function toggleSelectAllTx(checked) {
+        const curIds = window._txCurPage || [];
+        curIds.forEach((id) => {
+          if (checked) selectedIds.add(id);
+          else selectedIds.delete(id);
+        });
+        document
+          .querySelectorAll(".tx-row-check")
+          .forEach((cb) => (cb.checked = checked));
+        updateSelectionBar();
+      }
+
+      function clearTxSelection() {
+        selectedIds.clear();
+        document
+          .querySelectorAll(".tx-row-check")
+          .forEach((cb) => (cb.checked = false));
+        const sa = document.getElementById("txSelectAll");
+        if (sa) {
+          sa.checked = false;
+          sa.indeterminate = false;
+        }
+        updateSelectionBar();
+      }
+
+      async function markSelectedDone() {
+        if (!selectedIds.size) return;
+        await bulkSetTransactionStatus(
+          [...selectedIds],
+          selectedIds.size + " row(s)",
+          "",
+          "processed",
+        );
+        clearTxSelection();
+      }
+
+      async function reopenSelected() {
+        if (!selectedIds.size) return;
+        await bulkSetTransactionStatus(
+          [...selectedIds],
+          selectedIds.size + " row(s)",
+          "",
+          "pending",
+        );
+        clearTxSelection();
+      }
+
+      function populateEodWorkerSelect() {
+        const sel = document.getElementById("eodWorkerSelect");
+        if (!sel) return;
+        const prev = sel.value;
+        const workers = [
+          ...new Set(
+            allTransactions
+              .filter(
+                (tx) =>
+                  String(tx.syncStatus || "pending").toLowerCase() ===
+                  "pending",
+              )
+              .map((t) => t.Worker_Name)
+              .filter(Boolean),
+          ),
+        ].sort();
+        sel.innerHTML =
+          '<option value="">-- Select Worker --</option>' +
+          workers
+            .map(
+              (w) =>
+                '<option value="' +
+                esc(w) +
+                '"' +
+                (w === prev ? " selected" : "") +
+                ">" +
+                esc(w) +
+                " (" +
+                allTransactions.filter(
+                  (tx) =>
+                    tx.Worker_Name === w &&
+                    String(tx.syncStatus || "pending").toLowerCase() ===
+                      "pending",
+                ).length +
+                ")</option>",
+            )
+            .join("");
+      }
+
+      async function downloadWorkerEOD(format) {
+        const worker = document.getElementById("eodWorkerSelect")?.value;
+        const resultDiv = document.getElementById("eodResult");
+        if (!worker) {
+          resultDiv.innerHTML =
+            '<div class="alert alert-error">Select a worker first.</div>';
+          return;
+        }
+        const workerTxs = allTransactions.filter(
+          (tx) =>
+            tx.Worker_Name === worker &&
+            String(tx.syncStatus || "pending").toLowerCase() === "pending",
+        );
+        if (!workerTxs.length) {
+          resultDiv.innerHTML =
+            '<div class="alert alert-error">No pending transactions for ' +
+            esc(worker) +
+            ".</div>";
+          return;
+        }
+        const erpDetails = collectErpDetails();
+        if (erpDetails === null) return;
+        const filename = nextExportFilename(worker) + "." + format;
+        if (format === "xlsx" && typeof XLSX !== "undefined") {
+          const headers = ["Worker","Date","Barcode","ItemCode","ItemName","From","To","Qty","Notes"];
+          const aoa = [
+            headers,
+            ...workerTxs.map((r) => [
+              r.Worker_Name || "",
+              r.Timestamp ? new Date(r.Timestamp).toLocaleString() : "",
+              r.Item_Barcode || "",
+              r.Item_Code || "",
+              r.Item_Name || "",
+              r.Frombin || "",
+              r.Tobin || "",
+              r.Qty ?? "",
+              r.Notes || "",
+            ]),
+          ];
+          const ws = XLSX.utils.aoa_to_sheet(aoa);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+          XLSX.writeFile(wb, filename);
+        } else {
+          const url =
+            API +
+            "/transactions/export?worker=" +
+            encodeURIComponent(worker) +
+            "&status=pending";
+          fetch(url, { headers: { Authorization: "Bearer " + authToken } })
+            .then((r) => r.blob())
+            .then((blob) => {
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = filename;
+              a.click();
+            });
+        }
+        try {
+          const workerIds = workerTxs.map((tx) => tx._id);
+          const data = await apiFetch("/transactions/bulk-status", {
+            method: "POST",
+            body: JSON.stringify({
+              ids: workerIds,
+              status: "processed",
+              fromStatus: "all",
+              ...erpDetails,
+            }),
+          });
+          resultDiv.innerHTML =
+            '<div class="alert alert-success">&#10004; Exported and marked ' +
+            (data.updated || workerIds.length) +
+            " transaction(s) as done for " +
+            esc(worker) +
+            ".</div>";
+          await Promise.all([loadTransactions(), loadStats()]);
+        } catch (err) {
+          resultDiv.innerHTML =
+            '<div class="alert alert-error">' + esc(err.message) + "</div>";
+        }
+      }
+
+      async function markWorkerDoneOnly() {
+        const worker = document.getElementById("eodWorkerSelect")?.value;
+        const resultDiv = document.getElementById("eodResult");
+        if (!worker) {
+          resultDiv.innerHTML =
+            '<div class="alert alert-error">Select a worker first.</div>';
+          return;
+        }
+        const ids = allTransactions
+          .filter(
+            (tx) =>
+              tx.Worker_Name === worker &&
+              String(tx.syncStatus || "pending").toLowerCase() === "pending",
+          )
+          .map((tx) => tx._id);
+        if (!ids.length) {
+          resultDiv.innerHTML =
+            '<div class="alert alert-error">No pending transactions for ' +
+            esc(worker) +
+            ".</div>";
+          return;
+        }
+        await bulkSetTransactionStatus(ids, worker, worker, "processed");
+      }
 
       async function loadTransactions() {
         const container = document.getElementById("txContainer");
@@ -1560,6 +1804,7 @@
           return true;
         });
         renderTransactions(filteredTransactions);
+        populateEodWorkerSelect();
       }
 
       function txStatusBadge(tx) {
@@ -1650,6 +1895,7 @@
         function render() {
           const start = (page - 1) * pageSize;
           const slice = txs.slice(start, start + pageSize);
+          window._txCurPage = slice.map((tx) => String(tx._id || "")).filter(Boolean);
           let html =
             '<div class="preview-count" style="display:flex;justify-content:space-between;align-items:center">Showing ' +
             (start + 1) +
@@ -1660,13 +1906,25 @@
             " transactions</div>";
           html +=
             '<div style="overflow-x:auto"><table id="txTable"><thead><tr>';
+          html +=
+            '<th style="width:32px;padding:8px 6px"><input type="checkbox" id="txSelectAll" title="Select all on this page" onchange="toggleSelectAllTx(this.checked)"></th>';
           visibleCols.forEach((c) => {
             html += "<th>" + esc(c.label) + "</th>";
           });
           html += "<th>Copy</th><th>Action</th></tr></thead><tbody>";
           slice.forEach((tx, i) => {
             const idx = start + i;
+            const txId = String(tx._id || "");
+            const isChecked = selectedIds.has(txId);
             html += "<tr>";
+            html +=
+              '<td style="padding:6px"><input type="checkbox" class="tx-row-check" value="' +
+              txId +
+              '" ' +
+              (isChecked ? "checked" : "") +
+              ' onchange="toggleTxRow(\'' +
+              txId.replace(/'/g, "") +
+              '\',this.checked)"></td>';
             visibleCols.forEach((c) => {
               html += txCellValue(tx, c.key);
             });
@@ -1706,6 +1964,13 @@
             html += "</div>";
           }
           container.innerHTML = html;
+          const sa = document.getElementById("txSelectAll");
+          if (sa && window._txCurPage.length > 0) {
+            sa.checked = window._txCurPage.every((x) => selectedIds.has(x));
+            sa.indeterminate =
+              !sa.checked && window._txCurPage.some((x) => selectedIds.has(x));
+          }
+          updateSelectionBar();
         }
         window.txPage = function (p) {
           page = p;

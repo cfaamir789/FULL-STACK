@@ -811,6 +811,23 @@ export default function AdminPanelScreen({ navigation }) {
             <Text style={styles.actionTitle}>Backup & Restore</Text>
             <Text style={styles.actionSub}>Recover this phone from backup</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate("ItemMaster")}
+          >
+            <View
+              style={[styles.actionIcon, { backgroundColor: "#006064" + "15" }]}
+            >
+              <MaterialCommunityIcons
+                name="database-sync"
+                size={24}
+                color="#006064"
+              />
+            </View>
+            <Text style={styles.actionTitle}>Item Master</Text>
+            <Text style={styles.actionSub}>Check, download, import items</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Safe Shift Close Section */}

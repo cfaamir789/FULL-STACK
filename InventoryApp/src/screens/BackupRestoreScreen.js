@@ -14,7 +14,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 
-import { getAllTransactions } from "../database/db";
+import { getAllTransactions, getDashboardStats } from "../database/db";
 import Colors from "../theme/colors";
 
 const IS_WEB = Platform.OS === "web";
@@ -81,9 +81,11 @@ export default function BackupRestoreScreen() {
         replaceExisting,
         fileName: file.name,
       });
+      const stats = await getDashboardStats();
+      const pendingSync = stats.pendingSync ?? 0;
       Alert.alert(
         "Restore Complete",
-        `Rows read: ${result.total}\nInserted: ${result.inserted}\nUpdated: ${result.updated}\nSkipped: ${result.skipped}`,
+        `Rows read: ${result.total}\nInserted: ${result.inserted}\nUpdated: ${result.updated}\nSkipped: ${result.skipped}\n\nPending sync to server: ${pendingSync} row${pendingSync !== 1 ? "s" : ""}`,
       );
       await loadBackups();
     } catch (err) {

@@ -73,7 +73,9 @@ export default function TransactionsScreen({ username, role }) {
           (tx.item_code && tx.item_code.toLowerCase().includes(q)) ||
           (tx.item_barcode && tx.item_barcode.toLowerCase().includes(q)) ||
           (tx.item_name && tx.item_name.toLowerCase().includes(q)) ||
-          (tx.worker_name && tx.worker_name.toLowerCase().includes(q)),
+          (tx.worker_name && tx.worker_name.toLowerCase().includes(q)) ||
+          (tx.erp_document && tx.erp_document.toLowerCase().includes(q)) ||
+          (tx.erp_batch && tx.erp_batch.toLowerCase().includes(q)),
       );
     }
     return result;
@@ -177,6 +179,9 @@ export default function TransactionsScreen({ username, role }) {
             notes: tx.Notes || "",
             timestamp: tx.Timestamp,
             synced: 1,
+            erp_document: tx.erpDocument || "",
+            erp_batch: tx.erpBatch || "",
+            sync_status: tx.syncStatus || "pending",
             _source: "server",
           }));
 
@@ -510,6 +515,33 @@ export default function TransactionsScreen({ username, role }) {
                   {editItem?.item_barcode}
                 </Text>
               </View>
+
+              {/* ERP fields (server transactions only) */}
+              {editItem?.erp_document ? (
+                <View style={[styles.readonlyBox, { marginTop: 4, backgroundColor: "#e8f5e9" }]}>
+                  <MaterialCommunityIcons
+                    name="file-document-outline"
+                    size={16}
+                    color="#2e7d32"
+                  />
+                  <Text style={[styles.readonlyText, { color: "#2e7d32" }]}>
+                    ERP: {editItem.erp_document}
+                    {editItem.erp_batch ? ` / ${editItem.erp_batch}` : ""}
+                  </Text>
+                </View>
+              ) : null}
+              {editItem?.sync_status && editItem.sync_status !== "pending" ? (
+                <View style={[styles.readonlyBox, { marginTop: 4, backgroundColor: "#e3f2fd" }]}>
+                  <MaterialCommunityIcons
+                    name="check-circle-outline"
+                    size={16}
+                    color="#1565c0"
+                  />
+                  <Text style={[styles.readonlyText, { color: "#1565c0" }]}>
+                    Status: {editItem.sync_status}
+                  </Text>
+                </View>
+              ) : null}
 
               <Text style={styles.label}>From Bin</Text>
               <TextInput

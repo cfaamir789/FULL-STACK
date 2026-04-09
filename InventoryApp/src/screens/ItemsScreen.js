@@ -191,6 +191,13 @@ export default function ItemsScreen({ navigation, route }) {
         >
           <MaterialCommunityIcons name="file-import" size={20} color="#fff" />
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.importBtn, { backgroundColor: Colors.success }]}
+          onPress={() => navigation.navigate("ItemMaster")}
+          title="Item Master"
+        >
+          <MaterialCommunityIcons name="database-sync" size={20} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.countText}>
