@@ -209,6 +209,13 @@ export default function TransactionsScreen({ username, role }) {
   );
 
   const openEdit = (item) => {
+    if (item._source === "server") {
+      Alert.alert(
+        "Cannot Edit",
+        "Server transactions cannot be edited locally. Use the admin panel to manage them.",
+      );
+      return;
+    }
     setEditItem(item);
     setEditFrombin(item.frombin);
     setEditTobin(item.tobin);
@@ -259,6 +266,13 @@ export default function TransactionsScreen({ username, role }) {
   };
 
   const openDelete = (item) => {
+    if (item._source === "server") {
+      Alert.alert(
+        "Cannot Delete",
+        "Server transactions cannot be deleted locally. Use the admin panel to manage them.",
+      );
+      return;
+    }
     setDeleteItem(item);
     setDeleteConfirmed(false);
   };

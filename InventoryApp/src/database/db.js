@@ -177,28 +177,31 @@ export const initDB = async () => {
       )
   `);
 
-  const missingClientIds = await db.getAllAsync(
-    `SELECT id, timestamp, worker_name FROM transactions
-     WHERE client_tx_id IS NULL OR client_tx_id = ''`,
-  );
-  for (const row of missingClientIds) {
-    const timestamp = normalizeIsoString(row.timestamp);
+  // Wrap backfill migrations in a single transaction for atomicity
+  await db.withTransactionAsync(async () => {
+    const missingClientIds = await db.getAllAsync(
+      `SELECT id, timestamp, worker_name FROM transactions
+       WHERE client_tx_id IS NULL OR client_tx_id = ''`,
+    );
+    for (const row of missingClientIds) {
+      const timestamp = normalizeIsoString(row.timestamp);
+      await db.runAsync(
+        `UPDATE transactions
+         SET client_tx_id = ?, updated_at = CASE
+           WHEN updated_at IS NULL OR updated_at = '' THEN ?
+           ELSE updated_at
+         END
+         WHERE id = ?`,
+        [makeClientTxId(row.worker_name, timestamp), timestamp, row.id],
+      );
+    }
+
     await db.runAsync(
       `UPDATE transactions
-       SET client_tx_id = ?, updated_at = CASE
-         WHEN updated_at IS NULL OR updated_at = '' THEN ?
-         ELSE updated_at
-       END
-       WHERE id = ?`,
-      [makeClientTxId(row.worker_name, timestamp), timestamp, row.id],
+       SET updated_at = timestamp
+       WHERE updated_at IS NULL OR updated_at = ''`,
     );
-  }
-
-  await db.runAsync(
-    `UPDATE transactions
-     SET updated_at = timestamp
-     WHERE updated_at IS NULL OR updated_at = ''`,
-  );
+  });
 };
 
 // ─── Items ────────────────────────────────────────────────────────────────────
