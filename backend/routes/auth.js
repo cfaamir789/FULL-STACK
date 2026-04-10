@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
@@ -9,9 +10,21 @@ const JWT_SECRET =
   process.env.JWT_SECRET || "warehouse_inv_super_secret_key_2026";
 const TOKEN_EXPIRY = "30d"; // workers stay logged in for 30 days
 
+// Middleware: fail fast if MongoDB is not connected
+function requireDB(req, res, next) {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      error: "Database is not connected. Please try again shortly.",
+      dbState: mongoose.connection.readyState,
+    });
+  }
+  next();
+}
+
 // ─── POST /api/auth/setup ───────────────────────────────────────────────────
 // Creates the first admin account. Blocked once any user exists.
-router.post("/setup", async (req, res) => {
+router.post("/setup", requireDB, async (req, res) => {
   try {
     const existing = await User.find({});
     if (existing.length > 0) {
@@ -51,7 +64,7 @@ router.post("/setup", async (req, res) => {
 });
 
 // ─── POST /api/auth/login ───────────────────────────────────────────────────
-router.post("/login", async (req, res) => {
+router.post("/login", requireDB, async (req, res) => {
   try {
     const { username, pin } = req.body;
     if (!username || !pin) {
@@ -91,7 +104,7 @@ router.post("/login", async (req, res) => {
 
 // ─── POST /api/auth/register ─────────────────────────────────────────────────
 // Admin-only: create a new worker account
-router.post("/register", requireAuth, requireAdmin, async (req, res) => {
+router.post("/register", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
     const { username, pin, role = "worker" } = req.body;
     if (!username || !pin) {
@@ -131,7 +144,7 @@ router.post("/register", requireAuth, requireAdmin, async (req, res) => {
 
 // ─── GET /api/auth/users ─────────────────────────────────────────────────────
 // Admin-only: list all users (no hashes returned)
-router.get("/users", requireAuth, requireAdmin, async (req, res) => {
+router.get("/users", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
     const users = await User.find({});
     const safe = users.map((u) => ({
@@ -150,6 +163,7 @@ router.get("/users", requireAuth, requireAdmin, async (req, res) => {
 // Admin-only: delete a worker account
 router.delete(
   "/users/:username",
+  requireDB,
   requireAuth,
   requireAdmin,
   async (req, res) => {
@@ -178,6 +192,7 @@ router.delete(
 // Admin-only: reset an existing user's PIN
 router.post(
   "/users/:username/reset-pin",
+  requireDB,
   requireAuth,
   requireAdmin,
   async (req, res) => {
@@ -207,7 +222,7 @@ router.post(
 
 // ─── GET /api/auth/check-setup ──────────────────────────────────────────────
 // Frontend calls this to decide whether to show the Setup screen or Login screen
-router.get("/check-setup", async (req, res) => {
+router.get("/check-setup", requireDB, async (req, res) => {
   try {
     const count = await User.countDocuments({});
     res.json({ success: true, needsSetup: count === 0 });

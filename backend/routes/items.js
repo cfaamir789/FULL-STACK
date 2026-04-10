@@ -1,11 +1,26 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require("mongoose");
 const multer = require("multer");
 const Papa = require("papaparse");
 const { randomUUID } = require("crypto");
 const Item = require("../models/Item");
 const Meta = require("../models/Meta");
 const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
+
+// Fail fast if MongoDB is not connected
+function requireDB(req, res, next) {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      error: "Database is not connected. Please try again shortly.",
+    });
+  }
+  next();
+}
+
+// Apply requireDB to all routes in this router
+router.use(requireDB);
 
 function chunkArray(arr, size) {
   const out = [];

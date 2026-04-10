@@ -51,11 +51,26 @@ app.get("/", (req, res) => {
 
 // Health check — phone pings this to detect if backend is reachable
 app.get("/api/health", (req, res) => {
+  const mongoose = require("mongoose");
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
     commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "local",
     node: process.version,
+    db: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+    dbState: mongoose.connection.readyState,
+  });
+});
+
+// DB status — fast check for admin panel
+app.get("/api/db-status", (req, res) => {
+  const mongoose = require("mongoose");
+  const state = mongoose.connection.readyState;
+  // 0=disconnected, 1=connected, 2=connecting, 3=disconnecting
+  res.json({
+    connected: state === 1,
+    state,
+    stateLabel: ["disconnected", "connected", "connecting", "disconnecting"][state] || "unknown",
   });
 });
 

@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 
 const router = express.Router();
 
@@ -6,6 +7,17 @@ const Transaction = require("../models/Transaction");
 const WorkerSync = require("../models/WorkerSync");
 const { appendTransactions } = require("../services/googleSheets");
 const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
+
+// Fail fast if MongoDB is not connected
+function requireDB(req, res, next) {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      error: "Database is not connected. Please try again shortly.",
+    });
+  }
+  next();
+}
 
 const PENDING_QUERY = {
   $or: [
@@ -111,7 +123,7 @@ async function recordWorkerSync(workerName, count) {
   await doc.save();
 }
 
-router.get("/worker-status", requireAuth, requireAdmin, async (req, res) => {
+router.get("/worker-status", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
     const docs = await WorkerSync.find().sort({ lastSync: -1 }).lean();
     const workers = docs.map((doc) => ({
@@ -128,7 +140,7 @@ router.get("/worker-status", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireDB, requireAuth, async (req, res) => {
   try {
     const { transactions } = req.body;
     if (!Array.isArray(transactions) || transactions.length === 0) {
@@ -265,7 +277,7 @@ router.post("/", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/", requireAuth, requireAdmin, async (req, res) => {
+router.get("/", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(
@@ -289,7 +301,7 @@ router.get("/", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/bulk-status", requireAuth, requireAdmin, async (req, res) => {
+router.post("/bulk-status", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
     const ids = Array.isArray(req.body?.ids)
       ? [...new Set(req.body.ids.map((id) => String(id)).filter(Boolean))]
@@ -358,7 +370,7 @@ router.post("/bulk-status", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/bulk-delete", requireAuth, requireAdmin, async (req, res) => {
+router.post("/bulk-delete", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
     const ids = Array.isArray(req.body?.ids)
       ? [...new Set(req.body.ids.map((id) => String(id)).filter(Boolean))]
@@ -452,7 +464,7 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
   }
 });
 
-router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
+router.get("/stats", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
     const [pendingTx, totalAll, totalProcessed, totalArchived] =
       await Promise.all([
@@ -498,7 +510,7 @@ router.get("/stats", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/export", requireAuth, requireAdmin, async (req, res) => {
+router.get("/export", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
     const { worker, json, status } = req.query;
     const query = {

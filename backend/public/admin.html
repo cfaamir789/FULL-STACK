@@ -2184,13 +2184,24 @@
         const username = document.getElementById("loginUser").value.trim();
         const pin = document.getElementById("loginPin").value.trim();
         const errEl = document.getElementById("loginError");
+        const btn = document.querySelector('.login-card button[onclick*="doLogin"]') || document.querySelector('.login-card button');
         errEl.classList.add("hidden");
         if (!username || !pin) {
           errEl.textContent = "Enter username and PIN";
           errEl.classList.remove("hidden");
           return;
         }
+        // Show loading state
+        if (btn) { btn.disabled = true; btn.textContent = "Connecting..."; }
         try {
+          // Quick DB check first (< 50ms) — avoids 10s timeout
+          const dbCheck = await fetch(API + "/db-status").then(r => r.json()).catch(() => null);
+          if (dbCheck && !dbCheck.connected) {
+            errEl.textContent = "Database is offline (" + dbCheck.stateLabel + "). Retrying connection...";
+            errEl.classList.remove("hidden");
+            if (btn) { btn.disabled = false; btn.textContent = "Login"; }
+            return;
+          }
           const data = await apiFetch("/auth/login", {
             method: "POST",
             body: JSON.stringify({ username, pin }),
@@ -2198,6 +2209,7 @@
           if (data.role !== "admin") {
             errEl.textContent = "Only admins can access this panel";
             errEl.classList.remove("hidden");
+            if (btn) { btn.disabled = false; btn.textContent = "Login"; }
             return;
           }
           authToken = data.token;
@@ -2209,6 +2221,7 @@
           errEl.textContent = err.message;
           errEl.classList.remove("hidden");
         }
+        if (btn) { btn.disabled = false; btn.textContent = "Login"; }
       }
 
       async function doSetup() {
