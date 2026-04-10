@@ -141,7 +141,7 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
             }
 
             // Accept any TLS 1.2 cipher — let the server and client negotiate
-            ConnectionSpec cs = new ConnectionSpec.Builder(true)
+                ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
                     .tlsVersions(TlsVersion.TLS_1_2)
                     .allEnabledCipherSuites()
                     .supportsTlsExtensions(true)
