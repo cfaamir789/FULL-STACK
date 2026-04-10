@@ -30,6 +30,7 @@ import okhttp3.TlsVersion;
 public final class Tls12SocketFactory extends SSLSocketFactory {
     private static final String TAG = "Tls12SF";
     private static final String[] TLS_V12 = {"TLSv1.2"};
+    private static final String TLS_FALLBACK_SCSV = "TLS_FALLBACK_SCSV";
     private final SSLSocketFactory delegate;
     private static volatile String providerStatus = "system TLS only";
 
@@ -52,12 +53,12 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
 
     @Override
     public String[] getDefaultCipherSuites() {
-        return delegate.getDefaultCipherSuites();
+        return filterCipherSuites(delegate.getDefaultCipherSuites());
     }
 
     @Override
     public String[] getSupportedCipherSuites() {
-        return delegate.getSupportedCipherSuites();
+        return filterCipherSuites(delegate.getSupportedCipherSuites());
     }
 
     @Override
@@ -93,9 +94,19 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
         if (socket instanceof SSLSocket) {
             SSLSocket ssl = (SSLSocket) socket;
             ssl.setEnabledProtocols(TLS_V12);
-            ssl.setEnabledCipherSuites(ssl.getSupportedCipherSuites());
+            ssl.setEnabledCipherSuites(filterCipherSuites(ssl.getSupportedCipherSuites()));
         }
         return socket;
+    }
+
+    private static String[] filterCipherSuites(String[] suites) {
+        java.util.List<String> filtered = new java.util.ArrayList<>();
+        for (String suite : suites) {
+            if (!TLS_FALLBACK_SCSV.equals(suite)) {
+                filtered.add(suite);
+            }
+        }
+        return filtered.toArray(new String[0]);
     }
 
     /**
@@ -120,7 +131,7 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
             Tls12SocketFactory factory = new Tls12SocketFactory(sc.getSocketFactory());
             builder.sslSocketFactory(factory, tm);
 
-            String[] ciphers = sc.getSocketFactory().getSupportedCipherSuites();
+            String[] ciphers = filterCipherSuites(sc.getSocketFactory().getSupportedCipherSuites());
             providerStatus = sc.getProvider().getName() + " " + ciphers.length + " ciphers";
             Log.i(TAG, "Provider=" + sc.getProvider().getName()
                     + " ciphers=" + ciphers.length);
@@ -130,13 +141,13 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
             }
 
             // Accept any TLS 1.2 cipher — let the server and client negotiate
-            ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.COMPATIBLE_TLS)
+            ConnectionSpec cs = new ConnectionSpec.Builder(true)
                     .tlsVersions(TlsVersion.TLS_1_2)
                     .allEnabledCipherSuites()
+                    .supportsTlsExtensions(true)
                     .build();
             java.util.List<ConnectionSpec> specs = new java.util.ArrayList<>();
             specs.add(cs);
-            specs.add(ConnectionSpec.CLEARTEXT);
             builder.connectionSpecs(specs);
         } catch (Throwable e) {
             Log.e(TAG, "apply() failed completely: " + e.getMessage(), e);

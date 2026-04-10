@@ -35,6 +35,7 @@ public final class ApiClient {
             synchronized (ApiClient.class) {
                 if (sClient == null) {
                     sClient = Tls12SocketFactory.apply(new OkHttpClient.Builder()
+                            .retryOnConnectionFailure(false)
                             .connectTimeout(15, TimeUnit.SECONDS)
                             .readTimeout(60, TimeUnit.SECONDS)
                             .writeTimeout(30, TimeUnit.SECONDS))
@@ -50,6 +51,7 @@ public final class ApiClient {
             synchronized (ApiClient.class) {
                 if (sBulkClient == null) {
                     sBulkClient = Tls12SocketFactory.apply(new OkHttpClient.Builder()
+                            .retryOnConnectionFailure(false)
                             .connectTimeout(20, TimeUnit.SECONDS)
                             .readTimeout(120, TimeUnit.SECONDS)
                             .writeTimeout(30, TimeUnit.SECONDS))
@@ -65,6 +67,7 @@ public final class ApiClient {
             synchronized (ApiClient.class) {
                 if (sHealthClient == null) {
                     sHealthClient = Tls12SocketFactory.apply(new OkHttpClient.Builder()
+                            .retryOnConnectionFailure(false)
                             .connectTimeout(5, TimeUnit.SECONDS)
                             .readTimeout(5, TimeUnit.SECONDS))
                             .build();
