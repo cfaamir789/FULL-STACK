@@ -1,11 +1,14 @@
 package com.inventory.legacyscanner.network;
 
+import android.content.Context;
 import android.os.Build;
 import android.util.Log;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.security.Provider;
+import java.security.Security;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
@@ -13,6 +16,10 @@ import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
+
+import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.common.GooglePlayServicesRepairableException;
+import com.google.android.gms.security.ProviderInstaller;
 
 import okhttp3.ConnectionSpec;
 import okhttp3.OkHttpClient;
@@ -31,11 +38,48 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
     private static final String TAG = "Tls12SF";
     private static final String[] TLS_V12 = {"TLSv1.2"};
     private static final String TLS_FALLBACK_SCSV = "TLS_FALLBACK_SCSV";
+    private static final String GMS_PROVIDER = "GmsCore_OpenSSL";
     private final SSLSocketFactory delegate;
     private static volatile String providerStatus = "system TLS only";
 
     private Tls12SocketFactory(SSLSocketFactory delegate) {
         this.delegate = delegate;
+    }
+
+    public static synchronized boolean installProvider(Context context) {
+        if (Build.VERSION.SDK_INT >= 21) {
+            providerStatus = "API" + Build.VERSION.SDK_INT + " platform TLS";
+            return true;
+        }
+        if (context == null) {
+            providerStatus = "No context; system TLS only";
+            return false;
+        }
+        try {
+            ProviderInstaller.installIfNeeded(context.getApplicationContext());
+            Provider provider = Security.getProvider(GMS_PROVIDER);
+            if (provider != null) {
+                SSLContext test = SSLContext.getInstance("TLSv1.2", provider);
+                String[] ciphers = filterCipherSuites(test.getSocketFactory().getSupportedCipherSuites());
+                providerStatus = provider.getName() + " " + ciphers.length + " ciphers";
+                Log.i(TAG, "ProviderInstaller OK: " + providerStatus);
+                return true;
+            }
+            providerStatus = "ProviderInstaller ran; provider missing";
+            return false;
+        } catch (GooglePlayServicesRepairableException e) {
+            providerStatus = "GMS repairable: " + e.getConnectionStatusCode();
+            Log.w(TAG, "ProviderInstaller repairable", e);
+            return false;
+        } catch (GooglePlayServicesNotAvailableException e) {
+            providerStatus = "GMS unavailable: " + e.errorCode;
+            Log.w(TAG, "ProviderInstaller unavailable", e);
+            return false;
+        } catch (Throwable e) {
+            providerStatus = "Provider install failed: " + e.getClass().getSimpleName();
+            Log.w(TAG, "ProviderInstaller failed", e);
+            return false;
+        }
     }
 
     public static synchronized boolean installProvider() {
@@ -125,7 +169,10 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
             TrustManager[] trustManagers = tmf.getTrustManagers();
             X509TrustManager tm = (X509TrustManager) trustManagers[0];
 
-            SSLContext sc = SSLContext.getInstance("TLSv1.2");
+                Provider gms = Security.getProvider(GMS_PROVIDER);
+                SSLContext sc = (gms != null)
+                    ? SSLContext.getInstance("TLSv1.2", gms)
+                    : SSLContext.getInstance("TLSv1.2");
             sc.init(null, new TrustManager[]{tm}, null);
 
             Tls12SocketFactory factory = new Tls12SocketFactory(sc.getSocketFactory());
@@ -141,7 +188,7 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
             }
 
             // Accept any TLS 1.2 cipher — let the server and client negotiate
-                ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+            ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
                     .tlsVersions(TlsVersion.TLS_1_2)
                     .allEnabledCipherSuites()
                     .supportsTlsExtensions(true)
