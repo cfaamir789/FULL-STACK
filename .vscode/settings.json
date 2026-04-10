@@ -28,5 +28,6 @@
   "emmet.includeLanguages": {
     "javascript": "javascriptreact"
   },
-  "workbench.iconTheme": "material-icon-theme"
+  "workbench.iconTheme": "material-icon-theme",
+  "java.configuration.updateBuildConfiguration": "automatic"
 }

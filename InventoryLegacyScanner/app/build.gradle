@@ -18,8 +18,8 @@ android {
         applicationId "com.inventory.legacyscanner"
         minSdk 19
         targetSdk 34
-        versionCode 6
-        versionName "1.2.1"
+        versionCode 7
+        versionName "1.2.2"
         multiDexEnabled true
         vectorDrawables.useSupportLibrary = true
     }
@@ -60,6 +60,7 @@ dependencies {
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'com.squareup.okhttp3:okhttp:3.12.13'
     implementation 'com.google.code.gson:gson:2.10.1'
+    implementation 'org.conscrypt:conscrypt-android:2.5.2'
     implementation('com.journeyapps:zxing-android-embedded:4.3.0') {
         transitive = false
     }

@@ -2,3 +2,5 @@
 -keep class com.google.zxing.** { *; }
 -dontwarn okhttp3.**
 -dontwarn okio.**
+-keep class org.conscrypt.** { *; }
+-dontwarn org.conscrypt.**
