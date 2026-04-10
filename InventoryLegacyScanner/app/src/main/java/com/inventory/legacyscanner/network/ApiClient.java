@@ -25,8 +25,7 @@ public final class ApiClient {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final Gson GSON = new Gson();
 
-    // Lazy-init clients to guarantee Conscrypt is installed (from Application.onCreate)
-    // before any SSLContext is created.
+    // Lazy-init clients so legacy TLS configuration is only created when networking is used.
     private static volatile OkHttpClient sClient;
     private static volatile OkHttpClient sBulkClient;
     private static volatile OkHttpClient sHealthClient;
