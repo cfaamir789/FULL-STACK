@@ -114,8 +114,8 @@ public class LoginActivity extends AppCompatActivity {
                             setLoading(false);
                             String detail = e.getMessage();
                             String version = "v" + BuildConfig.VERSION_NAME
-                                    + " (API " + android.os.Build.VERSION.SDK_INT + ")"
-                                    + " Conscrypt=" + Tls12SocketFactory.isConscryptInstalled();
+                                    + " API" + android.os.Build.VERSION.SDK_INT
+                                    + " " + Tls12SocketFactory.getProviderStatus();
                             showError(detail + "\n\n" + version);
                         }
                     });

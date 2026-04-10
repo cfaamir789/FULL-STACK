@@ -3,8 +3,6 @@ package com.inventory.legacyscanner.network;
 import android.os.Build;
 import android.util.Log;
 
-import org.conscrypt.Conscrypt;
-
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -23,48 +21,64 @@ import okhttp3.OkHttpClient;
 import okhttp3.TlsVersion;
 
 /**
- * Provides modern TLS on Android 4.x by using the bundled Conscrypt (BoringSSL) provider.
- * The stock Android 4.4 OpenSSL is ancient and lacks modern cipher suites;
- * Conscrypt replaces it entirely so TLS 1.2 with modern ciphers works.
+ * Provides modern TLS on Android 4.x devices.
+ * Strategy:
+ *   1. Try to load bundled Conscrypt via reflection (BoringSSL with modern ciphers).
+ *   2. If Conscrypt fails (native lib crash on some Huawei devices), fall back to
+ *      the system SSLContext but enable ALL supported cipher suites — stock Android 4.4
+ *      has ECDHE ciphers available but disabled by default.
+ *
+ * Conscrypt is loaded via REFLECTION so that if its native library fails,
+ * no class-loading error propagates to this class or the Application.
  */
 public final class Tls12SocketFactory extends SSLSocketFactory {
     private static final String TAG = "Tls12SF";
     private static final String[] TLS_V12 = {"TLSv1.2"};
     private final SSLSocketFactory delegate;
     private static volatile boolean conscryptInstalled = false;
+    private static volatile String providerStatus = "not attempted";
 
     private Tls12SocketFactory(SSLSocketFactory delegate) {
         this.delegate = delegate;
     }
 
     /**
-     * Install Conscrypt as the primary security provider.
-     * MUST be called from Application.onCreate() before any network call.
+     * Try to install Conscrypt via reflection. Never references org.conscrypt directly.
+     * If the native library fails to load, this method logs the error and returns false.
      */
-    public static synchronized void installProvider() {
-        if (conscryptInstalled) return;
+    public static synchronized boolean installProvider() {
+        if (conscryptInstalled) return true;
         try {
-            Provider provider = Conscrypt.newProvider();
+            // Load Conscrypt via reflection — isolates native lib crashes
+            Class<?> conscryptClass = Class.forName("org.conscrypt.Conscrypt");
+            java.lang.reflect.Method newProvider = conscryptClass.getMethod("newProvider");
+            Provider provider = (Provider) newProvider.invoke(null);
             int pos = Security.insertProviderAt(provider, 1);
             conscryptInstalled = true;
-            Log.i(TAG, "Conscrypt provider installed at position " + pos);
+            providerStatus = "Conscrypt at #" + pos;
+            Log.i(TAG, "Conscrypt installed at position " + pos);
 
-            // Verify by creating an SSLContext with Conscrypt
+            // Verify
             SSLContext test = SSLContext.getInstance("TLSv1.2", provider);
-            Log.i(TAG, "SSLContext provider: " + test.getProvider().getName()
-                    + " (" + test.getProvider().getClass().getName() + ")");
             String[] ciphers = test.getSocketFactory().getSupportedCipherSuites();
-            Log.i(TAG, "Supported ciphers: " + ciphers.length);
-            for (int i = 0; i < Math.min(5, ciphers.length); i++) {
-                Log.d(TAG, "  cipher: " + ciphers[i]);
-            }
+            Log.i(TAG, "Conscrypt ciphers: " + ciphers.length);
+            providerStatus += ", " + ciphers.length + " ciphers";
+            return true;
         } catch (Throwable e) {
-            Log.e(TAG, "Conscrypt installation FAILED: " + e.getClass().getName() + ": " + e.getMessage(), e);
+            // Catches UnsatisfiedLinkError, ExceptionInInitializerError, ClassNotFoundException,
+            // NoClassDefFoundError, etc.
+            providerStatus = "FAILED: " + e.getClass().getSimpleName() + ": " + e.getMessage();
+            Log.e(TAG, "Conscrypt failed: " + providerStatus, e);
+            return false;
         }
     }
 
     public static boolean isConscryptInstalled() {
         return conscryptInstalled;
+    }
+
+    public static String getProviderStatus() {
+        return providerStatus;
     }
 
     @Override
@@ -102,18 +116,22 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
         return patch(delegate.createSocket(address, port, localAddress, localPort));
     }
 
+    /**
+     * Force TLS 1.2 and enable ALL supported cipher suites on every socket.
+     * Even the stock Android 4.4 OpenSSL supports ECDHE ciphers but doesn't enable them.
+     */
     private static Socket patch(Socket socket) {
         if (socket instanceof SSLSocket) {
             SSLSocket ssl = (SSLSocket) socket;
             ssl.setEnabledProtocols(TLS_V12);
-            // Enable all supported cipher suites from Conscrypt
             ssl.setEnabledCipherSuites(ssl.getSupportedCipherSuites());
         }
         return socket;
     }
 
     /**
-     * Configure an OkHttpClient.Builder with Conscrypt TLS for Android 4.x.
+     * Configure an OkHttpClient.Builder for TLS 1.2 on Android 4.x.
+     * Uses Conscrypt if available, otherwise falls back to system SSL with all ciphers enabled.
      * On API 21+ this is a no-op.
      */
     public static OkHttpClient.Builder apply(OkHttpClient.Builder builder) {
@@ -129,28 +147,39 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
 
             SSLContext sc;
             if (conscryptInstalled) {
-                // Explicitly request Conscrypt provider — do NOT let JCE fall back
-                Provider conscrypt = Security.getProvider("Conscrypt");
-                if (conscrypt != null) {
-                    sc = SSLContext.getInstance("TLSv1.2", conscrypt);
-                    Log.i(TAG, "apply(): using Conscrypt SSLContext");
-                } else {
+                // Use Conscrypt's BoringSSL — modern ciphers guaranteed
+                try {
+                    Provider conscrypt = Security.getProvider("Conscrypt");
+                    if (conscrypt != null) {
+                        sc = SSLContext.getInstance("TLSv1.2", conscrypt);
+                        Log.i(TAG, "apply(): Conscrypt SSLContext OK");
+                    } else {
+                        sc = SSLContext.getInstance("TLSv1.2");
+                        Log.w(TAG, "apply(): Conscrypt flag set but provider not found");
+                    }
+                } catch (Throwable e) {
                     sc = SSLContext.getInstance("TLSv1.2");
-                    Log.w(TAG, "apply(): Conscrypt provider not found, using default");
+                    Log.w(TAG, "apply(): Conscrypt SSLContext failed, using system: " + e.getMessage());
                 }
             } else {
+                // Fallback: system SSL + we'll enable all cipher suites in patch()
                 sc = SSLContext.getInstance("TLSv1.2");
-                Log.w(TAG, "apply(): Conscrypt NOT installed, using system TLS");
+                Log.i(TAG, "apply(): system SSLContext (Conscrypt not available)");
             }
             sc.init(null, new TrustManager[]{tm}, null);
 
             Tls12SocketFactory factory = new Tls12SocketFactory(sc.getSocketFactory());
             builder.sslSocketFactory(factory, tm);
 
-            Log.i(TAG, "SSLContext.provider=" + sc.getProvider().getName()
-                    + " ciphers=" + sc.getSocketFactory().getSupportedCipherSuites().length);
+            String[] ciphers = sc.getSocketFactory().getSupportedCipherSuites();
+            Log.i(TAG, "Provider=" + sc.getProvider().getName()
+                    + " ciphers=" + ciphers.length);
+            // Log ECDHE ciphers specifically (these are needed for Render/Cloudflare)
+            for (String c : ciphers) {
+                if (c.contains("ECDHE")) Log.d(TAG, "  " + c);
+            }
 
-            // Allow any TLS 1.2 cipher suite
+            // Accept any TLS 1.2 cipher — let the server and client negotiate
             ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.COMPATIBLE_TLS)
                     .tlsVersions(TlsVersion.TLS_1_2)
                     .allEnabledCipherSuites()
@@ -159,9 +188,11 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
             specs.add(cs);
             specs.add(ConnectionSpec.CLEARTEXT);
             builder.connectionSpecs(specs);
-        } catch (Exception e) {
-            Log.e(TAG, "apply() failed: " + e.getMessage(), e);
+        } catch (Throwable e) {
+            Log.e(TAG, "apply() failed completely: " + e.getMessage(), e);
         }
         return builder;
+    }
+}
     }
 }

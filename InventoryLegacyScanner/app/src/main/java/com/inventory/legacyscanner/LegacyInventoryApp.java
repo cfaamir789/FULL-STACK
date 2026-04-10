@@ -15,15 +15,13 @@ public class LegacyInventoryApp extends MultiDexApplication {
     public void onCreate() {
         super.onCreate();
 
-        // Install Conscrypt FIRST — MUST happen before any class touches SSL/OkHttp.
-        // On Android 4.x the system OpenSSL is too old (no modern cipher suites).
-        // Conscrypt bundles BoringSSL which provides modern TLS on any API level.
+        // On Android 4.x, try to install Conscrypt for modern TLS.
+        // If it fails (e.g. native lib issue on some Huawei devices),
+        // the app still works using system SSL with all ciphers enabled.
         if (Build.VERSION.SDK_INT < 21) {
-            Log.i(TAG, "Android API " + Build.VERSION.SDK_INT + " — installing Conscrypt");
-            Tls12SocketFactory.installProvider();
-            Log.i(TAG, "Conscrypt installed: " + Tls12SocketFactory.isConscryptInstalled());
-        } else {
-            Log.i(TAG, "Android API " + Build.VERSION.SDK_INT + " — system TLS is fine");
+            Log.i(TAG, "API " + Build.VERSION.SDK_INT + " — attempting Conscrypt");
+            boolean ok = Tls12SocketFactory.installProvider();
+            Log.i(TAG, "Conscrypt result: " + ok + " — " + Tls12SocketFactory.getProviderStatus());
         }
 
         DbHelper.getInstance(this);
