@@ -194,5 +194,3 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
         return builder;
     }
 }
-    }
-}
