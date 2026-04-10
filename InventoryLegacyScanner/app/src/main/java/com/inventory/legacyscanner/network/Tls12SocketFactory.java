@@ -3,6 +3,8 @@ package com.inventory.legacyscanner.network;
 import android.os.Build;
 import android.util.Log;
 
+import org.conscrypt.Conscrypt;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
@@ -21,32 +23,48 @@ import okhttp3.OkHttpClient;
 import okhttp3.TlsVersion;
 
 /**
- * Provides modern TLS (1.2+) on Android 4.x by using Conscrypt (bundled BoringSSL).
- * The stock Android 4.4 OpenSSL lacks modern cipher suites; Conscrypt fixes that.
+ * Provides modern TLS on Android 4.x by using the bundled Conscrypt (BoringSSL) provider.
+ * The stock Android 4.4 OpenSSL is ancient and lacks modern cipher suites;
+ * Conscrypt replaces it entirely so TLS 1.2 with modern ciphers works.
  */
 public final class Tls12SocketFactory extends SSLSocketFactory {
-    private static final String TAG = "Tls12SocketFactory";
+    private static final String TAG = "Tls12SF";
     private static final String[] TLS_V12 = {"TLSv1.2"};
     private final SSLSocketFactory delegate;
+    private static volatile boolean conscryptInstalled = false;
 
     private Tls12SocketFactory(SSLSocketFactory delegate) {
         this.delegate = delegate;
     }
 
     /**
-     * Install Conscrypt as the top security provider. Call once from Application.onCreate().
-     * This gives the entire JVM modern TLS + cipher suites on old Android.
+     * Install Conscrypt as the primary security provider.
+     * MUST be called from Application.onCreate() before any network call.
      */
-    public static void installConscrypt() {
+    public static synchronized void installProvider() {
+        if (conscryptInstalled) return;
         try {
-            Class<?> conscryptClass = Class.forName("org.conscrypt.Conscrypt");
-            java.lang.reflect.Method newProvider = conscryptClass.getMethod("newProvider");
-            Provider provider = (Provider) newProvider.invoke(null);
-            Security.insertProviderAt(provider, 1);
-            Log.i(TAG, "Conscrypt installed as top security provider");
-        } catch (Exception e) {
-            Log.w(TAG, "Conscrypt install failed: " + e.getMessage());
+            Provider provider = Conscrypt.newProvider();
+            int pos = Security.insertProviderAt(provider, 1);
+            conscryptInstalled = true;
+            Log.i(TAG, "Conscrypt provider installed at position " + pos);
+
+            // Verify by creating an SSLContext with Conscrypt
+            SSLContext test = SSLContext.getInstance("TLSv1.2", provider);
+            Log.i(TAG, "SSLContext provider: " + test.getProvider().getName()
+                    + " (" + test.getProvider().getClass().getName() + ")");
+            String[] ciphers = test.getSocketFactory().getSupportedCipherSuites();
+            Log.i(TAG, "Supported ciphers: " + ciphers.length);
+            for (int i = 0; i < Math.min(5, ciphers.length); i++) {
+                Log.d(TAG, "  cipher: " + ciphers[i]);
+            }
+        } catch (Throwable e) {
+            Log.e(TAG, "Conscrypt installation FAILED: " + e.getClass().getName() + ": " + e.getMessage(), e);
         }
+    }
+
+    public static boolean isConscryptInstalled() {
+        return conscryptInstalled;
     }
 
     @Override
@@ -61,39 +79,41 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
 
     @Override
     public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
-        return enableTls12(delegate.createSocket(s, host, port, autoClose));
+        return patch(delegate.createSocket(s, host, port, autoClose));
     }
 
     @Override
     public Socket createSocket(String host, int port) throws IOException {
-        return enableTls12(delegate.createSocket(host, port));
+        return patch(delegate.createSocket(host, port));
     }
 
     @Override
     public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException {
-        return enableTls12(delegate.createSocket(host, port, localHost, localPort));
+        return patch(delegate.createSocket(host, port, localHost, localPort));
     }
 
     @Override
     public Socket createSocket(InetAddress host, int port) throws IOException {
-        return enableTls12(delegate.createSocket(host, port));
+        return patch(delegate.createSocket(host, port));
     }
 
     @Override
     public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
-        return enableTls12(delegate.createSocket(address, port, localAddress, localPort));
+        return patch(delegate.createSocket(address, port, localAddress, localPort));
     }
 
-    private static Socket enableTls12(Socket socket) {
+    private static Socket patch(Socket socket) {
         if (socket instanceof SSLSocket) {
-            ((SSLSocket) socket).setEnabledProtocols(TLS_V12);
+            SSLSocket ssl = (SSLSocket) socket;
+            ssl.setEnabledProtocols(TLS_V12);
+            // Enable all supported cipher suites from Conscrypt
+            ssl.setEnabledCipherSuites(ssl.getSupportedCipherSuites());
         }
         return socket;
     }
 
     /**
-     * Apply modern TLS to an OkHttpClient.Builder.
-     * Uses Conscrypt's SSLContext (installed at app startup) for modern cipher suites.
+     * Configure an OkHttpClient.Builder with Conscrypt TLS for Android 4.x.
      * On API 21+ this is a no-op.
      */
     public static OkHttpClient.Builder apply(OkHttpClient.Builder builder) {
@@ -107,28 +127,40 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
             TrustManager[] trustManagers = tmf.getTrustManagers();
             X509TrustManager tm = (X509TrustManager) trustManagers[0];
 
-            // Conscrypt is now the top provider, so getInstance("TLSv1.2")
-            // will use Conscrypt's BoringSSL with modern cipher suites.
-            SSLContext sc = SSLContext.getInstance("TLSv1.2");
+            SSLContext sc;
+            if (conscryptInstalled) {
+                // Explicitly request Conscrypt provider — do NOT let JCE fall back
+                Provider conscrypt = Security.getProvider("Conscrypt");
+                if (conscrypt != null) {
+                    sc = SSLContext.getInstance("TLSv1.2", conscrypt);
+                    Log.i(TAG, "apply(): using Conscrypt SSLContext");
+                } else {
+                    sc = SSLContext.getInstance("TLSv1.2");
+                    Log.w(TAG, "apply(): Conscrypt provider not found, using default");
+                }
+            } else {
+                sc = SSLContext.getInstance("TLSv1.2");
+                Log.w(TAG, "apply(): Conscrypt NOT installed, using system TLS");
+            }
             sc.init(null, new TrustManager[]{tm}, null);
 
             Tls12SocketFactory factory = new Tls12SocketFactory(sc.getSocketFactory());
             builder.sslSocketFactory(factory, tm);
 
-            // Log available ciphers for debugging
-            String[] ciphers = sc.getSocketFactory().getSupportedCipherSuites();
-            Log.i(TAG, "SSLContext provider: " + sc.getProvider().getName()
-                    + ", supported ciphers: " + ciphers.length);
+            Log.i(TAG, "SSLContext.provider=" + sc.getProvider().getName()
+                    + " ciphers=" + sc.getSocketFactory().getSupportedCipherSuites().length);
 
-            ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
+            // Allow any TLS 1.2 cipher suite
+            ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.COMPATIBLE_TLS)
                     .tlsVersions(TlsVersion.TLS_1_2)
+                    .allEnabledCipherSuites()
                     .build();
             java.util.List<ConnectionSpec> specs = new java.util.ArrayList<>();
             specs.add(cs);
             specs.add(ConnectionSpec.CLEARTEXT);
             builder.connectionSpecs(specs);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to apply TLS 1.2: " + e.getMessage());
+            Log.e(TAG, "apply() failed: " + e.getMessage(), e);
         }
         return builder;
     }

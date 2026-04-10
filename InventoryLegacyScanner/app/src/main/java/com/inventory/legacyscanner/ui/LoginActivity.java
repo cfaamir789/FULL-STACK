@@ -13,11 +13,13 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.inventory.legacyscanner.R;
+import com.inventory.legacyscanner.BuildConfig;
 import com.inventory.legacyscanner.config.AppConfig;
 import com.inventory.legacyscanner.data.PrefsStore;
 import com.inventory.legacyscanner.model.AuthSession;
 import com.inventory.legacyscanner.network.ApiClient;
 import com.inventory.legacyscanner.network.NetworkUtils;
+import com.inventory.legacyscanner.network.Tls12SocketFactory;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -110,7 +112,11 @@ public class LoginActivity extends AppCompatActivity {
                         @Override
                         public void run() {
                             setLoading(false);
-                            showError(e.getMessage());
+                            String detail = e.getMessage();
+                            String version = "v" + BuildConfig.VERSION_NAME
+                                    + " (API " + android.os.Build.VERSION.SDK_INT + ")"
+                                    + " Conscrypt=" + Tls12SocketFactory.isConscryptInstalled();
+                            showError(detail + "\n\n" + version);
                         }
                     });
                 }

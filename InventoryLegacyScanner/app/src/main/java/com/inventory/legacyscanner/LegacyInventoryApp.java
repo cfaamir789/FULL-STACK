@@ -9,14 +9,21 @@ import com.inventory.legacyscanner.data.DbHelper;
 import com.inventory.legacyscanner.network.Tls12SocketFactory;
 
 public class LegacyInventoryApp extends MultiDexApplication {
+    private static final String TAG = "LegacyApp";
+
     @Override
     public void onCreate() {
         super.onCreate();
 
-        // Install Conscrypt FIRST — before any code touches OkHttp or SSL.
-        // This gives the JVM modern TLS 1.2 + modern cipher suites via BoringSSL.
+        // Install Conscrypt FIRST — MUST happen before any class touches SSL/OkHttp.
+        // On Android 4.x the system OpenSSL is too old (no modern cipher suites).
+        // Conscrypt bundles BoringSSL which provides modern TLS on any API level.
         if (Build.VERSION.SDK_INT < 21) {
-            Tls12SocketFactory.installConscrypt();
+            Log.i(TAG, "Android API " + Build.VERSION.SDK_INT + " — installing Conscrypt");
+            Tls12SocketFactory.installProvider();
+            Log.i(TAG, "Conscrypt installed: " + Tls12SocketFactory.isConscryptInstalled());
+        } else {
+            Log.i(TAG, "Android API " + Build.VERSION.SDK_INT + " — system TLS is fine");
         }
 
         DbHelper.getInstance(this);

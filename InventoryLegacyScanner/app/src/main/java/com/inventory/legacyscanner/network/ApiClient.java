@@ -25,22 +25,55 @@ public final class ApiClient {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final Gson GSON = new Gson();
 
-    private static final OkHttpClient CLIENT = Tls12SocketFactory.apply(new OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS))
-            .build();
+    // Lazy-init clients to guarantee Conscrypt is installed (from Application.onCreate)
+    // before any SSLContext is created.
+    private static volatile OkHttpClient sClient;
+    private static volatile OkHttpClient sBulkClient;
+    private static volatile OkHttpClient sHealthClient;
 
-    private static final OkHttpClient BULK_CLIENT = Tls12SocketFactory.apply(new OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS))
-            .build();
+    private static OkHttpClient getClient() {
+        if (sClient == null) {
+            synchronized (ApiClient.class) {
+                if (sClient == null) {
+                    sClient = Tls12SocketFactory.apply(new OkHttpClient.Builder()
+                            .connectTimeout(15, TimeUnit.SECONDS)
+                            .readTimeout(60, TimeUnit.SECONDS)
+                            .writeTimeout(30, TimeUnit.SECONDS))
+                            .build();
+                }
+            }
+        }
+        return sClient;
+    }
 
-    private static final OkHttpClient HEALTH_CLIENT = Tls12SocketFactory.apply(new OkHttpClient.Builder()
-            .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(5, TimeUnit.SECONDS))
-            .build();
+    private static OkHttpClient getBulkClient() {
+        if (sBulkClient == null) {
+            synchronized (ApiClient.class) {
+                if (sBulkClient == null) {
+                    sBulkClient = Tls12SocketFactory.apply(new OkHttpClient.Builder()
+                            .connectTimeout(20, TimeUnit.SECONDS)
+                            .readTimeout(120, TimeUnit.SECONDS)
+                            .writeTimeout(30, TimeUnit.SECONDS))
+                            .build();
+                }
+            }
+        }
+        return sBulkClient;
+    }
+
+    private static OkHttpClient getHealthClient() {
+        if (sHealthClient == null) {
+            synchronized (ApiClient.class) {
+                if (sHealthClient == null) {
+                    sHealthClient = Tls12SocketFactory.apply(new OkHttpClient.Builder()
+                            .connectTimeout(5, TimeUnit.SECONDS)
+                            .readTimeout(5, TimeUnit.SECONDS))
+                            .build();
+                }
+            }
+        }
+        return sHealthClient;
+    }
 
     private ApiClient() {
     }
@@ -69,7 +102,7 @@ public final class ApiClient {
             try {
                 String url = server.replaceAll("/+$", "") + "/api/health";
                 Request req = new Request.Builder().url(url).get().build();
-                Response res = HEALTH_CLIENT.newCall(req).execute();
+                Response res = getHealthClient().newCall(req).execute();
                 if (res.isSuccessful()) {
                     PrefsStore.setServerAddress(ctx, server);
                     res.close();
@@ -91,7 +124,7 @@ public final class ApiClient {
                 .url(url)
                 .post(RequestBody.create(JSON, body.toString()))
                 .build();
-        Response response = CLIENT.newCall(request).execute();
+        Response response = getClient().newCall(request).execute();
         String responseBody = response.body() != null ? response.body().string() : "";
         if (!response.isSuccessful()) {
             JsonObject err = new JsonParser().parse(responseBody).getAsJsonObject();
@@ -124,7 +157,7 @@ public final class ApiClient {
                 .addHeader("Authorization", "Bearer " + token)
                 .post(RequestBody.create(JSON, body.toString()))
                 .build();
-        Response response = CLIENT.newCall(request).execute();
+        Response response = getClient().newCall(request).execute();
         String responseBody = response.body() != null ? response.body().string() : "{}";
         if (!response.isSuccessful()) {
             throw new IOException("Sync failed: " + response.code());
@@ -143,7 +176,7 @@ public final class ApiClient {
         IOException lastError = null;
         for (int attempt = 0; attempt < 3; attempt++) {
             try {
-                Response response = BULK_CLIENT.newCall(request).execute();
+                Response response = getBulkClient().newCall(request).execute();
                 String responseBody = response.body() != null ? response.body().string() : "{}";
                 if (!response.isSuccessful()) {
                     throw new IOException("Fetch items failed: " + response.code());
