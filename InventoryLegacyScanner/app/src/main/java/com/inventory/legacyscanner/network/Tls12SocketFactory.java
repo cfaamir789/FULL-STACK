@@ -6,7 +6,13 @@ import android.util.Log;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.security.KeyStore;
+import java.security.SecureRandom;
 import java.security.Security;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
@@ -16,6 +22,10 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.jsse.BCSSLSocket;
+import org.bouncycastle.jsse.BCSNIHostName;
+import org.bouncycastle.jsse.BCSNIServerName;
+import org.bouncycastle.jsse.BCSSLParameters;
 import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider;
 
 import okhttp3.ConnectionSpec;
@@ -23,104 +33,158 @@ import okhttp3.OkHttpClient;
 import okhttp3.TlsVersion;
 
 /**
- * Provides modern TLS on Android 4.x devices via BouncyCastle JSSE.
- * Stock Android 4.4's OpenSSL doesn't negotiate ciphers accepted by
- * Cloudflare/Render. BouncyCastle JSSE is pure Java (no native libs)
- * and works on Huawei devices without Google Play Services.
+ * TLS 1.2 on Android 4.4 via BouncyCastle JSSE (pure Java).
+ *
+ * Three things Android 4.4 breaks that this class fixes:
+ * 1) The stock OpenSSL provider lacks ECDHE+GCM ciphers Cloudflare needs.
+ *    → BouncyCastle provides them (pure Java, no native libs, no GMS).
+ * 2) Android's JSSE SPI ignores third-party providers registered by name.
+ *    → We store the BouncyCastleJsseProvider INSTANCE and pass it directly
+ *      to SSLContext.getInstance() / TrustManagerFactory.getInstance().
+ * 3) OkHttp sets SNI via reflection on Android's internal SSLSocket class,
+ *    which doesn't exist on BCSSLSocket.
+ *    → We set SNI ourselves via BCSSLSocket.setParameters(BCSSLParameters).
  */
 public final class Tls12SocketFactory extends SSLSocketFactory {
     private static final String TAG = "Tls12SF";
     private static final String[] TLS_V12 = {"TLSv1.2"};
     private static final String TLS_FALLBACK_SCSV = "TLS_FALLBACK_SCSV";
-    private static final String BCJSSE = "BCJSSE";
+
     private final SSLSocketFactory delegate;
-    private static volatile String providerStatus = "system TLS only";
+    private static volatile String providerStatus = "not initialized";
+
+    // Provider INSTANCES — never looked up by string name on Android
+    private static volatile BouncyCastleJsseProvider sProvider;
+    private static volatile X509TrustManager sTrustManager;
 
     private Tls12SocketFactory(SSLSocketFactory delegate) {
         this.delegate = delegate;
     }
 
     /**
-     * Install BouncyCastle as the JCE + JSSE provider so TLS 1.2 with
-     * modern cipher suites (ECDHE+GCM) is available on Android 4.x.
+     * Install BouncyCastle JCE + JSSE. Call once from Application.onCreate().
      */
     public static synchronized boolean installProvider() {
         if (Build.VERSION.SDK_INT >= 21) {
-            providerStatus = "API" + Build.VERSION.SDK_INT + " platform TLS";
+            providerStatus = "API" + Build.VERSION.SDK_INT + " native TLS";
             return true;
         }
         try {
-            // Remove Android's built-in stripped BouncyCastle to avoid conflicts
+            // ── Step 1: Full BouncyCastle JCE (replace Android's stripped one) ──
             Security.removeProvider("BC");
-            Security.insertProviderAt(new BouncyCastleProvider(), 1);
-            Security.insertProviderAt(new BouncyCastleJsseProvider(), 2);
+            BouncyCastleProvider bcProv = new BouncyCastleProvider();
+            Security.insertProviderAt(bcProv, 1);
+            Log.i(TAG, "BC JCE v" + bcProv.getVersion() + " installed at pos 1");
 
-            // Verify it works
-            SSLContext test = SSLContext.getInstance("TLSv1.2", BCJSSE);
-            test.init(null, null, null);
+            // ── Step 2: BCJSSE linked to our BC JCE (provider OBJECT, not name) ──
+            sProvider = new BouncyCastleJsseProvider(bcProv);
+            Security.insertProviderAt(sProvider, 2);
+            Log.i(TAG, "BCJSSE provider installed at pos 2");
+
+            // ── Step 3: Copy Android system CAs into a KeyStore BCJSSE can read ──
+            TrustManagerFactory sysTmf = TrustManagerFactory.getInstance(
+                    TrustManagerFactory.getDefaultAlgorithm());
+            sysTmf.init((KeyStore) null);
+            X509TrustManager sysTm = null;
+            for (TrustManager tm : sysTmf.getTrustManagers()) {
+                if (tm instanceof X509TrustManager) { sysTm = (X509TrustManager) tm; break; }
+            }
+            if (sysTm == null) {
+                providerStatus = "no system X509TrustManager";
+                return false;
+            }
+            X509Certificate[] systemCAs = sysTm.getAcceptedIssuers();
+            KeyStore bcKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            bcKeyStore.load(null, null);
+            for (int i = 0; i < systemCAs.length; i++) {
+                bcKeyStore.setCertificateEntry("ca_" + i, systemCAs[i]);
+            }
+            Log.i(TAG, "Copied " + systemCAs.length + " system CAs into BCJSSE KeyStore");
+
+            // ── Step 4: BCJSSE TrustManager from provider INSTANCE ──
+            TrustManagerFactory bcTmf = TrustManagerFactory.getInstance("PKIX", sProvider);
+            bcTmf.init(bcKeyStore);
+            for (TrustManager tm : bcTmf.getTrustManagers()) {
+                if (tm instanceof X509TrustManager) { sTrustManager = (X509TrustManager) tm; break; }
+            }
+            if (sTrustManager == null) {
+                providerStatus = "no BCJSSE X509TrustManager";
+                return false;
+            }
+
+            // ── Step 5: Verify SSLContext creation works ──
+            SSLContext test = SSLContext.getInstance("TLSv1.2", sProvider);
+            test.init(null, new TrustManager[]{sTrustManager}, new SecureRandom());
             String[] ciphers = filterCipherSuites(
                     test.getSocketFactory().getSupportedCipherSuites());
-            providerStatus = BCJSSE + " " + ciphers.length + " ciphers";
-            Log.i(TAG, "BouncyCastle JSSE OK: " + providerStatus);
-
+            providerStatus = "BCJSSE " + ciphers.length + " ciphers";
+            Log.i(TAG, providerStatus);
             for (String c : ciphers) {
-                if (c.contains("ECDHE")) Log.d(TAG, "  BC: " + c);
+                if (c.contains("ECDHE") || c.contains("GCM")) Log.d(TAG, "  " + c);
             }
             return true;
         } catch (Throwable e) {
-            providerStatus = "BCJSSE failed: " + e.getMessage();
-            Log.e(TAG, "BouncyCastle JSSE install failed", e);
+            sProvider = null;
+            sTrustManager = null;
+            providerStatus = "BCJSSE fail: " + e.getClass().getSimpleName()
+                    + ": " + e.getMessage();
+            Log.e(TAG, "installProvider failed", e);
             return false;
         }
     }
 
-    public static boolean isConscryptInstalled() {
-        return false;
-    }
+    public static boolean isConscryptInstalled() { return false; }
+    public static String getProviderStatus() { return providerStatus; }
 
-    public static String getProviderStatus() {
-        return providerStatus;
-    }
+    // ─── SSLSocketFactory delegate methods ─────────────────────────────────
 
-    @Override
-    public String[] getDefaultCipherSuites() {
+    @Override public String[] getDefaultCipherSuites() {
         return filterCipherSuites(delegate.getDefaultCipherSuites());
     }
-
-    @Override
-    public String[] getSupportedCipherSuites() {
+    @Override public String[] getSupportedCipherSuites() {
         return filterCipherSuites(delegate.getSupportedCipherSuites());
     }
 
     @Override
     public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
-        return patch(delegate.createSocket(s, host, port, autoClose));
+        return patchAndSni(delegate.createSocket(s, host, port, autoClose), host);
     }
-
     @Override
     public Socket createSocket(String host, int port) throws IOException {
-        return patch(delegate.createSocket(host, port));
+        return patchAndSni(delegate.createSocket(host, port), host);
     }
-
     @Override
     public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException {
-        return patch(delegate.createSocket(host, port, localHost, localPort));
+        return patchAndSni(delegate.createSocket(host, port, localHost, localPort), host);
     }
-
     @Override
     public Socket createSocket(InetAddress host, int port) throws IOException {
         return patch(delegate.createSocket(host, port));
     }
-
     @Override
     public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
         return patch(delegate.createSocket(address, port, localAddress, localPort));
     }
 
-    /**
-     * Force TLS 1.2 and enable ALL supported cipher suites on every socket.
-     * Even the stock Android 4.4 OpenSSL supports ECDHE ciphers but doesn't enable them.
-     */
+    // ─── SNI via BouncyCastle's own API (not Android's broken reflection) ──
+
+    private static Socket patchAndSni(Socket socket, String host) {
+        if (socket instanceof BCSSLSocket && host != null && !host.isEmpty()) {
+            try {
+                BCSSLSocket bcSsl = (BCSSLSocket) socket;
+                BCSSLParameters params = bcSsl.getParameters();
+                List<BCSNIServerName> names = new ArrayList<BCSNIServerName>();
+                names.add(new BCSNIHostName(host));
+                params.setServerNames(names);
+                bcSsl.setParameters(params);
+                Log.d(TAG, "SNI → " + host);
+            } catch (Throwable e) {
+                Log.w(TAG, "SNI failed for " + host + ": " + e.getMessage());
+            }
+        }
+        return patch(socket);
+    }
+
     private static Socket patch(Socket socket) {
         if (socket instanceof SSLSocket) {
             SSLSocket ssl = (SSLSocket) socket;
@@ -131,64 +195,54 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
     }
 
     private static String[] filterCipherSuites(String[] suites) {
-        java.util.List<String> filtered = new java.util.ArrayList<>();
-        for (String suite : suites) {
-            if (!TLS_FALLBACK_SCSV.equals(suite)) {
-                filtered.add(suite);
-            }
+        List<String> out = new ArrayList<String>();
+        for (String s : suites) {
+            if (!TLS_FALLBACK_SCSV.equals(s)) out.add(s);
         }
-        return filtered.toArray(new String[0]);
+        return out.toArray(new String[0]);
     }
 
-    /**
-     * Configure an OkHttpClient.Builder for TLS 1.2 on Android 4.x.
-     * Uses BouncyCastle JSSE if installed, otherwise falls back to system SSL.
-     * On API 21+ this is a no-op.
-     */
+    // ─── OkHttp integration ───────────────────────────────────────────────
+
     public static OkHttpClient.Builder apply(OkHttpClient.Builder builder) {
-        if (Build.VERSION.SDK_INT >= 21) {
-            return builder;
-        }
+        if (Build.VERSION.SDK_INT >= 21) return builder;
         try {
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(
-                    TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init((java.security.KeyStore) null);
-            TrustManager[] trustManagers = tmf.getTrustManagers();
-            X509TrustManager tm = (X509TrustManager) trustManagers[0];
-
-            // Prefer BCJSSE; fall back to system provider
             SSLContext sc;
-            try {
-                sc = SSLContext.getInstance("TLSv1.2", BCJSSE);
-            } catch (Throwable e) {
-                Log.w(TAG, "BCJSSE unavailable, falling back to system", e);
+            X509TrustManager tm;
+
+            if (sProvider != null && sTrustManager != null) {
+                // BCJSSE path — provider OBJECT (not string name)
+                sc = SSLContext.getInstance("TLSv1.2", sProvider);
+                tm = sTrustManager;
+                sc.init(null, new TrustManager[]{tm}, new SecureRandom());
+                Log.i(TAG, "apply(): using BCJSSE provider instance");
+            } else {
+                // Fallback: system TLS (will probably fail on Cloudflare)
+                Log.w(TAG, "apply(): BCJSSE unavailable, system TLS fallback");
+                TrustManagerFactory tmf = TrustManagerFactory.getInstance(
+                        TrustManagerFactory.getDefaultAlgorithm());
+                tmf.init((KeyStore) null);
+                tm = (X509TrustManager) tmf.getTrustManagers()[0];
                 sc = SSLContext.getInstance("TLSv1.2");
+                sc.init(null, new TrustManager[]{tm}, null);
             }
-            sc.init(null, new TrustManager[]{tm}, null);
 
-            Tls12SocketFactory factory = new Tls12SocketFactory(sc.getSocketFactory());
-            builder.sslSocketFactory(factory, tm);
+            builder.sslSocketFactory(new Tls12SocketFactory(sc.getSocketFactory()), tm);
 
-            String[] ciphers = filterCipherSuites(sc.getSocketFactory().getSupportedCipherSuites());
+            String[] ciphers = filterCipherSuites(
+                    sc.getSocketFactory().getSupportedCipherSuites());
             providerStatus = sc.getProvider().getName() + " " + ciphers.length + " ciphers";
-            Log.i(TAG, "Provider=" + sc.getProvider().getName()
-                    + " ciphers=" + ciphers.length);
-            // Log ECDHE ciphers specifically (these are needed for Render/Cloudflare)
-            for (String c : ciphers) {
-                if (c.contains("ECDHE")) Log.d(TAG, "  " + c);
-            }
+            Log.i(TAG, "OkHttp TLS: " + providerStatus);
 
-            // Accept any TLS 1.2 cipher — let the server and client negotiate
             ConnectionSpec cs = new ConnectionSpec.Builder(ConnectionSpec.MODERN_TLS)
                     .tlsVersions(TlsVersion.TLS_1_2)
                     .allEnabledCipherSuites()
                     .supportsTlsExtensions(true)
                     .build();
-            java.util.List<ConnectionSpec> specs = new java.util.ArrayList<>();
-            specs.add(cs);
-            builder.connectionSpecs(specs);
+            builder.connectionSpecs(Collections.singletonList(cs));
         } catch (Throwable e) {
-            Log.e(TAG, "apply() failed completely: " + e.getMessage(), e);
+            providerStatus = "apply fail: " + e.getMessage();
+            Log.e(TAG, "apply() failed", e);
         }
         return builder;
     }

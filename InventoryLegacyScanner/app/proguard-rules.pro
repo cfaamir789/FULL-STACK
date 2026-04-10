@@ -6,9 +6,7 @@
 # Conscrypt — no longer used but keep dontwarn
 -dontwarn org.conscrypt.**
 
-# BouncyCastle JCE + JSSE providers
--keep class org.bouncycastle.jce.provider.BouncyCastleProvider { *; }
--keep class org.bouncycastle.jsse.provider.BouncyCastleJsseProvider { *; }
--keep class org.bouncycastle.jsse.** { *; }
--keep class org.bouncycastle.tls.** { *; }
+# BouncyCastle — keep ALL classes (JCE + JSSE + TLS + crypto internals).
+# BC uses reflection-heavy SPI; stripping any class causes runtime crashes.
+-keep class org.bouncycastle.** { *; }
 -dontwarn org.bouncycastle.**
