@@ -16,7 +16,7 @@ public class LegacyInventoryApp extends MultiDexApplication {
         super.onCreate();
 
         if (Build.VERSION.SDK_INT < 21) {
-            boolean ok = Tls12SocketFactory.installProvider(this);
+            boolean ok = Tls12SocketFactory.installProvider();
             Log.i(TAG, "TLS provider install: " + ok + " - " + Tls12SocketFactory.getProviderStatus());
         }
 
