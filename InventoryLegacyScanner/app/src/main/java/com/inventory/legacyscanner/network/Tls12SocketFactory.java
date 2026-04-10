@@ -1,11 +1,10 @@
 package com.inventory.legacyscanner.network;
 
-import android.content.Context;
 import android.os.Build;
 import android.util.Log;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.security.KeyStore;
@@ -38,15 +37,11 @@ import okhttp3.TlsVersion;
 /**
  * TLS 1.2 on Android 4.4 via BouncyCastle JSSE (pure Java).
  *
- * Three things Android 4.4 breaks that this class fixes:
- * 1) The stock OpenSSL provider lacks ECDHE+GCM ciphers Cloudflare needs.
- *    → BouncyCastle provides them (pure Java, no native libs, no GMS).
- * 2) Android's JSSE SPI ignores third-party providers registered by name.
- *    → We store the BouncyCastleJsseProvider INSTANCE and pass it directly
- *      to SSLContext.getInstance() / TrustManagerFactory.getInstance().
- * 3) OkHttp sets SNI via reflection on Android's internal SSLSocket class,
- *    which doesn't exist on BCSSLSocket.
- *    → We set SNI ourselves via BCSSLSocket.setParameters(BCSSLParameters).
+ * Fixes four things Android 4.4 breaks:
+ * 1) Stock OpenSSL lacks ECDHE+GCM ciphers → BouncyCastle provides them.
+ * 2) Android ignores third-party JSSE providers by name → use INSTANCE.
+ * 3) OkHttp sets SNI via Android-internal reflection → BCSSLSocket API.
+ * 4) Android 4.4 trust store lacks GTS Root R1/R4 → embedded PEM certs.
  */
 public final class Tls12SocketFactory extends SSLSocketFactory {
     private static final String TAG = "Tls12SF";
@@ -56,99 +51,176 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
     private final SSLSocketFactory delegate;
     private static volatile String providerStatus = "not initialized";
 
-    // Provider INSTANCES — never looked up by string name on Android
     private static volatile BouncyCastleJsseProvider sProvider;
     private static volatile X509TrustManager sTrustManager;
+
+    // ── Root CAs embedded as PEM strings (no Context/resources needed) ────
+    // Render chain: onrender.com → WE1 → GTS Root R4 → GlobalSign Root CA
+
+    /** GTS Root R4 — self-signed, EC P-384, valid 2016–2036 */
+    private static final String GTS_ROOT_R4 =
+        "-----BEGIN CERTIFICATE-----\n"
+        + "MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD\n"
+        + "VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG\n"
+        + "A1UEAxMLR1RTIFJvb3QgUjQwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw\n"
+        + "WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz\n"
+        + "IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjQwdjAQBgcqhkjOPQIBBgUrgQQAIgNi\n"
+        + "AATzdHOnaItgrkO4NcWBMHtLSZ37wWHO5t5GvWvVYRg1rkDdc/eJkTBa6zzuhXyi\n"
+        + "QHY7qca4R9gq55KRanPpsXI5nymfopjTX15YhmUPoYRlBtHci8nHc8iMai/lxKvR\n"
+        + "HYqjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW\n"
+        + "BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D\n"
+        + "9J+uHXqnLrmvT/aDHQ4thQEd0dlq7A/Cr8deVl5c1RxYIigL9zC2L7F8AjEA8GE8\n"
+        + "p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD\n"
+        + "-----END CERTIFICATE-----";
+
+    /** GTS Root R1 — self-signed, RSA 4096, valid 2016–2036 */
+    private static final String GTS_ROOT_R1 =
+        "-----BEGIN CERTIFICATE-----\n"
+        + "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\n"
+        + "bP6MvPJwNQzcmRk13NfIRmPVNnGuV/u3gm3c\n"
+        + "-----END CERTIFICATE-----";
+
+    /** GlobalSign Root CA — self-signed, RSA 2048, valid 1998–2028 */
+    private static final String GLOBALSIGN_ROOT =
+        "-----BEGIN CERTIFICATE-----\n"
+        + "MIIDdTCCAl2gAwIBAgILBAAAAAABFUtaw5QwDQYJKoZIhvcNAQEFBQAwVzELMAkG\n"
+        + "A1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExEDAOBgNVBAsTB1Jv\n"
+        + "b3QgQ0ExGzAZBgNVBAMTEkdsb2JhbFNpZ24gUm9vdCBDQTAeFw05ODA5MDExMjAw\n"
+        + "MDBaFw0yODAxMjgxMjAwMDBaMFcxCzAJBgNVBAYTAkJFMRkwFwYDVQQKExBHbG9i\n"
+        + "YWxTaWduIG52LXNhMRAwDgYDVQQLEwdSb290IENBMRswGQYDVQQDExJHbG9iYWxT\n"
+        + "aWduIFJvb3QgQ0EwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDaDuaZ\n"
+        + "jc6j40+Kfvvxi4Mla+pIH/EqsLmVEQS98GPR4mdmzxzdzxtIK+6NiY6arymAZavp\n"
+        + "xy0Sy6scTHAHoT0KMM0VjU/43dSMUBUc71DuxC73/OlS8pF94G3VNTCOXkNz8kHp\n"
+        + "1Wrjsok6Vjk4bwY8iGlbKk3Fp1S4bInMm/k8yuX9ifUSPJJ4ltbcdG6TRGHRjcdG\n"
+        + "snUOhugZitVtbNV4FpWi6cgKOOvyJBNPc1STE4U6G7weNLWLBYy5d4ux2x8gkasJ\n"
+        + "U26Qzns3dLlwR5EiUWMWea6xrkEmCMgZK9FGqkjWZCrXgzT/LCrBbBlDSgeF59N8\n"
+        + "9iFo7+ryUp9/k5DPAgMBAAGjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8E\n"
+        + "BTADAQH/MB0GA1UdDgQWBBRge2YaRQ2XyolQL30EzTSo//z9SzANBgkqhkiG9w0B\n"
+        + "AQUFAAOCAQEA1nPnfE920I2/7LqivjTFKDK1fPxsnCwrvQmeU79rXqoRSLblCKOz\n"
+        + "yj1hTdNGCbM+w6DjY1Ub8rrvrTnhQ7k4o+YviiY776BQVvnGCv04zcQLcFGUl5gE\n"
+        + "38NflNUVyRRBnMRddWQVDf9VMOyGj/8N7yy5Y0b2qvzfvGn9LhJIZJrglfCm7ymP\n"
+        + "AbEVtQwdpf5pLGkkeB6zpxxxYu7KyJesF12KwvhHhm4qxFYxldBniYUr+WymXUad\n"
+        + "DKqC5JlR3XC321Y9YeRq4VzW9v493kHMB65jUr9TU/Qr6cf9tveCX4XSQRjbgbME\n"
+        + "HMUfpIBvFSDJ3gyICh3WZlXi/EjJKSZp4A==\n"
+        + "-----END CERTIFICATE-----";
+
+    private static final String[] BUNDLED_PEMS = {
+        GTS_ROOT_R4, GTS_ROOT_R1, GLOBALSIGN_ROOT
+    };
+    private static final String[] BUNDLED_NAMES = {
+        "gts_root_r4", "gts_root_r1", "globalsign_root"
+    };
 
     private Tls12SocketFactory(SSLSocketFactory delegate) {
         this.delegate = delegate;
     }
 
     /**
-     * Install BouncyCastle JCE + JSSE. Call once from Application.onCreate().
-     * Needs Context to read bundled root CAs from res/raw.
+     * Install BouncyCastle JCE + JSSE with embedded root CAs.
+     * No Context needed — certs are hardcoded PEM strings.
+     * Call once from Application.onCreate().
      */
-    public static synchronized boolean installProvider(Context context) {
+    public static synchronized boolean installProvider() {
         if (Build.VERSION.SDK_INT >= 21) {
             providerStatus = "API" + Build.VERSION.SDK_INT + " native TLS";
             return true;
         }
         try {
-            // ── Step 1: Full BouncyCastle JCE (replace Android's stripped one) ──
+            // ── Step 1: Full BouncyCastle JCE ──
             Security.removeProvider("BC");
             BouncyCastleProvider bcProv = new BouncyCastleProvider();
             Security.insertProviderAt(bcProv, 1);
-            Log.i(TAG, "BC JCE v" + bcProv.getVersion() + " installed at pos 1");
+            Log.i(TAG, "BC JCE v" + bcProv.getVersion());
 
-            // ── Step 2: BCJSSE linked to our BC JCE (provider OBJECT, not name) ──
+            // ── Step 2: BCJSSE provider INSTANCE ──
             sProvider = new BouncyCastleJsseProvider(bcProv);
             Security.insertProviderAt(sProvider, 2);
-            Log.i(TAG, "BCJSSE provider installed at pos 2");
 
-            // ── Step 3: Build KeyStore with BOTH system CAs AND bundled CAs ──
-            KeyStore bcKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-            bcKeyStore.load(null, null);
+            // ── Step 3: Build KeyStore with system CAs + embedded CAs ──
+            KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+            ks.load(null, null);
 
-            // 3a: Copy ALL Android system CAs
-            TrustManagerFactory sysTmf = TrustManagerFactory.getInstance(
-                    TrustManagerFactory.getDefaultAlgorithm());
-            sysTmf.init((KeyStore) null);
-            X509TrustManager sysTm = null;
-            for (TrustManager tm : sysTmf.getTrustManagers()) {
-                if (tm instanceof X509TrustManager) { sysTm = (X509TrustManager) tm; break; }
-            }
+            // 3a: System CAs
             int count = 0;
-            if (sysTm != null) {
-                X509Certificate[] systemCAs = sysTm.getAcceptedIssuers();
-                for (int i = 0; i < systemCAs.length; i++) {
-                    bcKeyStore.setCertificateEntry("sys_" + i, systemCAs[i]);
-                    count++;
+            try {
+                TrustManagerFactory sysTmf = TrustManagerFactory.getInstance(
+                        TrustManagerFactory.getDefaultAlgorithm());
+                sysTmf.init((KeyStore) null);
+                for (TrustManager tm : sysTmf.getTrustManagers()) {
+                    if (tm instanceof X509TrustManager) {
+                        for (X509Certificate ca : ((X509TrustManager) tm).getAcceptedIssuers()) {
+                            ks.setCertificateEntry("sys_" + count, ca);
+                            count++;
+                        }
+                        break;
+                    }
                 }
+            } catch (Throwable e) {
+                Log.w(TAG, "System CAs failed: " + e.getMessage());
             }
-            Log.i(TAG, "Loaded " + count + " system CAs");
+            Log.i(TAG, count + " system CAs loaded");
 
-            // 3b: Add bundled CAs (roots Android 4.4 doesn't have)
+            // 3b: Embedded PEM root CAs (no I/O, no Context, no resources)
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
-            int[] bundledCerts = {
-                com.inventory.legacyscanner.R.raw.gts_root_r1,
-                com.inventory.legacyscanner.R.raw.gts_root_r4,
-                com.inventory.legacyscanner.R.raw.globalsign_root
-            };
-            String[] bundledNames = {"gts_root_r1", "gts_root_r4", "globalsign_root"};
-            for (int i = 0; i < bundledCerts.length; i++) {
-                InputStream is = context.getResources().openRawResource(bundledCerts[i]);
+            for (int i = 0; i < BUNDLED_PEMS.length; i++) {
                 try {
-                    X509Certificate cert = (X509Certificate) cf.generateCertificate(is);
-                    bcKeyStore.setCertificateEntry("bundled_" + bundledNames[i], cert);
-                    Log.i(TAG, "Bundled CA: " + cert.getSubjectDN().getName());
+                    ByteArrayInputStream bis = new ByteArrayInputStream(
+                            BUNDLED_PEMS[i].getBytes("UTF-8"));
+                    X509Certificate cert = (X509Certificate) cf.generateCertificate(bis);
+                    ks.setCertificateEntry("bundled_" + BUNDLED_NAMES[i], cert);
+                    Log.i(TAG, "Bundled: " + cert.getSubjectDN());
                     count++;
-                } finally {
-                    is.close();
+                } catch (Throwable e) {
+                    Log.w(TAG, "Bundle " + BUNDLED_NAMES[i] + " failed: " + e);
                 }
             }
-            Log.i(TAG, "Total CAs in trust store: " + count);
+            Log.i(TAG, "Total trust store: " + count + " CAs");
 
             // ── Step 4: BCJSSE TrustManager from provider INSTANCE ──
             TrustManagerFactory bcTmf = TrustManagerFactory.getInstance("PKIX", sProvider);
-            bcTmf.init(bcKeyStore);
+            bcTmf.init(ks);
             for (TrustManager tm : bcTmf.getTrustManagers()) {
                 if (tm instanceof X509TrustManager) { sTrustManager = (X509TrustManager) tm; break; }
             }
             if (sTrustManager == null) {
-                providerStatus = "no BCJSSE X509TrustManager";
+                providerStatus = "no BCJSSE TrustManager";
                 return false;
             }
 
-            // ── Step 5: Verify SSLContext creation works ──
+            // ── Step 5: Verify ──
             SSLContext test = SSLContext.getInstance("TLSv1.2", sProvider);
             test.init(null, new TrustManager[]{sTrustManager}, new SecureRandom());
             String[] ciphers = filterCipherSuites(
                     test.getSocketFactory().getSupportedCipherSuites());
             providerStatus = "BCJSSE " + ciphers.length + " ciphers";
             Log.i(TAG, providerStatus);
-            for (String c : ciphers) {
-                if (c.contains("ECDHE") || c.contains("GCM")) Log.d(TAG, "  " + c);
-            }
             return true;
         } catch (Throwable e) {
             sProvider = null;
