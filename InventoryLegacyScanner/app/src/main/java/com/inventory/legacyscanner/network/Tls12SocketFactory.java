@@ -1,14 +1,17 @@
 package com.inventory.legacyscanner.network;
 
+import android.content.Context;
 import android.os.Build;
 import android.util.Log;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.security.Security;
+import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -63,8 +66,9 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
 
     /**
      * Install BouncyCastle JCE + JSSE. Call once from Application.onCreate().
+     * Needs Context to read bundled root CAs from res/raw.
      */
-    public static synchronized boolean installProvider() {
+    public static synchronized boolean installProvider(Context context) {
         if (Build.VERSION.SDK_INT >= 21) {
             providerStatus = "API" + Build.VERSION.SDK_INT + " native TLS";
             return true;
@@ -81,7 +85,11 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
             Security.insertProviderAt(sProvider, 2);
             Log.i(TAG, "BCJSSE provider installed at pos 2");
 
-            // ── Step 3: Copy Android system CAs into a KeyStore BCJSSE can read ──
+            // ── Step 3: Build KeyStore with BOTH system CAs AND bundled CAs ──
+            KeyStore bcKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            bcKeyStore.load(null, null);
+
+            // 3a: Copy ALL Android system CAs
             TrustManagerFactory sysTmf = TrustManagerFactory.getInstance(
                     TrustManagerFactory.getDefaultAlgorithm());
             sysTmf.init((KeyStore) null);
@@ -89,17 +97,36 @@ public final class Tls12SocketFactory extends SSLSocketFactory {
             for (TrustManager tm : sysTmf.getTrustManagers()) {
                 if (tm instanceof X509TrustManager) { sysTm = (X509TrustManager) tm; break; }
             }
-            if (sysTm == null) {
-                providerStatus = "no system X509TrustManager";
-                return false;
+            int count = 0;
+            if (sysTm != null) {
+                X509Certificate[] systemCAs = sysTm.getAcceptedIssuers();
+                for (int i = 0; i < systemCAs.length; i++) {
+                    bcKeyStore.setCertificateEntry("sys_" + i, systemCAs[i]);
+                    count++;
+                }
             }
-            X509Certificate[] systemCAs = sysTm.getAcceptedIssuers();
-            KeyStore bcKeyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-            bcKeyStore.load(null, null);
-            for (int i = 0; i < systemCAs.length; i++) {
-                bcKeyStore.setCertificateEntry("ca_" + i, systemCAs[i]);
+            Log.i(TAG, "Loaded " + count + " system CAs");
+
+            // 3b: Add bundled CAs (roots Android 4.4 doesn't have)
+            CertificateFactory cf = CertificateFactory.getInstance("X.509");
+            int[] bundledCerts = {
+                com.inventory.legacyscanner.R.raw.gts_root_r1,
+                com.inventory.legacyscanner.R.raw.gts_root_r4,
+                com.inventory.legacyscanner.R.raw.globalsign_root
+            };
+            String[] bundledNames = {"gts_root_r1", "gts_root_r4", "globalsign_root"};
+            for (int i = 0; i < bundledCerts.length; i++) {
+                InputStream is = context.getResources().openRawResource(bundledCerts[i]);
+                try {
+                    X509Certificate cert = (X509Certificate) cf.generateCertificate(is);
+                    bcKeyStore.setCertificateEntry("bundled_" + bundledNames[i], cert);
+                    Log.i(TAG, "Bundled CA: " + cert.getSubjectDN().getName());
+                    count++;
+                } finally {
+                    is.close();
+                }
             }
-            Log.i(TAG, "Copied " + systemCAs.length + " system CAs into BCJSSE KeyStore");
+            Log.i(TAG, "Total CAs in trust store: " + count);
 
             // ── Step 4: BCJSSE TrustManager from provider INSTANCE ──
             TrustManagerFactory bcTmf = TrustManagerFactory.getInstance("PKIX", sProvider);
