@@ -1,0 +1,931 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Super Admin Console</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #0f1923;
+        color: #e0e6ed;
+        min-height: 100vh;
+      }
+      .header {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+        padding: 20px 32px;
+        display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: 12px;
+        border-bottom: 2px solid #e94560;
+        box-shadow: 0 4px 20px rgba(233,69,96,0.15);
+      }
+      .header h1 { font-size: 26px; font-weight: 700; color: #e94560; letter-spacing: -0.02em; }
+      .header p { opacity: 0.7; font-size: 13px; margin-top: 2px; }
+      .header-right { text-align: right; font-size: 13px; }
+      .header-right .clock { font-size: 20px; font-weight: 700; color: #e94560; }
+      .header-right .date { font-size: 11px; opacity: 0.6; }
+      .header-actions { display: flex; gap: 10px; align-items: center; }
+      .container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+      .card {
+        background: #1a2332;
+        border: 1px solid #2a3a4a;
+        border-radius: 14px;
+        padding: 24px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      }
+      .card h2 {
+        font-size: 18px; margin-bottom: 16px; color: #e94560;
+        display: flex; align-items: center; gap: 8px;
+      }
+      .card h3 { font-size: 15px; color: #7ec8e3; margin-bottom: 10px; }
+      .stats-row { display: flex; gap: 14px; flex-wrap: wrap; }
+      .stat {
+        flex: 1; min-width: 140px;
+        background: #0f1923;
+        border: 1px solid #2a3a4a;
+        border-radius: 10px; padding: 18px; text-align: center;
+      }
+      .stat .num { font-size: 30px; font-weight: 700; color: #e94560; }
+      .stat .label { font-size: 12px; color: #7a8a9a; margin-top: 4px; }
+      .stat.ok .num { color: #4caf50; }
+      .stat.warn .num { color: #ff9800; }
+      .stat.danger .num { color: #f44336; }
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        gap: 8px; padding: 12px 24px; border: none; border-radius: 8px;
+        font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+      }
+      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .btn-primary { background: #e94560; color: #fff; }
+      .btn-primary:hover:not(:disabled) { background: #c73651; }
+      .btn-danger { background: #b71c1c; color: #fff; }
+      .btn-danger:hover:not(:disabled) { background: #8e1515; }
+      .btn-success { background: #2e7d32; color: #fff; }
+      .btn-success:hover:not(:disabled) { background: #1b5e20; }
+      .btn-outline {
+        background: transparent; color: #7ec8e3; border: 1px solid #2a3a4a;
+      }
+      .btn-outline:hover:not(:disabled) { border-color: #7ec8e3; background: rgba(126,200,227,0.08); }
+      .btn-sm { padding: 8px 16px; font-size: 13px; }
+      .alert { padding: 12px 16px; border-radius: 8px; margin: 12px 0; font-size: 14px; }
+      .alert-success { background: rgba(46,125,50,0.15); color: #4caf50; border: 1px solid rgba(46,125,50,0.3); }
+      .alert-error { background: rgba(183,28,28,0.15); color: #ef5350; border: 1px solid rgba(183,28,28,0.3); }
+      .alert-info { background: rgba(126,200,227,0.1); color: #7ec8e3; border: 1px solid rgba(126,200,227,0.2); }
+      .hidden { display: none; }
+      /* Login */
+      .login-card { max-width: 420px; margin: 100px auto; }
+      .login-card input {
+        width: 100%; padding: 12px; border: 1px solid #2a3a4a;
+        border-radius: 8px; font-size: 15px; margin-bottom: 12px;
+        background: #0f1923; color: #e0e6ed;
+      }
+      .login-card input:focus { outline: none; border-color: #e94560; }
+      .login-card input::placeholder { color: #5a6a7a; }
+      /* Tab bar */
+      .tab-bar {
+        display: flex; gap: 0; margin-bottom: 20px;
+        border-bottom: 2px solid #2a3a4a;
+        overflow-x: auto;
+      }
+      .tab-bar button {
+        padding: 12px 22px; border: none; background: none; cursor: pointer;
+        font-size: 14px; font-weight: 600; color: #5a6a7a;
+        border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s;
+        white-space: nowrap;
+      }
+      .tab-bar button.active { color: #e94560; border-bottom-color: #e94560; }
+      .tab-bar button:hover { color: #e94560; }
+      /* Tables */
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+      th {
+        background: #0f1923; text-align: left; padding: 10px 12px;
+        font-weight: 600; color: #7a8a9a; border-bottom: 2px solid #2a3a4a;
+      }
+      td { padding: 8px 12px; border-bottom: 1px solid #1e2d3d; color: #b0bec5; }
+      tr:hover td { background: rgba(233,69,96,0.04); }
+      /* User cards */
+      .user-card {
+        background: #0f1923; border: 1px solid #2a3a4a; border-radius: 12px;
+        padding: 18px; margin-bottom: 12px; display: flex; align-items: center;
+        gap: 14px; flex-wrap: wrap;
+      }
+      .user-avatar {
+        width: 42px; height: 42px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0;
+      }
+      .user-avatar.superadmin { background: linear-gradient(135deg, #e94560, #c73651); }
+      .user-avatar.admin { background: linear-gradient(135deg, #1565c0, #1976d2); }
+      .user-avatar.worker { background: linear-gradient(135deg, #455a64, #546e7a); }
+      .user-info { flex: 1; }
+      .user-info .name { font-weight: 700; font-size: 15px; color: #e0e6ed; }
+      .user-info .meta { font-size: 12px; color: #5a6a7a; margin-top: 2px; }
+      .role-badge {
+        font-size: 11px; padding: 4px 12px; border-radius: 20px;
+        font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+      }
+      .role-badge.superadmin { background: rgba(233,69,96,0.15); color: #e94560; }
+      .role-badge.admin { background: rgba(21,101,192,0.15); color: #42a5f5; }
+      .role-badge.worker { background: rgba(69,90,100,0.15); color: #90a4ae; }
+      .user-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      /* Danger zone */
+      .danger-zone {
+        border: 2px solid rgba(183,28,28,0.4); border-radius: 14px;
+        padding: 24px; margin-top: 16px; background: rgba(183,28,28,0.05);
+      }
+      .danger-zone h3 { color: #ef5350; margin-bottom: 12px; }
+      .danger-item {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 0; border-bottom: 1px solid rgba(183,28,28,0.15);
+        flex-wrap: wrap; gap: 10px;
+      }
+      .danger-item:last-child { border-bottom: none; }
+      .danger-item .desc { font-size: 13px; color: #b0bec5; max-width: 500px; }
+      .danger-item .desc strong { color: #ef5350; }
+      /* Confirm modal */
+      .modal-overlay {
+        display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.6); z-index: 1000;
+        align-items: center; justify-content: center;
+      }
+      .modal-overlay.open { display: flex; }
+      .modal {
+        background: #1a2332; border: 1px solid #2a3a4a; border-radius: 16px;
+        width: 440px; max-width: 92vw; overflow: hidden;
+        animation: modalPop 0.2s ease-out;
+      }
+      @keyframes modalPop {
+        from { opacity: 0; transform: scale(0.92) translateY(10px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      .modal-header {
+        padding: 18px 24px; border-bottom: 1px solid #2a3a4a;
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .modal-header h3 { font-size: 16px; font-weight: 700; color: #e94560; }
+      .modal-close {
+        background: none; border: none; font-size: 22px; cursor: pointer;
+        color: #5a6a7a; padding: 0; line-height: 1;
+      }
+      .modal-close:hover { color: #e0e6ed; }
+      .modal-body { padding: 24px; }
+      .modal-body p { font-size: 14px; color: #b0bec5; margin-bottom: 12px; }
+      .modal-body input {
+        width: 100%; padding: 12px; border: 1px solid #2a3a4a;
+        border-radius: 8px; font-size: 15px; background: #0f1923; color: #e0e6ed;
+        margin-bottom: 12px;
+      }
+      .modal-body input:focus { outline: none; border-color: #e94560; }
+      .modal-body input::placeholder { color: #5a6a7a; }
+      .modal-footer { padding: 0 24px 24px; display: flex; gap: 10px; justify-content: flex-end; }
+      /* System health */
+      .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+      .health-item {
+        background: #0f1923; border: 1px solid #2a3a4a; border-radius: 10px;
+        padding: 16px; display: flex; align-items: center; gap: 12px;
+      }
+      .health-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+      .health-dot.green { background: #4caf50; box-shadow: 0 0 8px rgba(76,175,80,0.4); }
+      .health-dot.red { background: #f44336; box-shadow: 0 0 8px rgba(244,67,54,0.4); }
+      .health-dot.yellow { background: #ff9800; box-shadow: 0 0 8px rgba(255,152,0,0.4); }
+      .health-label { font-size: 13px; color: #7a8a9a; }
+      .health-value { font-size: 14px; font-weight: 600; color: #e0e6ed; }
+      /* Responsive */
+      @media (max-width: 600px) {
+        .header { padding: 16px; }
+        .header h1 { font-size: 20px; }
+        .container { padding: 0 10px; }
+        .card { padding: 16px; }
+        .stats-row { gap: 8px; }
+        .stat { min-width: 100px; padding: 12px; }
+        .stat .num { font-size: 22px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <div>
+        <h1>&#128737; Super Admin Console</h1>
+        <p>System control &bull; Reports &bull; Critical data management</p>
+      </div>
+      <div class="header-right">
+        <div class="clock" id="headerClock">--:--:--</div>
+        <div class="date" id="headerDate"></div>
+      </div>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="loginSection" class="container">
+      <div class="card login-card">
+        <h2>&#128274; Super Admin Login</h2>
+        <p style="color:#5a6a7a; font-size:13px; margin-bottom:14px">
+          Only superadmin accounts can access this console.
+        </p>
+        <input id="loginUser" type="text" placeholder="Username" autocomplete="username" />
+        <input id="loginPin" type="password" placeholder="PIN" autocomplete="current-password" />
+        <div id="loginError" class="alert alert-error hidden"></div>
+        <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Login</button>
+        <div style="margin-top:14px;text-align:center">
+          <a href="#" onclick="showRecovery();return false" style="color:#5a6a7a;font-size:12px">Forgot PIN? Use Recovery Key</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- RECOVERY -->
+    <div id="recoverySection" class="container hidden">
+      <div class="card login-card">
+        <h2>&#128273; Recovery</h2>
+        <input id="recoverUser" type="text" placeholder="Username" autocomplete="username" />
+        <input id="recoverKey" type="text" placeholder="Recovery Key" autocomplete="off" style="font-family:monospace" />
+        <input id="recoverNewPin" type="password" placeholder="New PIN (min 4 digits)" autocomplete="new-password" />
+        <div id="recoverError" class="alert alert-error hidden"></div>
+        <div id="recoverSuccess" class="alert alert-success hidden"></div>
+        <button class="btn btn-primary" style="width:100%" onclick="doRecover()">Reset PIN &amp; Login</button>
+        <div style="margin-top:12px;text-align:center">
+          <a href="#" onclick="hideRecovery();return false" style="color:#5a6a7a;font-size:12px">Back to Login</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN PANEL -->
+    <div id="mainPanel" class="container hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+        <div style="font-size:14px;color:#5a6a7a">
+          Logged in as <strong id="displayUser" style="color:#e94560"></strong>
+          <span class="role-badge superadmin" style="margin-left:6px">SUPERADMIN</span>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-outline btn-sm" onclick="window.open('/admin','_blank')">Open Admin Panel &#8599;</button>
+          <button class="btn btn-outline btn-sm" onclick="doLogout()">Logout</button>
+        </div>
+      </div>
+
+      <div class="tab-bar" id="tabBar">
+        <button class="active" onclick="switchPage('overview')">Overview</button>
+        <button onclick="switchPage('users')">Users</button>
+        <button onclick="switchPage('reports')">Reports</button>
+        <button onclick="switchPage('data')">Data Management</button>
+      </div>
+
+      <!-- PAGE: Overview -->
+      <div id="pageOverview">
+        <div class="card">
+          <h2>&#128200; System Overview</h2>
+          <div class="stats-row" id="overviewStats">
+            <div class="stat"><div class="num" id="statItems">--</div><div class="label">Total Items</div></div>
+            <div class="stat"><div class="num" id="statTransactions">--</div><div class="label">Transactions</div></div>
+            <div class="stat"><div class="num" id="statWorkers">--</div><div class="label">Workers</div></div>
+            <div class="stat"><div class="num" id="statUsers">--</div><div class="label">Users</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>&#9889; System Health</h2>
+          <div class="health-grid" id="healthGrid">
+            <div class="health-item">
+              <div class="health-dot" id="dotDb"></div>
+              <div><div class="health-label">Database</div><div class="health-value" id="healthDb">Checking...</div></div>
+            </div>
+            <div class="health-item">
+              <div class="health-dot" id="dotApi"></div>
+              <div><div class="health-label">API Server</div><div class="health-value" id="healthApi">Checking...</div></div>
+            </div>
+            <div class="health-item">
+              <div class="health-dot" id="dotNode"></div>
+              <div><div class="health-label">Node.js</div><div class="health-value" id="healthNode">--</div></div>
+            </div>
+            <div class="health-item">
+              <div class="health-dot yellow" id="dotCommit"></div>
+              <div><div class="health-label">Deploy Commit</div><div class="health-value" id="healthCommit">--</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>&#128101; Worker Activity (Last Sync)</h2>
+          <div id="workerActivity" style="color:#5a6a7a">Loading...</div>
+        </div>
+      </div>
+
+      <!-- PAGE: Users -->
+      <div id="pageUsers" class="hidden">
+        <div class="card">
+          <h2>&#128101; User Management</h2>
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" onclick="showCreateUser()">+ Create User</button>
+            <button class="btn btn-outline btn-sm" onclick="loadUsers()">&#x21bb; Refresh</button>
+          </div>
+          <div id="usersList">Loading...</div>
+        </div>
+      </div>
+
+      <!-- PAGE: Reports -->
+      <div id="pageReports" class="hidden">
+        <div class="card">
+          <h2>&#128202; Reports</h2>
+          <p style="color:#5a6a7a;margin-bottom:16px">Transaction summaries and analytics.</p>
+        </div>
+        <div class="card">
+          <h3>Transaction Summary by Worker</h3>
+          <div id="reportWorkerSummary">Loading...</div>
+        </div>
+        <div class="card">
+          <h3>Transaction Summary by Status</h3>
+          <div id="reportStatusSummary">Loading...</div>
+        </div>
+        <div class="card">
+          <h3>Recent Transactions</h3>
+          <div id="reportRecentTx">Loading...</div>
+        </div>
+      </div>
+
+      <!-- PAGE: Data Management -->
+      <div id="pageData" class="hidden">
+        <div class="card">
+          <h2>&#128451; Data Management</h2>
+          <p style="color:#5a6a7a;margin-bottom:16px">Critical operations that affect all system data.</p>
+        </div>
+        <div class="card">
+          <h3>Quick Actions</h3>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+            <button class="btn btn-success btn-sm" onclick="exportData('items')">&#128229; Export Items JSON</button>
+            <button class="btn btn-success btn-sm" onclick="exportData('transactions')">&#128229; Export Transactions JSON</button>
+          </div>
+        </div>
+        <div class="danger-zone">
+          <h3>&#9888; Danger Zone</h3>
+          <p style="font-size:13px;color:#7a8a9a;margin-bottom:16px">These actions are permanent and cannot be undone.</p>
+          <div class="danger-item">
+            <div class="desc"><strong>Delete All Transactions</strong><br>Remove every transaction and worker sync record from the system.</div>
+            <button class="btn btn-danger btn-sm" onclick="confirmDanger('resetAll')">Reset All Data</button>
+          </div>
+          <div class="danger-item">
+            <div class="desc"><strong>Delete All Items</strong><br>Remove every item from the master inventory list.</div>
+            <button class="btn btn-danger btn-sm" onclick="confirmDanger('deleteItems')">Delete All Items</button>
+          </div>
+          <div class="danger-item">
+            <div class="desc"><strong>Delete All Transactions Only</strong><br>Remove only transactions, keep worker sync records.</div>
+            <button class="btn btn-danger btn-sm" onclick="confirmDanger('deleteTx')">Delete Transactions</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONFIRM MODAL -->
+    <div class="modal-overlay" id="confirmModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 id="confirmTitle">Confirm Action</h3>
+          <button class="modal-close" onclick="closeConfirm()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p id="confirmMessage">Are you sure?</p>
+          <p style="font-size:13px;color:#ef5350">Type <strong id="confirmWord">CONFIRM</strong> to proceed:</p>
+          <input id="confirmInput" type="text" placeholder="Type here..." autocomplete="off" />
+          <div id="confirmError" class="alert alert-error hidden"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline btn-sm" onclick="closeConfirm()">Cancel</button>
+          <button class="btn btn-danger btn-sm" id="confirmBtn" onclick="execDanger()">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CREATE USER MODAL -->
+    <div class="modal-overlay" id="createUserModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Create New User</h3>
+          <button class="modal-close" onclick="closeCreateUser()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input id="newUsername" type="text" placeholder="Username" autocomplete="off" />
+          <input id="newPin" type="password" placeholder="PIN (min 4 digits)" autocomplete="new-password" />
+          <div style="margin-bottom:12px">
+            <label style="font-size:13px;color:#7a8a9a;display:block;margin-bottom:6px">Role</label>
+            <select id="newRole" style="width:100%;padding:10px;border:1px solid #2a3a4a;border-radius:8px;background:#0f1923;color:#e0e6ed;font-size:14px">
+              <option value="worker">Worker</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div id="createUserError" class="alert alert-error hidden"></div>
+          <div id="createUserSuccess" class="alert alert-success hidden"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline btn-sm" onclick="closeCreateUser()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="createUser()">Create</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESET PIN MODAL -->
+    <div class="modal-overlay" id="resetPinModal">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Reset PIN</h3>
+          <button class="modal-close" onclick="closeResetPin()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>Reset PIN for <strong id="resetPinUser"></strong></p>
+          <input id="resetPinValue" type="password" placeholder="New PIN (min 4 digits)" autocomplete="new-password" />
+          <div id="resetPinError" class="alert alert-error hidden"></div>
+          <div id="resetPinSuccess" class="alert alert-success hidden"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline btn-sm" onclick="closeResetPin()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="doResetPin()">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ─── Failover ──────────────────────────────────────────────────────
+      const SERVERS = [
+        window.location.origin,
+        "https://full-stack-4m9b.onrender.com",
+        "https://inventory-backend-fdex.onrender.com",
+      ];
+      const UNIQUE_SERVERS = [...new Set(SERVERS)];
+      let API = window.location.origin + "/api";
+
+      async function findWorkingServer() {
+        for (const server of UNIQUE_SERVERS) {
+          try {
+            const res = await fetch(server + "/api/health", { signal: AbortSignal.timeout(5000) });
+            if (res.ok) {
+              const dbRes = await fetch(server + "/api/db-status", { signal: AbortSignal.timeout(3000) })
+                .then(r => r.json()).catch(() => null);
+              if (dbRes && !dbRes.connected) continue;
+              API = server + "/api";
+              return server;
+            }
+          } catch (_) {}
+        }
+        return null;
+      }
+
+      async function apiFetch(path, opts = {}) {
+        const headers = { ...(opts.headers || {}) };
+        if (authToken) headers["Authorization"] = "Bearer " + authToken;
+        if (!(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
+        try {
+          const res = await fetch(API + path, { ...opts, headers });
+          const raw = await res.text();
+          let data = {};
+          try { data = raw ? JSON.parse(raw) : {}; } catch { data = { error: raw || "Request failed" }; }
+          if (!res.ok) throw new Error(data.error || "Request failed");
+          return data;
+        } catch (err) {
+          const working = await findWorkingServer();
+          if (working) {
+            const res2 = await fetch(API + path, { ...opts, headers });
+            const raw2 = await res2.text();
+            let data2 = {};
+            try { data2 = raw2 ? JSON.parse(raw2) : {}; } catch { data2 = { error: raw2 || "Request failed" }; }
+            if (!res2.ok) throw new Error(data2.error || "Request failed");
+            return data2;
+          }
+          throw err;
+        }
+      }
+
+      // ─── Auth state ────────────────────────────────────────────────────
+      let authToken = localStorage.getItem("saToken") || "";
+      let adminUsername = localStorage.getItem("saUsername") || "";
+      let adminRole = localStorage.getItem("saRole") || "";
+      let currentPage = "overview";
+
+      // ─── Clock ─────────────────────────────────────────────────────────
+      function tickClock() {
+        const now = new Date();
+        document.getElementById("headerClock").textContent = now.toLocaleTimeString();
+        document.getElementById("headerDate").textContent = now.toLocaleDateString(undefined, {
+          weekday: "long", year: "numeric", month: "short", day: "numeric"
+        });
+      }
+      tickClock();
+      setInterval(tickClock, 1000);
+
+      // ─── Auto-login ────────────────────────────────────────────────────
+      (async function init() {
+        if (authToken) {
+          try {
+            const data = await apiFetch("/auth/users");
+            if (data && adminRole === "superadmin") { showPanel(); return; }
+          } catch (_) {}
+          // Token invalid
+          doLogout();
+        }
+      })();
+
+      // ─── Login ─────────────────────────────────────────────────────────
+      async function doLogin() {
+        const username = document.getElementById("loginUser").value.trim();
+        const pin = document.getElementById("loginPin").value.trim();
+        const errEl = document.getElementById("loginError");
+        errEl.classList.add("hidden");
+        if (!username || !pin) { errEl.textContent = "Enter username and PIN"; errEl.classList.remove("hidden"); return; }
+
+        try {
+          const dbCheck = await fetch(API + "/db-status").then(r => r.json()).catch(() => null);
+          if (dbCheck && !dbCheck.connected) {
+            const working = await findWorkingServer();
+            if (!working) { errEl.textContent = "Database offline. All servers unreachable."; errEl.classList.remove("hidden"); return; }
+          }
+          const data = await apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ username, pin }) });
+          if (data.role !== "superadmin") {
+            errEl.textContent = "Only superadmin accounts can access this console.";
+            errEl.classList.remove("hidden");
+            return;
+          }
+          authToken = data.token;
+          localStorage.setItem("saToken", authToken);
+          adminUsername = username;
+          localStorage.setItem("saUsername", username);
+          adminRole = data.role;
+          localStorage.setItem("saRole", data.role);
+          showPanel();
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.classList.remove("hidden");
+        }
+      }
+
+      // ─── Recovery ──────────────────────────────────────────────────────
+      function showRecovery() {
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("recoverySection").classList.remove("hidden");
+      }
+      function hideRecovery() {
+        document.getElementById("recoverySection").classList.add("hidden");
+        document.getElementById("loginSection").classList.remove("hidden");
+      }
+      async function doRecover() {
+        const username = document.getElementById("recoverUser").value.trim();
+        const recoveryKey = document.getElementById("recoverKey").value.trim();
+        const newPin = document.getElementById("recoverNewPin").value.trim();
+        const errEl = document.getElementById("recoverError");
+        const succEl = document.getElementById("recoverSuccess");
+        errEl.classList.add("hidden"); succEl.classList.add("hidden");
+        if (!username || !recoveryKey || !newPin) { errEl.textContent = "All fields are required."; errEl.classList.remove("hidden"); return; }
+        if (newPin.length < 4) { errEl.textContent = "PIN must be at least 4 digits."; errEl.classList.remove("hidden"); return; }
+        try {
+          const data = await apiFetch("/auth/recover-superadmin", {
+            method: "POST", body: JSON.stringify({ username, recoveryKey, newPin })
+          });
+          authToken = data.token;
+          localStorage.setItem("saToken", authToken);
+          adminUsername = data.username;
+          localStorage.setItem("saUsername", data.username);
+          adminRole = data.role;
+          localStorage.setItem("saRole", data.role);
+          succEl.textContent = "PIN reset successful! Logging you in...";
+          succEl.classList.remove("hidden");
+          setTimeout(() => { hideRecovery(); showPanel(); }, 2000);
+        } catch (err) { errEl.textContent = err.message; errEl.classList.remove("hidden"); }
+      }
+
+      // ─── Panel ─────────────────────────────────────────────────────────
+      function showPanel() {
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("recoverySection").classList.add("hidden");
+        document.getElementById("mainPanel").classList.remove("hidden");
+        document.getElementById("displayUser").textContent = adminUsername;
+        switchPage("overview");
+      }
+      function doLogout() {
+        authToken = ""; adminUsername = ""; adminRole = "";
+        localStorage.removeItem("saToken");
+        localStorage.removeItem("saUsername");
+        localStorage.removeItem("saRole");
+        document.getElementById("mainPanel").classList.add("hidden");
+        document.getElementById("recoverySection").classList.add("hidden");
+        document.getElementById("loginSection").classList.remove("hidden");
+      }
+
+      // ─── Tab switching ─────────────────────────────────────────────────
+      function switchPage(page) {
+        currentPage = page;
+        ["Overview", "Users", "Reports", "Data"].forEach(p => {
+          document.getElementById("page" + p).classList.add("hidden");
+        });
+        document.getElementById("page" + page.charAt(0).toUpperCase() + page.slice(1)).classList.remove("hidden");
+        document.querySelectorAll("#tabBar button").forEach(b => b.classList.remove("active"));
+        const idx = { overview: 0, users: 1, reports: 2, data: 3 }[page];
+        document.querySelectorAll("#tabBar button")[idx].classList.add("active");
+        // Load data for the page
+        if (page === "overview") loadOverview();
+        if (page === "users") loadUsers();
+        if (page === "reports") loadReports();
+      }
+
+      // ─── Overview ──────────────────────────────────────────────────────
+      async function loadOverview() {
+        // Stats
+        try {
+          const [items, txData, users, health, dbStatus] = await Promise.all([
+            apiFetch("/items/count"),
+            apiFetch("/sync?limit=1"),
+            apiFetch("/auth/users"),
+            fetch(API + "/health").then(r => r.json()).catch(() => null),
+            fetch(API + "/db-status").then(r => r.json()).catch(() => null),
+          ]);
+          document.getElementById("statItems").textContent = items.count ?? "--";
+          document.getElementById("statTransactions").textContent = txData.total ?? "--";
+          const workerCount = users.filter ? users.filter(u => u.role === "worker").length : "--";
+          document.getElementById("statWorkers").textContent = workerCount;
+          document.getElementById("statUsers").textContent = users.length ?? "--";
+
+          // Health
+          if (health) {
+            setHealth("Api", true, "Online");
+            setHealth("Node", true, health.node || "--");
+            document.getElementById("healthCommit").textContent = (health.commit || "--").substring(0, 8);
+          } else {
+            setHealth("Api", false, "Offline");
+          }
+          if (dbStatus) {
+            setHealth("Db", dbStatus.connected, dbStatus.connected ? "Connected" : dbStatus.stateLabel || "Disconnected");
+          }
+        } catch (err) {
+          console.error("Overview load error:", err);
+        }
+        // Worker activity
+        try {
+          const workers = await apiFetch("/sync/worker-status");
+          if (workers && workers.length > 0) {
+            let html = '<table><tr><th>Worker</th><th>Last Sync</th><th>Today\'s Txns</th></tr>';
+            workers.forEach(w => {
+              const lastSync = w.lastSync ? new Date(w.lastSync).toLocaleString() : "Never";
+              html += `<tr><td style="color:#e0e6ed;font-weight:600">${esc(w.workerName)}</td><td>${lastSync}</td><td>${w.todayCount || 0}</td></tr>`;
+            });
+            html += '</table>';
+            document.getElementById("workerActivity").innerHTML = html;
+          } else {
+            document.getElementById("workerActivity").innerHTML = '<p style="color:#5a6a7a">No worker activity yet.</p>';
+          }
+        } catch (_) {
+          document.getElementById("workerActivity").innerHTML = '<p style="color:#ef5350">Failed to load worker data.</p>';
+        }
+      }
+      function setHealth(key, ok, text) {
+        const dot = document.getElementById("dot" + key);
+        const val = document.getElementById("health" + key);
+        if (dot) { dot.className = "health-dot " + (ok ? "green" : "red"); }
+        if (val) val.textContent = text;
+      }
+
+      // ─── Users ─────────────────────────────────────────────────────────
+      async function loadUsers() {
+        try {
+          const users = await apiFetch("/auth/users");
+          if (!users || !users.length) {
+            document.getElementById("usersList").innerHTML = '<p style="color:#5a6a7a">No users found.</p>';
+            return;
+          }
+          // Sort: superadmin first, then admin, then worker
+          const order = { superadmin: 0, admin: 1, worker: 2 };
+          users.sort((a, b) => (order[a.role] ?? 3) - (order[b.role] ?? 3));
+          let html = "";
+          users.forEach(u => {
+            const isSA = u.role === "superadmin";
+            const initial = (u.username || "?")[0].toUpperCase();
+            html += `<div class="user-card">
+              <div class="user-avatar ${u.role}">${initial}</div>
+              <div class="user-info">
+                <div class="name">${esc(u.username)}</div>
+                <div class="meta">Created: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "N/A"}</div>
+              </div>
+              <span class="role-badge ${u.role}">${u.role}</span>
+              <div class="user-actions">
+                ${isSA ? '' : `<button class="btn btn-outline btn-sm" onclick="showResetPin('${esc(u.username)}')">Reset PIN</button>`}
+                ${isSA ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteUser('${esc(u.username)}')">Delete</button>`}
+              </div>
+            </div>`;
+          });
+          document.getElementById("usersList").innerHTML = html;
+        } catch (err) {
+          document.getElementById("usersList").innerHTML = `<p style="color:#ef5350">${esc(err.message)}</p>`;
+        }
+      }
+
+      // Create user
+      function showCreateUser() {
+        document.getElementById("createUserModal").classList.add("open");
+        document.getElementById("newUsername").value = "";
+        document.getElementById("newPin").value = "";
+        document.getElementById("newRole").value = "worker";
+        document.getElementById("createUserError").classList.add("hidden");
+        document.getElementById("createUserSuccess").classList.add("hidden");
+      }
+      function closeCreateUser() { document.getElementById("createUserModal").classList.remove("open"); }
+      async function createUser() {
+        const username = document.getElementById("newUsername").value.trim();
+        const pin = document.getElementById("newPin").value.trim();
+        const role = document.getElementById("newRole").value;
+        const errEl = document.getElementById("createUserError");
+        const succEl = document.getElementById("createUserSuccess");
+        errEl.classList.add("hidden"); succEl.classList.add("hidden");
+        if (!username || !pin) { errEl.textContent = "Username and PIN required."; errEl.classList.remove("hidden"); return; }
+        if (pin.length < 4) { errEl.textContent = "PIN must be at least 4 digits."; errEl.classList.remove("hidden"); return; }
+        try {
+          await apiFetch("/auth/register", { method: "POST", body: JSON.stringify({ username, pin, role }) });
+          succEl.textContent = `User "${username}" created as ${role}.`;
+          succEl.classList.remove("hidden");
+          loadUsers();
+          setTimeout(closeCreateUser, 1500);
+        } catch (err) { errEl.textContent = err.message; errEl.classList.remove("hidden"); }
+      }
+
+      // Reset PIN
+      let resetPinTarget = "";
+      function showResetPin(username) {
+        resetPinTarget = username;
+        document.getElementById("resetPinUser").textContent = username;
+        document.getElementById("resetPinValue").value = "";
+        document.getElementById("resetPinError").classList.add("hidden");
+        document.getElementById("resetPinSuccess").classList.add("hidden");
+        document.getElementById("resetPinModal").classList.add("open");
+      }
+      function closeResetPin() { document.getElementById("resetPinModal").classList.remove("open"); }
+      async function doResetPin() {
+        const newPin = document.getElementById("resetPinValue").value.trim();
+        const errEl = document.getElementById("resetPinError");
+        const succEl = document.getElementById("resetPinSuccess");
+        errEl.classList.add("hidden"); succEl.classList.add("hidden");
+        if (!newPin || newPin.length < 4) { errEl.textContent = "PIN must be at least 4 digits."; errEl.classList.remove("hidden"); return; }
+        try {
+          await apiFetch(`/auth/users/${encodeURIComponent(resetPinTarget)}/reset-pin`, {
+            method: "POST", body: JSON.stringify({ newPin })
+          });
+          succEl.textContent = "PIN reset successfully.";
+          succEl.classList.remove("hidden");
+          setTimeout(closeResetPin, 1500);
+        } catch (err) { errEl.textContent = err.message; errEl.classList.remove("hidden"); }
+      }
+
+      // Delete user
+      async function deleteUser(username) {
+        if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+        try {
+          await apiFetch(`/auth/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+          loadUsers();
+        } catch (err) { alert(err.message); }
+      }
+
+      // ─── Reports ───────────────────────────────────────────────────────
+      async function loadReports() {
+        // Worker summary
+        try {
+          const workers = await apiFetch("/sync/worker-status");
+          if (workers && workers.length > 0) {
+            let html = '<table><tr><th>Worker</th><th>Total Synced</th><th>Today</th><th>Last Activity</th></tr>';
+            workers.forEach(w => {
+              html += `<tr>
+                <td style="color:#e0e6ed;font-weight:600">${esc(w.workerName)}</td>
+                <td>${w.totalCount || 0}</td>
+                <td>${w.todayCount || 0}</td>
+                <td>${w.lastSync ? new Date(w.lastSync).toLocaleString() : "Never"}</td>
+              </tr>`;
+            });
+            html += '</table>';
+            document.getElementById("reportWorkerSummary").innerHTML = html;
+          } else {
+            document.getElementById("reportWorkerSummary").innerHTML = '<p style="color:#5a6a7a">No worker data.</p>';
+          }
+        } catch (_) {
+          document.getElementById("reportWorkerSummary").innerHTML = '<p style="color:#ef5350">Failed to load.</p>';
+        }
+
+        // Status summary
+        try {
+          const [pending, processed] = await Promise.all([
+            apiFetch("/sync?status=pending&limit=1"),
+            apiFetch("/sync?status=processed&limit=1"),
+          ]);
+          let html = '<div class="stats-row" style="margin-top:8px">';
+          html += `<div class="stat warn"><div class="num">${pending.total ?? 0}</div><div class="label">Pending</div></div>`;
+          html += `<div class="stat ok"><div class="num">${processed.total ?? 0}</div><div class="label">Processed</div></div>`;
+          html += '</div>';
+          document.getElementById("reportStatusSummary").innerHTML = html;
+        } catch (_) {
+          document.getElementById("reportStatusSummary").innerHTML = '<p style="color:#ef5350">Failed to load.</p>';
+        }
+
+        // Recent transactions
+        try {
+          const tx = await apiFetch("/sync?limit=20&sort=-createdAt");
+          if (tx.transactions && tx.transactions.length > 0) {
+            let html = '<table><tr><th>Worker</th><th>Barcode</th><th>Item</th><th>Qty</th><th>Status</th><th>Date</th></tr>';
+            tx.transactions.forEach(t => {
+              const statusColor = t.status === "processed" ? "#4caf50" : t.status === "pending" ? "#ff9800" : "#90a4ae";
+              html += `<tr>
+                <td style="color:#e0e6ed">${esc(t.workerName || "--")}</td>
+                <td>${esc(t.barcode || "--")}</td>
+                <td>${esc(t.itemName || "--")}</td>
+                <td>${t.quantity ?? "--"}</td>
+                <td><span style="color:${statusColor};font-weight:600">${esc(t.status || "--")}</span></td>
+                <td>${t.createdAt ? new Date(t.createdAt).toLocaleString() : "--"}</td>
+              </tr>`;
+            });
+            html += '</table>';
+            document.getElementById("reportRecentTx").innerHTML = html;
+          } else {
+            document.getElementById("reportRecentTx").innerHTML = '<p style="color:#5a6a7a">No transactions yet.</p>';
+          }
+        } catch (_) {
+          document.getElementById("reportRecentTx").innerHTML = '<p style="color:#ef5350">Failed to load.</p>';
+        }
+      }
+
+      // ─── Data Management (Danger) ─────────────────────────────────────
+      let pendingDanger = null;
+      const DANGER_MAP = {
+        resetAll: {
+          title: "Reset All Data",
+          message: "This will permanently delete ALL transactions and worker sync records.",
+          word: "RESET",
+          exec: () => apiFetch("/sync/reset-all-data", { method: "DELETE" }),
+        },
+        deleteItems: {
+          title: "Delete All Items",
+          message: "This will permanently delete ALL items from the inventory master list.",
+          word: "DELETE",
+          exec: () => apiFetch("/items/all", { method: "DELETE" }),
+        },
+        deleteTx: {
+          title: "Delete All Transactions",
+          message: "This will permanently delete ALL transactions (worker sync records will remain).",
+          word: "DELETE",
+          exec: () => apiFetch("/sync/all", { method: "DELETE" }),
+        },
+      };
+
+      function confirmDanger(key) {
+        const d = DANGER_MAP[key];
+        if (!d) return;
+        pendingDanger = d;
+        document.getElementById("confirmTitle").textContent = d.title;
+        document.getElementById("confirmMessage").textContent = d.message;
+        document.getElementById("confirmWord").textContent = d.word;
+        document.getElementById("confirmInput").value = "";
+        document.getElementById("confirmError").classList.add("hidden");
+        document.getElementById("confirmModal").classList.add("open");
+      }
+      function closeConfirm() {
+        document.getElementById("confirmModal").classList.remove("open");
+        pendingDanger = null;
+      }
+      async function execDanger() {
+        if (!pendingDanger) return;
+        const input = document.getElementById("confirmInput").value.trim();
+        const errEl = document.getElementById("confirmError");
+        if (input !== pendingDanger.word) {
+          errEl.textContent = `Type "${pendingDanger.word}" to confirm.`;
+          errEl.classList.remove("hidden");
+          return;
+        }
+        const btn = document.getElementById("confirmBtn");
+        btn.disabled = true; btn.textContent = "Processing...";
+        try {
+          const result = await pendingDanger.exec();
+          closeConfirm();
+          alert("Done. " + JSON.stringify(result));
+          if (currentPage === "overview") loadOverview();
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.classList.remove("hidden");
+        }
+        btn.disabled = false; btn.textContent = "Confirm";
+      }
+
+      // ─── Export ────────────────────────────────────────────────────────
+      async function exportData(type) {
+        try {
+          let data;
+          if (type === "items") {
+            data = await apiFetch("/items");
+          } else {
+            data = await apiFetch("/sync?limit=100000");
+            data = data.transactions || data;
+          }
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${type}_export_${new Date().toISOString().split("T")[0]}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch (err) { alert("Export failed: " + err.message); }
+      }
+
+      // ─── Utilities ─────────────────────────────────────────────────────
+      function esc(str) {
+        if (!str) return "";
+        const d = document.createElement("div");
+        d.textContent = str;
+        return d.innerHTML;
+      }
+    </script>
+  </body>
+</html>

@@ -80,6 +80,16 @@ app.get("/admin", (req, res) => {
   res.setHeader("Expires", "0");
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
+// Super Admin Console — separate page at /superadmin
+app.get("/superadmin", (req, res) => {
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate",
+  );
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.sendFile(path.join(__dirname, "public", "superadmin.html"));
+});
 // Root URL → redirect to admin panel
 app.get("/", (req, res) => {
   res.redirect("/admin");
