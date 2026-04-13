@@ -147,12 +147,17 @@ router.get(
         worker: doc.worker,
         lastSync: doc.lastSync,
         // If lastResetDate is not today, show 0 (stale counter from previous day)
-        totalToday: doc.lastResetDate === todayStr ? (doc.totalToday || 0) : 0,
+        totalToday: doc.lastResetDate === todayStr ? doc.totalToday || 0 : 0,
         minutesAgo: Math.round(
           (Date.now() - new Date(doc.lastSync).getTime()) / 60000,
         ),
       }));
-      res.json({ success: true, workers, serverTime: new Date().toISOString(), timezone: SERVER_TZ });
+      res.json({
+        success: true,
+        workers,
+        serverTime: new Date().toISOString(),
+        timezone: SERVER_TZ,
+      });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }

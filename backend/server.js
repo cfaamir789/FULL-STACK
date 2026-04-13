@@ -179,7 +179,9 @@ connectDB()
       const Meta = require("./models/Meta");
 
       // Migration v2: set AAMIR as superadmin with fixed recovery keys
-      let migrationV2 = await Meta.findOne({ key: "superadmin_migration_v2" }).catch(() => null);
+      let migrationV2 = await Meta.findOne({
+        key: "superadmin_migration_v2",
+      }).catch(() => null);
       if (!migrationV2) {
         console.log("Running migration v2: set superadmin recovery keys...");
 
@@ -197,14 +199,18 @@ connectDB()
 
         // Clean old test data (safe to re-run — only deletes if data exists)
         const txDel = await Transaction.deleteMany({});
-        if (txDel.deletedCount > 0) console.log("Cleaned " + txDel.deletedCount + " old transactions.");
+        if (txDel.deletedCount > 0)
+          console.log("Cleaned " + txDel.deletedCount + " old transactions.");
         const wsDel = await WorkerSync.deleteMany({});
-        if (wsDel.deletedCount > 0) console.log("Cleaned " + wsDel.deletedCount + " old worker sync records.");
+        if (wsDel.deletedCount > 0)
+          console.log(
+            "Cleaned " + wsDel.deletedCount + " old worker sync records.",
+          );
 
         await Meta.findOneAndUpdate(
           { key: "superadmin_migration_v2" },
           { key: "superadmin_migration_v2", version: 1 },
-          { upsert: true }
+          { upsert: true },
         );
         console.log("Migration v2 complete!");
       }
