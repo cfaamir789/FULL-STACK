@@ -2686,10 +2686,13 @@
             '" style="background:#fff3e0;color:#e65100;font-size:11px">&#128465; Clear Phone</button></td></tr>';
         });
         html += "</tbody></table></div></div>";
-        html += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
-        html += '<button class="btn btn-primary" onclick="clearAllWorkersPhones()" style="background:#d32f2f;border-color:#d32f2f;font-size:13px">&#128465; Clear All Workers\' Phones</button>';
-        html += '<button class="btn" onclick="clearSelectedWorkersPhones()" style="background:#ff9800;border-color:#ff9800;color:#fff;font-size:13px">&#9745; Clear Selected Workers</button>';
-        html += '</div>';
+        html +=
+          '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
+        html +=
+          '<button class="btn btn-primary" onclick="clearAllWorkersPhones()" style="background:#d32f2f;border-color:#d32f2f;font-size:13px">&#128465; Clear All Workers\' Phones</button>';
+        html +=
+          '<button class="btn" onclick="clearSelectedWorkersPhones()" style="background:#ff9800;border-color:#ff9800;color:#fff;font-size:13px">&#9745; Clear Selected Workers</button>';
+        html += "</div>";
         return html;
       }
 
@@ -3113,11 +3116,13 @@
           const workers = data.workers || [];
           container.innerHTML = renderWorkerStatusMarkup(workers, false);
           // Bind clear-phone buttons
-          container.querySelectorAll(".btn-clear-phone").forEach(function (btn) {
-            btn.addEventListener("click", function () {
-              clearWorkerPhone(this.dataset.worker);
+          container
+            .querySelectorAll(".btn-clear-phone")
+            .forEach(function (btn) {
+              btn.addEventListener("click", function () {
+                clearWorkerPhone(this.dataset.worker);
+              });
             });
-          });
         } catch (err) {
           container.innerHTML =
             '<div class="alert alert-error">' + err.message + "</div>";
@@ -3126,28 +3131,48 @@
 
       // ─── Clear Worker Phone Data ─────────────────────────────────────────────
       async function clearWorkerPhone(workerName) {
-        if (!confirm("Clear all synced transactions from " + workerName + "'s phone?\\n\\nThis will remove processed data from their mobile app on next sync.")) return;
+        if (
+          !confirm(
+            "Clear all synced transactions from " +
+              workerName +
+              "'s phone?\\n\\nThis will remove processed data from their mobile app on next sync.",
+          )
+        )
+          return;
         try {
           await apiFetch("/sync/clear-worker-data", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ workers: [workerName] }),
           });
-          alert("Clear command sent to " + workerName + ".\\nData will be removed on their next sync.");
+          alert(
+            "Clear command sent to " +
+              workerName +
+              ".\\nData will be removed on their next sync.",
+          );
         } catch (err) {
           alert("Error: " + err.message);
         }
       }
 
       async function clearAllWorkersPhones() {
-        if (!confirm("⚠️ Clear ALL synced transactions from ALL workers' phones?\\n\\nThis affects every worker on next sync.")) return;
+        if (
+          !confirm(
+            "⚠️ Clear ALL synced transactions from ALL workers' phones?\\n\\nThis affects every worker on next sync.",
+          )
+        )
+          return;
         try {
           const result = await apiFetch("/sync/clear-worker-data", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ workers: "all" }),
           });
-          alert("Clear command sent to " + (result.updated || 0) + " worker(s).\\nData will be removed on their next sync.");
+          alert(
+            "Clear command sent to " +
+              (result.updated || 0) +
+              " worker(s).\\nData will be removed on their next sync.",
+          );
         } catch (err) {
           alert("Error: " + err.message);
         }
@@ -3155,11 +3180,18 @@
 
       async function clearSelectedWorkersPhones() {
         // Get list of workers from the table
-        const checkboxes = document.querySelectorAll(".worker-select-cb:checked");
+        const checkboxes = document.querySelectorAll(
+          ".worker-select-cb:checked",
+        );
         if (checkboxes.length === 0) {
           // If no checkboxes shown yet, show selection mode
-          const rows = document.querySelectorAll("#workerStatusContainer table tbody tr");
-          if (rows.length === 0) { alert("No workers found."); return; }
+          const rows = document.querySelectorAll(
+            "#workerStatusContainer table tbody tr",
+          );
+          if (rows.length === 0) {
+            alert("No workers found.");
+            return;
+          }
           // Add checkboxes to the table
           rows.forEach(function (row) {
             const nameCell = row.cells[0];
@@ -3173,18 +3205,35 @@
               nameCell.insertBefore(cb, nameCell.firstChild);
             }
           });
-          alert("Select workers using checkboxes, then click 'Clear Selected Workers' again.");
+          alert(
+            "Select workers using checkboxes, then click 'Clear Selected Workers' again.",
+          );
           return;
         }
-        const selected = Array.from(checkboxes).map(function (cb) { return cb.dataset.worker; });
-        if (!confirm("Clear synced data from " + selected.length + " worker(s): " + selected.join(", ") + "?")) return;
+        const selected = Array.from(checkboxes).map(function (cb) {
+          return cb.dataset.worker;
+        });
+        if (
+          !confirm(
+            "Clear synced data from " +
+              selected.length +
+              " worker(s): " +
+              selected.join(", ") +
+              "?",
+          )
+        )
+          return;
         try {
           const result = await apiFetch("/sync/clear-worker-data", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ workers: selected }),
           });
-          alert("Clear command sent to " + (result.updated || 0) + " worker(s).\\nData removed on next sync.");
+          alert(
+            "Clear command sent to " +
+              (result.updated || 0) +
+              " worker(s).\\nData removed on next sync.",
+          );
           loadWorkerStatus();
         } catch (err) {
           alert("Error: " + err.message);

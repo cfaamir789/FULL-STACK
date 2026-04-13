@@ -133,7 +133,9 @@ export const attemptSync = async () => {
       if (clearRes?.clearBefore) {
         const cleared = await clearSyncedTransactions();
         if (cleared > 0) {
-          console.log(`[Sync] Cleared ${cleared} synced transactions (admin command)`);
+          console.log(
+            `[Sync] Cleared ${cleared} synced transactions (admin command)`,
+          );
         }
         await ackClear();
       }
@@ -178,7 +180,9 @@ export const attemptSync = async () => {
     if (clearRes?.clearBefore) {
       const cleared = await clearSyncedTransactions();
       if (cleared > 0) {
-        console.log(`[Sync] Cleared ${cleared} synced transactions (admin command)`);
+        console.log(
+          `[Sync] Cleared ${cleared} synced transactions (admin command)`,
+        );
       }
       await ackClear();
     }

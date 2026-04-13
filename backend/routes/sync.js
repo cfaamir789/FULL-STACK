@@ -604,7 +604,11 @@ router.post(
           .json({ success: false, error: "workers must be an array or 'all'" });
       }
 
-      res.json({ success: true, updated, clearBefore: clearBefore.toISOString() });
+      res.json({
+        success: true,
+        updated,
+        clearBefore: clearBefore.toISOString(),
+      });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }
