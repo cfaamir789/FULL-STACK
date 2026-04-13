@@ -151,6 +151,7 @@ router.get(
         minutesAgo: Math.round(
           (Date.now() - new Date(doc.lastSync).getTime()) / 60000,
         ),
+        clearBefore: doc.clearBefore ? doc.clearBefore.toISOString() : null,
       }));
       res.json({
         success: true,

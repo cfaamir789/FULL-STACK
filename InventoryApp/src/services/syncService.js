@@ -14,6 +14,7 @@ import {
   markTransactionsSynced,
   clearAndReplaceAllItems,
   clearSyncedTransactions,
+  clearAllTransactions,
 } from "../database/db";
 
 let _onStatusChange = null;
@@ -131,10 +132,11 @@ export const attemptSync = async () => {
     try {
       const clearRes = await checkClearCommand();
       if (clearRes?.clearBefore) {
-        const cleared = await clearSyncedTransactions();
+        // Admin requested full phone wipe — clear ALL transactions (synced + unsynced)
+        const cleared = await clearAllTransactions();
         if (cleared > 0) {
           console.log(
-            `[Sync] Cleared ${cleared} synced transactions (admin command)`,
+            `[Sync] Cleared ALL ${cleared} transactions (admin command)`,
           );
         }
         await ackClear();
@@ -178,10 +180,11 @@ export const attemptSync = async () => {
   try {
     const clearRes = await checkClearCommand();
     if (clearRes?.clearBefore) {
-      const cleared = await clearSyncedTransactions();
+      // Admin requested full phone wipe — clear ALL transactions (synced + unsynced)
+      const cleared = await clearAllTransactions();
       if (cleared > 0) {
         console.log(
-          `[Sync] Cleared ${cleared} synced transactions (admin command)`,
+          `[Sync] Cleared ALL ${cleared} transactions (admin command)`,
         );
       }
       await ackClear();

@@ -27,6 +27,7 @@ import TransactionRow from "../components/TransactionRow";
 import VoiceMic from "../components/VoiceMic";
 import CalcInput from "../components/CalcInput";
 import Colors from "../theme/colors";
+import { isAdminRole } from "../utils/roles";
 
 const IS_WEB = Platform.OS === "web";
 let backupSvc = null;
@@ -36,6 +37,7 @@ if (!IS_WEB) {
 
 export default function TransactionsScreen({ username, role }) {
   const queryRef = useRef(null);
+  const canManageAll = isAdminRole(role);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
@@ -45,7 +47,7 @@ export default function TransactionsScreen({ username, role }) {
   // Get unique worker names for filter chips
   const workerNames = useMemo(
     () =>
-      role === "admin"
+      canManageAll
         ? [
             ...new Set(
               transactions
@@ -54,7 +56,7 @@ export default function TransactionsScreen({ username, role }) {
             ),
           ]
         : [],
-    [transactions, role],
+    [canManageAll, transactions],
   );
 
   const filtered = useMemo(() => {
@@ -163,7 +165,7 @@ export default function TransactionsScreen({ username, role }) {
       const localData = await getRecentTransactions(200);
 
       // If admin, also try fetching from server and merge
-      if (role === "admin") {
+      if (canManageAll) {
         try {
           await checkHealth();
           const serverRes = await getServerTransactions(1, 500, "pending");
@@ -200,7 +202,7 @@ export default function TransactionsScreen({ username, role }) {
       setTransactions([]);
     }
     setLoading(false);
-  }, [role]);
+  }, [canManageAll]);
 
   useFocusEffect(
     useCallback(() => {
@@ -342,7 +344,7 @@ export default function TransactionsScreen({ username, role }) {
       </View>
 
       {/* Worker filter chips (admin only) */}
-      {role === "admin" && workerNames.length > 0 && (
+      {canManageAll && workerNames.length > 0 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -453,11 +455,11 @@ export default function TransactionsScreen({ username, role }) {
                   onEdit={openEdit}
                   onDelete={openDelete}
                   canEdit={
-                    role === "admin" ||
+                    canManageAll ||
                     (item.worker_name === username && item.synced !== 1)
                   }
                   canDelete={
-                    role === "admin" ||
+                    canManageAll ||
                     (item.worker_name === username && item.synced !== 1)
                   }
                 />

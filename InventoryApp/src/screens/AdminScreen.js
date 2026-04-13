@@ -8,8 +8,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getUsers, registerWorker, deleteUser } from '../services/api';
 import Colors from '../theme/colors';
+import { isAdminRole, isSuperAdminRole } from '../utils/roles';
 
-export default function AdminScreen() {
+export default function AdminScreen({ viewerRole = 'admin' }) {
+  const canManageAdmins = isSuperAdminRole(viewerRole);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -39,7 +41,7 @@ export default function AdminScreen() {
     if (p.length < 4) { setAddError('PIN must be at least 4 digits.'); return; }
     setAdding(true); setAddError('');
     try {
-      await registerWorker(u, p, newRole);
+      await registerWorker(u, p, canManageAdmins ? newRole : 'worker');
       setShowAdd(false);
       loadUsers();
     } catch (err) {
@@ -90,20 +92,34 @@ export default function AdminScreen() {
             <View style={styles.userRow}>
               <View style={styles.userAvatar}>
                 <MaterialCommunityIcons
-                  name={item.role === 'admin' ? 'shield-account' : 'account-hard-hat'}
+                  name={item.role === 'superadmin' ? 'crown' : isAdminRole(item.role) ? 'shield-account' : 'account-hard-hat'}
                   size={26}
-                  color={item.role === 'admin' ? Colors.primary : Colors.textSecondary}
+                  color={item.role === 'superadmin' ? Colors.error : isAdminRole(item.role) ? Colors.primary : Colors.textSecondary}
                 />
               </View>
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{item.username}</Text>
-                <View style={[styles.roleBadge, item.role === 'admin' ? styles.roleAdmin : styles.roleWorker]}>
-                  <Text style={[styles.roleText, item.role === 'admin' ? styles.roleTextAdmin : styles.roleTextWorker]}>
-                    {item.role.toUpperCase()}
+                <View style={[
+                  styles.roleBadge,
+                  item.role === 'superadmin'
+                    ? styles.roleSuperAdmin
+                    : isAdminRole(item.role)
+                      ? styles.roleAdmin
+                      : styles.roleWorker,
+                ]}>
+                  <Text style={[
+                    styles.roleText,
+                    item.role === 'superadmin'
+                      ? styles.roleTextSuperAdmin
+                      : isAdminRole(item.role)
+                        ? styles.roleTextAdmin
+                        : styles.roleTextWorker,
+                  ]}>
+                    {item.role === 'superadmin' ? 'SUPER ADMIN' : item.role.toUpperCase()}
                   </Text>
                 </View>
               </View>
-              {item.role !== 'admin' && (
+              {(item.role === 'worker' || (item.role === 'admin' && canManageAdmins)) && (
                 <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item)}>
                   <MaterialCommunityIcons name="trash-can-outline" size={20} color={Colors.error} />
                 </TouchableOpacity>
@@ -155,13 +171,15 @@ export default function AdminScreen() {
                   <MaterialCommunityIcons name="account-hard-hat" size={16} color={newRole === 'worker' ? '#fff' : Colors.textSecondary} />
                   <Text style={[styles.roleToggleText, newRole === 'worker' && styles.roleToggleTextActive]}>Worker</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.roleToggle, newRole === 'admin' && styles.roleToggleActive]}
-                  onPress={() => setNewRole('admin')}
-                >
-                  <MaterialCommunityIcons name="shield-account" size={16} color={newRole === 'admin' ? '#fff' : Colors.textSecondary} />
-                  <Text style={[styles.roleToggleText, newRole === 'admin' && styles.roleToggleTextActive]}>Admin</Text>
-                </TouchableOpacity>
+                {canManageAdmins && (
+                  <TouchableOpacity
+                    style={[styles.roleToggle, newRole === 'admin' && styles.roleToggleActive]}
+                    onPress={() => setNewRole('admin')}
+                  >
+                    <MaterialCommunityIcons name="shield-account" size={16} color={newRole === 'admin' ? '#fff' : Colors.textSecondary} />
+                    <Text style={[styles.roleToggleText, newRole === 'admin' && styles.roleToggleTextActive]}>Admin</Text>
+                  </TouchableOpacity>
+                )}
               </View>
               {addError ? <Text style={styles.errorText}>{addError}</Text> : null}
               <TouchableOpacity
@@ -196,9 +214,11 @@ const styles = StyleSheet.create({
   userInfo: { flex: 1 },
   userName: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
   roleBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  roleSuperAdmin: { backgroundColor: Colors.error + '20' },
   roleAdmin: { backgroundColor: Colors.primary + '20' },
   roleWorker: { backgroundColor: Colors.success + '20' },
   roleText: { fontSize: 11, fontWeight: '700' },
+  roleTextSuperAdmin: { color: Colors.error },
   roleTextAdmin: { color: Colors.primary },
   roleTextWorker: { color: Colors.success },
   deleteBtn: { padding: 8, borderRadius: 8, backgroundColor: Colors.error + '10' },

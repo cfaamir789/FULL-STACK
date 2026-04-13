@@ -1,5 +1,6 @@
 import * as SQLite from "expo-sqlite";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { isAdminRole } from "../utils/roles";
 
 let db;
 
@@ -379,7 +380,7 @@ export const updateTransaction = async (
   username,
   role,
 ) => {
-  if (role !== "admin") {
+  if (!isAdminRole(role)) {
     const tx = await db.getFirstAsync(
       "SELECT worker_name FROM transactions WHERE id = ?",
       [id],
@@ -410,7 +411,7 @@ export const updateTransaction = async (
 };
 
 export const deleteTransaction = async (id, username, role) => {
-  if (role !== "admin") {
+  if (!isAdminRole(role)) {
     const tx = await db.getFirstAsync(
       "SELECT worker_name FROM transactions WHERE id = ?",
       [id],

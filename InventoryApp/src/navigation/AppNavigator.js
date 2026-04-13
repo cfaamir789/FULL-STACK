@@ -18,6 +18,7 @@ import AdminPanelScreen from "../screens/AdminPanelScreen";
 import BackupRestoreScreen from "../screens/BackupRestoreScreen";
 import ItemMasterScreen from "../screens/ItemMasterScreen";
 import Colors from "../theme/colors";
+import { isAdminRole } from "../utils/roles";
 import { loadServerUrl } from "../services/api";
 import { attemptSync } from "../services/syncService";
 
@@ -52,7 +53,7 @@ const ItemsStackNavigator = ({ role }) => (
   </ItemsStack.Navigator>
 );
 
-const AdminStackNavigator = ({ username }) => (
+const AdminStackNavigator = ({ username, role }) => (
   <AdminStack.Navigator
     screenOptions={{
       headerStyle: { backgroundColor: Colors.primary },
@@ -65,11 +66,9 @@ const AdminStackNavigator = ({ username }) => (
       component={AdminPanelScreen}
       options={{ title: "Admin Panel" }}
     />
-    <AdminStack.Screen
-      name="AdminUsers"
-      component={AdminScreen}
-      options={{ title: "Manage Users" }}
-    />
+    <AdminStack.Screen name="AdminUsers" options={{ title: "Manage Users" }}>
+      {() => <AdminScreen viewerRole={role} />}
+    </AdminStack.Screen>
     <AdminStack.Screen
       name="Import"
       component={ImportScreen}
@@ -89,7 +88,7 @@ const AdminStackNavigator = ({ username }) => (
       name="AdminTransactions"
       options={{ title: "All Transactions" }}
     >
-      {() => <TransactionsScreen username={username} role="admin" />}
+      {() => <TransactionsScreen username={username} role={role} />}
     </AdminStack.Screen>
   </AdminStack.Navigator>
 );
@@ -174,7 +173,20 @@ export default function AppNavigator() {
           <Tab.Screen
             name="Dashboard"
             component={DashboardScreen}
-            options={{ title: `Dashboard · ${workerName}` }}
+            options={{
+              title: `Dashboard · ${workerName}`,
+              headerRight: () => (
+                <TouchableOpacity
+                  onPress={async () => {
+                    await AsyncStorage.multiRemove(["workerName", "workerRole", "authToken"]);
+                    setSession(null);
+                  }}
+                  style={{ marginRight: 14 }}
+                >
+                  <MaterialCommunityIcons name="logout" size={22} color="#fff" />
+                </TouchableOpacity>
+              ),
+            }}
           />
           <Tab.Screen
             name="Scanner"
@@ -209,14 +221,14 @@ export default function AppNavigator() {
               ),
             }}
           >
-            {() => <TransactionsScreen username={workerName} role={role} />}
+            {() => <TransactionsScreen username={workerName} role="worker" />}
           </Tab.Screen>
-          {role === "admin" && (
+          {isAdminRole(role) && (
             <Tab.Screen
               name="Admin"
               options={{ headerShown: false, title: "Admin" }}
             >
-              {() => <AdminStackNavigator username={workerName} />}
+              {() => <AdminStackNavigator username={workerName} role={role} />}
             </Tab.Screen>
           )}
         </Tab.Navigator>

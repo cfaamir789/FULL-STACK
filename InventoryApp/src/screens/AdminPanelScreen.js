@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+﻿import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -458,6 +458,7 @@ export default function AdminPanelScreen({ navigation }) {
       Alert.alert(
         "Shift Closed",
         `Removed ${localCleared} synced transaction(s) from this phone.\n\nServer records were kept safe.`,
+        [{ text: "OK", onPress: () => navigation.getParent()?.navigate("Dashboard") }],
       );
     } catch (err) {
       Alert.alert("Error", err.message);
@@ -484,6 +485,7 @@ export default function AdminPanelScreen({ navigation }) {
               Alert.alert(
                 "Done",
                 "Phone data cleared. Items will re-download on next sync.",
+                [{ text: "OK", onPress: () => navigation.getParent()?.navigate("Dashboard") }],
               );
             } catch (err) {
               Alert.alert("Error", err.message);

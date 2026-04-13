@@ -280,27 +280,21 @@
             <div class="stat"><div class="num" id="statUsers">--</div><div class="label">Users</div></div>
           </div>
         </div>
+
         <div class="card">
-          <h2>&#9889; System Health</h2>
-          <div class="health-grid" id="healthGrid">
-            <div class="health-item">
-              <div class="health-dot" id="dotDb"></div>
-              <div><div class="health-label">Database</div><div class="health-value" id="healthDb">Checking...</div></div>
-            </div>
-            <div class="health-item">
-              <div class="health-dot" id="dotApi"></div>
-              <div><div class="health-label">API Server</div><div class="health-value" id="healthApi">Checking...</div></div>
-            </div>
-            <div class="health-item">
-              <div class="health-dot" id="dotNode"></div>
-              <div><div class="health-label">Node.js</div><div class="health-value" id="healthNode">--</div></div>
-            </div>
-            <div class="health-item">
-              <div class="health-dot yellow" id="dotCommit"></div>
-              <div><div class="health-label">Deploy Commit</div><div class="health-value" id="healthCommit">--</div></div>
-            </div>
+          <h2>&#9889; Multi-Server Health</h2>
+          <p style="color:#5a6a7a;font-size:12px;margin-bottom:14px">All failover servers are checked in parallel. Green = online &amp; DB connected.</p>
+          <div id="multiServerHealth" style="display:flex;flex-direction:column;gap:10px;">
+            <p style="color:#5a6a7a">Checking servers...</p>
           </div>
         </div>
+
+        <div class="card">
+          <h2>&#128241; Worker Devices &amp; Clear Status</h2>
+          <p style="color:#5a6a7a;font-size:12px;margin-bottom:14px">Live worker sync status. Orange clock = clear command pending (waiting for phone to sync).</p>
+          <div id="workerDevices" style="color:#5a6a7a">Loading...</div>
+        </div>
+
         <div class="card">
           <h2>&#128101; Worker Activity (Last Sync)</h2>
           <div id="workerActivity" style="color:#5a6a7a">Loading...</div>
@@ -623,41 +617,36 @@
       async function loadOverview() {
         // Stats
         try {
-          const [items, txData, users, health, dbStatus] = await Promise.all([
+          const [items, txData, usersData] = await Promise.all([
             apiFetch("/items/count"),
             apiFetch("/sync?limit=1"),
             apiFetch("/auth/users"),
-            fetch(API + "/health").then(r => r.json()).catch(() => null),
-            fetch(API + "/db-status").then(r => r.json()).catch(() => null),
           ]);
           document.getElementById("statItems").textContent = items.count ?? "--";
           document.getElementById("statTransactions").textContent = txData.total ?? "--";
-          const workerCount = users.filter ? users.filter(u => u.role === "worker").length : "--";
+          const users = usersData.users || [];
+          const workerCount = users.filter(u => u.role === "worker").length;
           document.getElementById("statWorkers").textContent = workerCount;
-          document.getElementById("statUsers").textContent = users.length ?? "--";
-
-          // Health
-          if (health) {
-            setHealth("Api", true, "Online");
-            setHealth("Node", true, health.node || "--");
-            document.getElementById("healthCommit").textContent = (health.commit || "--").substring(0, 8);
-          } else {
-            setHealth("Api", false, "Offline");
-          }
-          if (dbStatus) {
-            setHealth("Db", dbStatus.connected, dbStatus.connected ? "Connected" : dbStatus.stateLabel || "Disconnected");
-          }
+          document.getElementById("statUsers").textContent = users.length;
         } catch (err) {
-          console.error("Overview load error:", err);
+          console.error("Overview stats error:", err);
         }
+
+        // Multi-server health
+        checkAllServers();
+
+        // Worker devices with clear status
+        loadWorkerDevices();
+
         // Worker activity
         try {
-          const workers = await apiFetch("/sync/worker-status");
-          if (workers && workers.length > 0) {
+          const data = await apiFetch("/sync/worker-status");
+          const workers = data.workers || [];
+          if (workers.length > 0) {
             let html = '<table><tr><th>Worker</th><th>Last Sync</th><th>Today\'s Txns</th></tr>';
             workers.forEach(w => {
               const lastSync = w.lastSync ? new Date(w.lastSync).toLocaleString() : "Never";
-              html += `<tr><td style="color:#e0e6ed;font-weight:600">${esc(w.workerName)}</td><td>${lastSync}</td><td>${w.todayCount || 0}</td></tr>`;
+              html += `<tr><td style="color:#e0e6ed;font-weight:600">${esc(w.worker)}</td><td>${lastSync}</td><td>${w.totalToday || 0}</td></tr>`;
             });
             html += '</table>';
             document.getElementById("workerActivity").innerHTML = html;
@@ -668,18 +657,114 @@
           document.getElementById("workerActivity").innerHTML = '<p style="color:#ef5350">Failed to load worker data.</p>';
         }
       }
-      function setHealth(key, ok, text) {
-        const dot = document.getElementById("dot" + key);
-        const val = document.getElementById("health" + key);
-        if (dot) { dot.className = "health-dot " + (ok ? "green" : "red"); }
-        if (val) val.textContent = text;
+
+      // ─── Multi-Server Health Check ─────────────────────────────────────
+      async function checkAllServers() {
+        const container = document.getElementById("multiServerHealth");
+        const results = await Promise.allSettled(
+          UNIQUE_SERVERS.map(async (server) => {
+            const label = server.replace(/^https?:\/\//, "").replace(/\.onrender\.com$/, "");
+            try {
+              const health = await fetch(server + "/api/health", { signal: AbortSignal.timeout(6000) }).then(r => r.json());
+              const dbRes = await fetch(server + "/api/db-status", { signal: AbortSignal.timeout(4000) }).then(r => r.json()).catch(() => null);
+              return {
+                server, label, online: true,
+                db: dbRes?.connected ?? (health.db === "connected"),
+                dbLabel: dbRes?.stateLabel || health.db || "unknown",
+                node: health.node || "--",
+                commit: (health.commit || "--").substring(0, 8),
+                isCurrent: server === window.location.origin,
+              };
+            } catch {
+              return { server, label, online: false, isCurrent: server === window.location.origin };
+            }
+          })
+        );
+        let html = '<div class="health-grid">';
+        results.forEach(r => {
+          const s = r.value;
+          const dotColor = s.online ? (s.db ? "green" : "yellow") : "red";
+          const statusText = s.online ? (s.db ? "Online" : "API OK / DB down") : "Offline";
+          html += `<div class="health-item" style="flex-direction:column;align-items:flex-start;gap:6px;${s.isCurrent ? "border-color:#e94560;" : ""}">
+            <div style="display:flex;align-items:center;gap:8px;width:100%">
+              <div class="health-dot ${dotColor}"></div>
+              <div style="flex:1">
+                <div class="health-value" style="font-size:13px">${esc(s.label)}${s.isCurrent ? ' <span style="color:#e94560;font-size:10px">● ACTIVE</span>' : ""}</div>
+                <div class="health-label">${statusText}</div>
+              </div>
+            </div>
+            ${s.online ? `<div style="font-size:11px;color:#5a6a7a;padding-left:20px">
+              Node ${esc(s.node)} &bull; Commit ${esc(s.commit)} &bull; DB: ${esc(s.dbLabel)}
+            </div>` : ""}
+          </div>`;
+        });
+        html += "</div>";
+        container.innerHTML = html;
+      }
+
+      // ─── Worker Devices & Clear Status ─────────────────────────────────
+      async function loadWorkerDevices() {
+        const container = document.getElementById("workerDevices");
+        try {
+          const [wsData, usersData] = await Promise.all([
+            apiFetch("/sync/worker-status"),
+            apiFetch("/auth/users"),
+          ]);
+          const workers = wsData.workers || [];
+          const users = usersData.users || [];
+          const workerUsers = users.filter(u => u.role === "worker");
+
+          if (workerUsers.length === 0 && workers.length === 0) {
+            container.innerHTML = '<p style="color:#5a6a7a">No workers registered yet.</p>';
+            return;
+          }
+
+          // Merge user data with sync data
+          const syncMap = {};
+          workers.forEach(w => { syncMap[w.worker] = w; });
+
+          let html = '<table><tr><th>Worker</th><th>Status</th><th>Last Sync</th><th>Minutes Ago</th><th>Today</th><th>Clear Pending</th><th>Action</th></tr>';
+          workerUsers.forEach(u => {
+            const w = syncMap[u.username];
+            const lastSync = w?.lastSync ? new Date(w.lastSync).toLocaleString() : "Never synced";
+            const ago = w?.minutesAgo != null ? w.minutesAgo : "--";
+            const agoColor = !w ? "#5a6a7a" : w.minutesAgo < 5 ? "#4caf50" : w.minutesAgo < 30 ? "#ff9800" : "#f44336";
+            const statusDot = !w ? "&#9899;" : w.minutesAgo < 5 ? "&#128994;" : w.minutesAgo < 30 ? "&#128992;" : "&#128308;";
+            const statusLabel = !w ? "Never" : w.minutesAgo < 5 ? "Active" : w.minutesAgo < 30 ? "Idle" : "Offline";
+            // clearBefore from WorkerSync - now included in worker-status response
+            const clearPending = w?.clearBefore ? '&#128992; Pending' : '&#9989; None';
+            html += `<tr>
+              <td style="color:#e0e6ed;font-weight:600">${esc(u.username)}</td>
+              <td>${statusDot} ${statusLabel}</td>
+              <td>${lastSync}</td>
+              <td style="color:${agoColor};font-weight:600">${ago === "--" ? "--" : ago + " min"}</td>
+              <td>${w?.totalToday || 0}</td>
+              <td>${clearPending}</td>
+              <td><button class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 10px" onclick="saClearWorker('${esc(u.username)}')">&#128465; Clear</button></td>
+            </tr>`;
+          });
+          html += '</table>';
+          container.innerHTML = html;
+        } catch (err) {
+          container.innerHTML = `<p style="color:#ef5350">Failed: ${esc(err.message)}</p>`;
+        }
+      }
+
+      async function saClearWorker(workerName) {
+        if (!confirm("Clear all synced data from " + workerName + "'s phone?\\nThis takes effect on their next sync (within ~15 seconds).")) return;
+        try {
+          await apiFetch("/sync/clear-worker-data", { method: "POST", body: JSON.stringify({ workers: [workerName] }) });
+          alert("Clear command sent for " + workerName + ".\\nTheir phone will clear on next sync.");
+          loadWorkerDevices();
+        } catch (err) { alert("Error: " + err.message); }
       }
 
       // ─── Users ─────────────────────────────────────────────────────────
       async function loadUsers() {
         try {
-          const users = await apiFetch("/auth/users");
-          if (!users || !users.length) {
+          const data = await apiFetch("/auth/users");
+          const users = data.users || [];
+          if (!users.length) {
             document.getElementById("usersList").innerHTML = '<p style="color:#5a6a7a">No users found.</p>';
             return;
           }
@@ -777,14 +862,14 @@
       async function loadReports() {
         // Worker summary
         try {
-          const workers = await apiFetch("/sync/worker-status");
-          if (workers && workers.length > 0) {
-            let html = '<table><tr><th>Worker</th><th>Total Synced</th><th>Today</th><th>Last Activity</th></tr>';
+          const data = await apiFetch("/sync/worker-status");
+          const workers = data.workers || [];
+          if (workers.length > 0) {
+            let html = '<table><tr><th>Worker</th><th>Total Today</th><th>Last Activity</th></tr>';
             workers.forEach(w => {
               html += `<tr>
-                <td style="color:#e0e6ed;font-weight:600">${esc(w.workerName)}</td>
-                <td>${w.totalCount || 0}</td>
-                <td>${w.todayCount || 0}</td>
+                <td style="color:#e0e6ed;font-weight:600">${esc(w.worker)}</td>
+                <td>${w.totalToday || 0}</td>
                 <td>${w.lastSync ? new Date(w.lastSync).toLocaleString() : "Never"}</td>
               </tr>`;
             });
