@@ -1,10 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
+const {
+  requireAuth,
+  requireAdmin,
+  requireSuperAdmin,
+} = require("../middleware/authMiddleware");
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "warehouse_inv_super_secret_key_2026";
@@ -44,10 +49,13 @@ router.post("/setup", requireDB, async (req, res) => {
         .json({ success: false, error: "PIN must be at least 4 digits." });
     }
     const hash = await bcrypt.hash(String(pin), 10);
+    // First user created via setup is always superadmin
+    const recoveryKey = crypto.randomBytes(16).toString("hex");
     const user = await User.create({
       username: username.trim().toUpperCase(),
       pin_hash: hash,
-      role: "admin",
+      role: "superadmin",
+      recoveryKey,
       createdAt: new Date(),
     });
     const token = jwt.sign(
@@ -55,9 +63,16 @@ router.post("/setup", requireDB, async (req, res) => {
       JWT_SECRET,
       { expiresIn: TOKEN_EXPIRY },
     );
-    res
-      .status(201)
-      .json({ success: true, token, username: user.username, role: user.role });
+    res.status(201).json({
+      success: true,
+      token,
+      username: user.username,
+      role: user.role,
+      recoveryKey,
+      message:
+        "SAVE THIS RECOVERY KEY! You will need it if you forget your PIN: " +
+        recoveryKey,
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -102,45 +117,124 @@ router.post("/login", requireDB, async (req, res) => {
   }
 });
 
-// ─── POST /api/auth/register ─────────────────────────────────────────────────
-// Admin-only: create a new worker account
-router.post("/register", requireDB, requireAuth, requireAdmin, async (req, res) => {
+// ─── POST /api/auth/recover-superadmin ──────────────────────────────────────
+// Super Admin forgot PIN — use recovery key to set a new PIN
+router.post("/recover-superadmin", requireDB, async (req, res) => {
   try {
-    const { username, pin, role = "worker" } = req.body;
-    if (!username || !pin) {
-      return res
-        .status(400)
-        .json({ success: false, error: "username and pin are required." });
+    const { username, recoveryKey, newPin } = req.body;
+    if (!username || !recoveryKey || !newPin) {
+      return res.status(400).json({
+        success: false,
+        error: "username, recoveryKey, and newPin are required.",
+      });
     }
-    if (String(pin).length < 4) {
+    if (String(newPin).length < 4) {
       return res
         .status(400)
         .json({ success: false, error: "PIN must be at least 4 digits." });
     }
-    if (!["admin", "worker"].includes(role)) {
-      return res
-        .status(400)
-        .json({ success: false, error: "role must be admin or worker." });
-    }
-    const hash = await bcrypt.hash(String(pin), 10);
-    const user = await User.create({
+    const user = await User.findOne({
       username: username.trim().toUpperCase(),
-      pin_hash: hash,
-      role,
-      createdAt: new Date(),
+      role: "superadmin",
     });
-    res
-      .status(201)
-      .json({ success: true, username: user.username, role: user.role });
-  } catch (err) {
-    if (err.code === 11000) {
+    if (!user) {
       return res
-        .status(409)
-        .json({ success: false, error: "Username already exists." });
+        .status(404)
+        .json({ success: false, error: "Super Admin not found." });
     }
+    if (!user.recoveryKey || user.recoveryKey !== recoveryKey.trim()) {
+      return res
+        .status(403)
+        .json({ success: false, error: "Invalid recovery key." });
+    }
+    // Reset PIN and generate a new recovery key
+    const hash = await bcrypt.hash(String(newPin), 10);
+    const newRecoveryKey = crypto.randomBytes(16).toString("hex");
+    user.pin_hash = hash;
+    user.recoveryKey = newRecoveryKey;
+    await user.save();
+    const token = jwt.sign(
+      { userId: user._id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: TOKEN_EXPIRY },
+    );
+    res.json({
+      success: true,
+      token,
+      username: user.username,
+      role: user.role,
+      recoveryKey: newRecoveryKey,
+      message:
+        "PIN reset successful! SAVE YOUR NEW RECOVERY KEY: " + newRecoveryKey,
+    });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// ─── POST /api/auth/register ─────────────────────────────────────────────────
+// Admin-only: create a new worker/admin account (only superadmin can create admins)
+router.post(
+  "/register",
+  requireDB,
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { username, pin, role = "worker" } = req.body;
+      if (!username || !pin) {
+        return res
+          .status(400)
+          .json({ success: false, error: "username and pin are required." });
+      }
+      if (String(pin).length < 4) {
+        return res
+          .status(400)
+          .json({ success: false, error: "PIN must be at least 4 digits." });
+      }
+      // Only superadmin can create admin accounts
+      if (role === "admin" && req.user.role !== "superadmin") {
+        return res
+          .status(403)
+          .json({
+            success: false,
+            error: "Only Super Admin can create admin accounts.",
+          });
+      }
+      // Nobody can create another superadmin
+      if (role === "superadmin") {
+        return res
+          .status(403)
+          .json({
+            success: false,
+            error: "Cannot create another Super Admin.",
+          });
+      }
+      if (!["admin", "worker"].includes(role)) {
+        return res
+          .status(400)
+          .json({ success: false, error: "role must be admin or worker." });
+      }
+      const hash = await bcrypt.hash(String(pin), 10);
+      const user = await User.create({
+        username: username.trim().toUpperCase(),
+        pin_hash: hash,
+        role,
+        createdAt: new Date(),
+      });
+      res
+        .status(201)
+        .json({ success: true, username: user.username, role: user.role });
+    } catch (err) {
+      if (err.code === 11000) {
+        return res
+          .status(409)
+          .json({ success: false, error: "Username already exists." });
+      }
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
 
 // ─── GET /api/auth/users ─────────────────────────────────────────────────────
 // Admin-only: list all users (no hashes returned)
@@ -160,7 +254,7 @@ router.get("/users", requireDB, requireAuth, requireAdmin, async (req, res) => {
 });
 
 // ─── DELETE /api/auth/users/:username ────────────────────────────────────────
-// Admin-only: delete a worker account
+// Delete a user account (superadmin protected)
 router.delete(
   "/users/:username",
   requireDB,
@@ -169,18 +263,37 @@ router.delete(
   async (req, res) => {
     try {
       const username = req.params.username.toUpperCase();
+      // Cannot delete yourself
       if (username === req.user.username) {
         return res
           .status(400)
           .json({ success: false, error: "Cannot delete your own account." });
       }
-      const resObj = await User.deleteOne({ username });
-      const removed = resObj.deletedCount;
-      if (removed === 0) {
+      // Check if target is superadmin — nobody can delete superadmin
+      const target = await User.findOne({ username });
+      if (!target) {
         return res
           .status(404)
           .json({ success: false, error: "User not found." });
       }
+      if (target.role === "superadmin") {
+        return res
+          .status(403)
+          .json({
+            success: false,
+            error: "Super Admin account cannot be deleted.",
+          });
+      }
+      // Only superadmin can delete admin accounts
+      if (target.role === "admin" && req.user.role !== "superadmin") {
+        return res
+          .status(403)
+          .json({
+            success: false,
+            error: "Only Super Admin can delete admin accounts.",
+          });
+      }
+      await User.deleteOne({ username });
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
@@ -189,7 +302,7 @@ router.delete(
 );
 
 // ─── POST /api/auth/users/:username/reset-pin ───────────────────────────────
-// Admin-only: reset an existing user's PIN
+// Reset a user's PIN (superadmin protected)
 router.post(
   "/users/:username/reset-pin",
   requireDB,
@@ -209,6 +322,28 @@ router.post(
         return res
           .status(404)
           .json({ success: false, error: "User not found." });
+      }
+      // Only superadmin can reset their own PIN or another superadmin's PIN
+      if (user.role === "superadmin" && req.user.role !== "superadmin") {
+        return res
+          .status(403)
+          .json({
+            success: false,
+            error: "Only Super Admin can reset Super Admin's PIN.",
+          });
+      }
+      // Regular admins cannot reset other admin PINs
+      if (
+        user.role === "admin" &&
+        req.user.role !== "superadmin" &&
+        username !== req.user.username
+      ) {
+        return res
+          .status(403)
+          .json({
+            success: false,
+            error: "Only Super Admin can reset other admins' PINs.",
+          });
       }
       const hash = await bcrypt.hash(String(pin), 10);
       user.pin_hash = hash;

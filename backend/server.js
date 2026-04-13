@@ -106,7 +106,9 @@ app.get("/api/db-status", (req, res) => {
   res.json({
     connected: state === 1,
     state,
-    stateLabel: ["disconnected", "connected", "connecting", "disconnecting"][state] || "unknown",
+    stateLabel:
+      ["disconnected", "connected", "connecting", "disconnecting"][state] ||
+      "unknown",
   });
 });
 
@@ -153,6 +155,54 @@ server.listen(PORT, "0.0.0.0", () => {
 });
 
 // Connect to MongoDB in the background (don't block server start)
-connectDB().catch((err) => {
-  console.error("MongoDB connection failed:", err?.message);
-});
+connectDB()
+  .then(async () => {
+    // ─── One-time startup migration ─────────────────────────────────────────
+    try {
+      const crypto = require("crypto");
+      const User = require("./models/User");
+      const Transaction = require("./models/Transaction");
+      const WorkerSync = require("./models/WorkerSync");
+      const Meta = require("./models/Meta");
+
+      // Check if migration already ran (stored in Meta collection)
+      let migrationDone = await Meta.findOne({ key: "superadmin_migration_v1" }).catch(() => null);
+      if (!migrationDone) {
+        console.log("Running one-time superadmin migration...");
+
+        // 1. Upgrade AAMIR to superadmin
+        const aamir = await User.findOne({ username: "AAMIR" });
+        if (aamir) {
+          const recoveryKey = crypto.randomBytes(16).toString("hex");
+          aamir.role = "superadmin";
+          aamir.recoveryKey = recoveryKey;
+          await aamir.save();
+          console.log("AAMIR upgraded to SUPER ADMIN");
+          console.log("RECOVERY KEY: " + recoveryKey);
+        } else {
+          console.log("User AAMIR not found — will become superadmin on next setup/register.");
+        }
+
+        // 2. Clean all old test transactions
+        const txDel = await Transaction.deleteMany({});
+        console.log("Cleaned " + txDel.deletedCount + " old transactions.");
+
+        // 3. Clean all old worker sync records
+        const wsDel = await WorkerSync.deleteMany({});
+        console.log("Cleaned " + wsDel.deletedCount + " old worker sync records.");
+
+        // Mark migration as done so it never runs again
+        await Meta.findOneAndUpdate(
+          { key: "superadmin_migration_v1" },
+          { key: "superadmin_migration_v1", version: 1 },
+          { upsert: true }
+        );
+        console.log("Migration complete! Dashboard is clean for live work.");
+      }
+    } catch (migErr) {
+      console.error("Migration error (non-fatal):", migErr.message);
+    }
+  })
+  .catch((err) => {
+    console.error("MongoDB connection failed:", err?.message);
+  });

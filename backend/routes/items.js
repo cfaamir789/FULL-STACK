@@ -6,7 +6,11 @@ const Papa = require("papaparse");
 const { randomUUID } = require("crypto");
 const Item = require("../models/Item");
 const Meta = require("../models/Meta");
-const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
+const {
+  requireAuth,
+  requireAdmin,
+  requireSuperAdmin,
+} = require("../middleware/authMiddleware");
 
 // Fail fast if MongoDB is not connected
 function requireDB(req, res, next) {
@@ -205,12 +209,10 @@ router.post("/push-master", requireAuth, requireAdmin, async (req, res) => {
   try {
     const count = await Item.countDocuments({});
     if (count === 0) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: "No items in database. Upload a CSV first.",
-        });
+      return res.status(400).json({
+        success: false,
+        error: "No items in database. Upload a CSV first.",
+      });
     }
     const newVersion = await bumpItemsVersion(req);
     res.json({ success: true, version: newVersion, totalItems: count });
@@ -327,8 +329,8 @@ router.post("/import", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-// DELETE /api/items/all — admin: clear all items before re-import
-router.delete("/all", requireAuth, requireAdmin, async (req, res) => {
+// DELETE /api/items/all — superadmin only: clear all items before re-import
+router.delete("/all", requireAuth, requireSuperAdmin, async (req, res) => {
   try {
     const count = await Item.countDocuments({});
     await Item.deleteMany({});
@@ -530,12 +532,17 @@ router.post(
             processed: 0,
           });
 
-          const result = await applyCsvItems(items, mode, (progress) => {
-            setUploadJob(jobId, {
-              status: "processing",
-              ...progress,
-            });
-          }, req);
+          const result = await applyCsvItems(
+            items,
+            mode,
+            (progress) => {
+              setUploadJob(jobId, {
+                status: "processing",
+                ...progress,
+              });
+            },
+            req,
+          );
 
           setUploadJob(jobId, {
             status: "done",

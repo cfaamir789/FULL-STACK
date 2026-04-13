@@ -1229,6 +1229,15 @@
         <div id="loginError" class="alert alert-error hidden"></div>
         <button class="btn btn-primary" onclick="doLogin()">Login</button>
         <div style="margin-top: 16px; text-align: center">
+          <a
+            href="#"
+            onclick="
+              showRecovery();
+              return false;
+            "
+            style="color: #888; font-size: 13px"
+            >Super Admin forgot PIN?</a
+          >
           <div id="setupSection" class="hidden">
             <p style="color: #888; margin-bottom: 8px">
               No admin exists yet. Create initial admin:
@@ -1237,6 +1246,51 @@
               Create Admin Account
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SUPER ADMIN RECOVERY -->
+    <div id="recoverySection" class="container hidden">
+      <div class="card login-card">
+        <h2>&#128273; Super Admin Recovery</h2>
+        <p style="color: #888; font-size: 13px; margin-bottom: 12px">
+          Enter your username, recovery key, and a new PIN.
+        </p>
+        <input
+          id="recoverUser"
+          type="text"
+          placeholder="Username"
+          autocomplete="username"
+        />
+        <input
+          id="recoverKey"
+          type="text"
+          placeholder="Recovery Key"
+          autocomplete="off"
+          style="font-family: monospace"
+        />
+        <input
+          id="recoverNewPin"
+          type="password"
+          placeholder="New PIN (min 4 digits)"
+          autocomplete="new-password"
+        />
+        <div id="recoverError" class="alert alert-error hidden"></div>
+        <div id="recoverSuccess" class="alert alert-success hidden"></div>
+        <button class="btn btn-primary" onclick="doRecover()">
+          Reset PIN &amp; Login
+        </button>
+        <div style="margin-top: 12px; text-align: center">
+          <a
+            href="#"
+            onclick="
+              hideRecovery();
+              return false;
+            "
+            style="color: #888; font-size: 13px"
+            >Back to Login</a
+          >
         </div>
       </div>
     </div>
@@ -2115,7 +2169,9 @@
               // Also check if this server's DB is actually connected
               const dbRes = await fetch(server + "/api/db-status", {
                 signal: AbortSignal.timeout(3000),
-              }).then(r => r.json()).catch(() => null);
+              })
+                .then((r) => r.json())
+                .catch(() => null);
               if (dbRes && !dbRes.connected) continue; // skip servers with offline DB
               API = server + "/api";
               console.log("[Failover] Using server:", server);
@@ -2127,6 +2183,7 @@
       }
       let authToken = localStorage.getItem("adminToken") || "";
       let adminUsername = localStorage.getItem("adminUsername") || "admin";
+      let adminRole = localStorage.getItem("adminRole") || "admin";
       let uploadMode = "replace";
       let selectedFile = null;
       let pageLoaded = {
@@ -2151,11 +2208,16 @@
         const wsUrl = proto + "//" + location.host + "/ws";
         try {
           ws = new WebSocket(wsUrl);
-        } catch { return; }
+        } catch {
+          return;
+        }
 
         ws.onopen = () => {
           console.log("[WS] Connected");
-          if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+          if (wsReconnectTimer) {
+            clearTimeout(wsReconnectTimer);
+            wsReconnectTimer = null;
+          }
         };
 
         ws.onmessage = (evt) => {
@@ -2249,7 +2311,9 @@
         const username = document.getElementById("loginUser").value.trim();
         const pin = document.getElementById("loginPin").value.trim();
         const errEl = document.getElementById("loginError");
-        const btn = document.querySelector('.login-card button[onclick*="doLogin"]') || document.querySelector('.login-card button');
+        const btn =
+          document.querySelector('.login-card button[onclick*="doLogin"]') ||
+          document.querySelector(".login-card button");
         errEl.classList.add("hidden");
         if (!username || !pin) {
           errEl.textContent = "Enter username and PIN";
@@ -2257,17 +2321,30 @@
           return;
         }
         // Show loading state
-        if (btn) { btn.disabled = true; btn.textContent = "Connecting..."; }
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = "Connecting...";
+        }
         try {
           // Quick DB check first — if local DB is offline, failover to a Render server
-          const dbCheck = await fetch(API + "/db-status").then(r => r.json()).catch(() => null);
+          const dbCheck = await fetch(API + "/db-status")
+            .then((r) => r.json())
+            .catch(() => null);
           if (dbCheck && !dbCheck.connected) {
-            console.log("[Failover] Local DB offline, trying remote servers...");
+            console.log(
+              "[Failover] Local DB offline, trying remote servers...",
+            );
             const working = await findWorkingServer();
             if (!working) {
-              errEl.textContent = "Database is offline (" + dbCheck.stateLabel + "). All servers unreachable.";
+              errEl.textContent =
+                "Database is offline (" +
+                dbCheck.stateLabel +
+                "). All servers unreachable.";
               errEl.classList.remove("hidden");
-              if (btn) { btn.disabled = false; btn.textContent = "Login"; }
+              if (btn) {
+                btn.disabled = false;
+                btn.textContent = "Login";
+              }
               return;
             }
             console.log("[Failover] Switched to:", API);
@@ -2276,22 +2353,30 @@
             method: "POST",
             body: JSON.stringify({ username, pin }),
           });
-          if (data.role !== "admin") {
+          if (data.role !== "admin" && data.role !== "superadmin") {
             errEl.textContent = "Only admins can access this panel";
             errEl.classList.remove("hidden");
-            if (btn) { btn.disabled = false; btn.textContent = "Login"; }
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = "Login";
+            }
             return;
           }
           authToken = data.token;
           localStorage.setItem("adminToken", authToken);
           adminUsername = username;
           localStorage.setItem("adminUsername", username);
+          adminRole = data.role;
+          localStorage.setItem("adminRole", data.role);
           showPanel();
         } catch (err) {
           errEl.textContent = err.message;
           errEl.classList.remove("hidden");
         }
-        if (btn) { btn.disabled = false; btn.textContent = "Login"; }
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Login";
+        }
       }
 
       async function doSetup() {
@@ -2318,6 +2403,15 @@
           localStorage.setItem("adminToken", authToken);
           adminUsername = username;
           localStorage.setItem("adminUsername", username);
+          adminRole = data.role || "superadmin";
+          localStorage.setItem("adminRole", adminRole);
+          if (data.recoveryKey) {
+            alert(
+              "IMPORTANT! Save this Recovery Key securely.\nYou will need it if you forget your PIN.\n\nRecovery Key: " +
+                data.recoveryKey +
+                "\n\nCopy it now and store it safely!",
+            );
+          }
           showPanel();
         } catch (err) {
           errEl.textContent = err.message;
@@ -2328,10 +2422,69 @@
       function doLogout() {
         authToken = "";
         adminUsername = "admin";
+        adminRole = "admin";
         localStorage.removeItem("adminToken");
         localStorage.removeItem("adminUsername");
+        localStorage.removeItem("adminRole");
         document.getElementById("mainPanel").classList.add("hidden");
         document.getElementById("loginSection").classList.remove("hidden");
+        document.getElementById("recoverySection").classList.add("hidden");
+      }
+
+      function showRecovery() {
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("recoverySection").classList.remove("hidden");
+        document.getElementById("recoverError").classList.add("hidden");
+        document.getElementById("recoverSuccess").classList.add("hidden");
+      }
+
+      function hideRecovery() {
+        document.getElementById("recoverySection").classList.add("hidden");
+        document.getElementById("loginSection").classList.remove("hidden");
+      }
+
+      async function doRecover() {
+        const username = document.getElementById("recoverUser").value.trim();
+        const recoveryKey = document.getElementById("recoverKey").value.trim();
+        const newPin = document.getElementById("recoverNewPin").value.trim();
+        const errEl = document.getElementById("recoverError");
+        const succEl = document.getElementById("recoverSuccess");
+        errEl.classList.add("hidden");
+        succEl.classList.add("hidden");
+        if (!username || !recoveryKey || !newPin) {
+          errEl.textContent = "All fields are required.";
+          errEl.classList.remove("hidden");
+          return;
+        }
+        if (newPin.length < 4) {
+          errEl.textContent = "PIN must be at least 4 digits.";
+          errEl.classList.remove("hidden");
+          return;
+        }
+        try {
+          const data = await apiFetch("/auth/recover-superadmin", {
+            method: "POST",
+            body: JSON.stringify({ username, recoveryKey, newPin }),
+          });
+          authToken = data.token;
+          localStorage.setItem("adminToken", authToken);
+          adminUsername = data.username;
+          localStorage.setItem("adminUsername", data.username);
+          adminRole = data.role;
+          localStorage.setItem("adminRole", data.role);
+          succEl.innerHTML =
+            "PIN reset! <strong>NEW Recovery Key: " +
+            esc(data.recoveryKey) +
+            "</strong><br>Save this key securely! Redirecting...";
+          succEl.classList.remove("hidden");
+          setTimeout(function () {
+            document.getElementById("recoverySection").classList.add("hidden");
+            showPanel();
+          }, 4000);
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.classList.remove("hidden");
+        }
       }
 
       async function showPanel() {
@@ -3844,16 +3997,29 @@
           let html = "";
           users.forEach((u) => {
             const initials = u.username.substring(0, 2).toUpperCase();
-            const avClass = u.role === "admin" ? "admin-av" : "worker-av";
+            const avClass =
+              u.role === "superadmin"
+                ? "admin-av"
+                : u.role === "admin"
+                  ? "admin-av"
+                  : "worker-av";
+            const isSuperAdmin = u.role === "superadmin";
+            const isAdmin = u.role === "admin";
+            const iAmSuperAdmin = adminRole === "superadmin";
             const dateStr = u.createdAt
               ? new Date(u.createdAt).toLocaleDateString()
               : "";
-            html += '<div class="user-card">';
+            html +=
+              '<div class="user-card"' +
+              (isSuperAdmin ? ' style="border: 2px solid #FFD700;"' : "") +
+              ">";
             html += '<div class="user-card-header">';
             html +=
               '<div class="user-avatar ' +
               avClass +
-              '">' +
+              '"' +
+              (isSuperAdmin ? ' style="background:#FFD700;color:#333;"' : "") +
+              ">" +
               esc(initials) +
               "</div>";
             html += '<div class="user-info">';
@@ -3862,30 +4028,50 @@
               esc(u.username) +
               ' <span class="role-badge ' +
               u.role +
-              '">' +
-              u.role.toUpperCase() +
+              '"' +
+              (isSuperAdmin ? ' style="background:#FFD700;color:#333;"' : "") +
+              ">" +
+              (isSuperAdmin ? "SUPER ADMIN" : u.role.toUpperCase()) +
               "</span></div>";
             html += '<div class="meta">Joined ' + dateStr + "</div>";
             html += "</div>";
             html += "</div>";
             html += '<div class="user-card-actions">';
-            html +=
-              '<button class="btn-sm btn-pin-reset" data-user="' +
-              esc(u.username) +
-              '" style="background:#e8f5e9;color:#2e7d32">&#128273; Reset PIN</button>';
-            html +=
-              '<button class="btn-sm btn-archive" data-user="' +
-              esc(u.username) +
-              '" style="background:#fff3e0;color:#e65100">&#128451; Archive Data</button>';
-            if (u.role !== "admin") {
+            // PIN reset: only superadmin can reset superadmin/admin PINs
+            if (isSuperAdmin && !iAmSuperAdmin) {
+              // Don't show any actions for superadmin to regular admins
               html +=
-                '<button class="btn-sm btn-del-user" data-user="' +
-                esc(u.username) +
-                '" style="background:#fce4ec;color:#c62828">&#128100; Delete User</button>';
+                '<span style="color:#999;font-size:12px;">Protected account</span>';
+            } else if (isAdmin && !iAmSuperAdmin) {
+              // Regular admin can only reset own PIN
               html +=
-                '<button class="btn-sm btn-del-all" data-user="' +
+                '<span style="color:#999;font-size:12px;">Admin — managed by Super Admin</span>';
+            } else {
+              html +=
+                '<button class="btn-sm btn-pin-reset" data-user="' +
                 esc(u.username) +
-                '" style="background:#d32f2f;color:#fff">&#128465; Delete User + Data</button>';
+                '" style="background:#e8f5e9;color:#2e7d32">&#128273; Reset PIN</button>';
+              if (!isSuperAdmin) {
+                html +=
+                  '<button class="btn-sm btn-archive" data-user="' +
+                  esc(u.username) +
+                  '" style="background:#fff3e0;color:#e65100">&#128451; Archive Data</button>';
+              }
+              if (!isSuperAdmin && !isAdmin) {
+                html +=
+                  '<button class="btn-sm btn-del-user" data-user="' +
+                  esc(u.username) +
+                  '" style="background:#fce4ec;color:#c62828">&#128100; Delete User</button>';
+                html +=
+                  '<button class="btn-sm btn-del-all" data-user="' +
+                  esc(u.username) +
+                  '" style="background:#d32f2f;color:#fff">&#128465; Delete User + Data</button>';
+              } else if (isAdmin && iAmSuperAdmin) {
+                html +=
+                  '<button class="btn-sm btn-del-user" data-user="' +
+                  esc(u.username) +
+                  '" style="background:#fce4ec;color:#c62828">&#128100; Delete Admin</button>';
+              }
             }
             html += "</div>";
             html += "</div>";

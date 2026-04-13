@@ -6,7 +6,11 @@ const router = express.Router();
 const Transaction = require("../models/Transaction");
 const WorkerSync = require("../models/WorkerSync");
 const { appendTransactions } = require("../services/googleSheets");
-const { requireAuth, requireAdmin } = require("../middleware/authMiddleware");
+const {
+  requireAuth,
+  requireAdmin,
+  requireSuperAdmin,
+} = require("../middleware/authMiddleware");
 
 // Fail fast if MongoDB is not connected
 function requireDB(req, res, next) {
@@ -123,22 +127,28 @@ async function recordWorkerSync(workerName, count) {
   await doc.save();
 }
 
-router.get("/worker-status", requireDB, requireAuth, requireAdmin, async (req, res) => {
-  try {
-    const docs = await WorkerSync.find().sort({ lastSync: -1 }).lean();
-    const workers = docs.map((doc) => ({
-      worker: doc.worker,
-      lastSync: doc.lastSync,
-      totalToday: doc.totalToday,
-      minutesAgo: Math.round(
-        (Date.now() - new Date(doc.lastSync).getTime()) / 60000,
-      ),
-    }));
-    res.json({ success: true, workers });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+router.get(
+  "/worker-status",
+  requireDB,
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const docs = await WorkerSync.find().sort({ lastSync: -1 }).lean();
+      const workers = docs.map((doc) => ({
+        worker: doc.worker,
+        lastSync: doc.lastSync,
+        totalToday: doc.totalToday,
+        minutesAgo: Math.round(
+          (Date.now() - new Date(doc.lastSync).getTime()) / 60000,
+        ),
+      }));
+      res.json({ success: true, workers });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
 
 router.post("/", requireDB, requireAuth, async (req, res) => {
   try {
@@ -306,111 +316,126 @@ router.get("/", requireDB, requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/bulk-status", requireDB, requireAuth, requireAdmin, async (req, res) => {
-  try {
-    const ids = Array.isArray(req.body?.ids)
-      ? [...new Set(req.body.ids.map((id) => String(id)).filter(Boolean))]
-      : [];
-    const worker = req.body?.worker
-      ? String(req.body.worker).trim().toUpperCase()
-      : "";
-    const fromStatus = normalizeStatus(req.body?.fromStatus || "all", "all");
-    const nextStatus = normalizeStatus(req.body?.status, "pending");
-    const erpDocument = String(req.body?.erpDocument || "")
-      .trim()
-      .toUpperCase();
-    const erpBatch = String(req.body?.erpBatch || "")
-      .trim()
-      .toUpperCase();
+router.post(
+  "/bulk-status",
+  requireDB,
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const ids = Array.isArray(req.body?.ids)
+        ? [...new Set(req.body.ids.map((id) => String(id)).filter(Boolean))]
+        : [];
+      const worker = req.body?.worker
+        ? String(req.body.worker).trim().toUpperCase()
+        : "";
+      const fromStatus = normalizeStatus(req.body?.fromStatus || "all", "all");
+      const nextStatus = normalizeStatus(req.body?.status, "pending");
+      const erpDocument = String(req.body?.erpDocument || "")
+        .trim()
+        .toUpperCase();
+      const erpBatch = String(req.body?.erpBatch || "")
+        .trim()
+        .toUpperCase();
 
-    if (!["pending", "processed", "archived"].includes(nextStatus)) {
-      return res.status(400).json({
-        success: false,
-        error: "status must be pending, processed, or archived.",
+      if (!["pending", "processed", "archived"].includes(nextStatus)) {
+        return res.status(400).json({
+          success: false,
+          error: "status must be pending, processed, or archived.",
+        });
+      }
+
+      const filter = {};
+      if (ids.length > 0) {
+        filter._id = { $in: ids };
+      } else if (worker) {
+        filter.Worker_Name = worker;
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: "Provide transaction ids or a worker name.",
+        });
+      }
+
+      if (fromStatus !== "all") {
+        Object.assign(filter, buildStatusQuery(fromStatus));
+      }
+
+      const update = { syncStatus: nextStatus };
+      if (nextStatus === "processed") {
+        update.processedAt = new Date();
+        update.processedBy = req.user.username;
+        update.erpDocument = erpDocument;
+        update.erpBatch = erpBatch;
+        update.archivedAt = null;
+      } else if (nextStatus === "archived") {
+        update.archivedAt = new Date();
+      } else {
+        update.processedAt = null;
+        update.processedBy = "";
+        update.erpDocument = "";
+        update.erpBatch = "";
+        update.archivedAt = null;
+      }
+
+      const result = await Transaction.updateMany(filter, { $set: update });
+      res.json({
+        success: true,
+        matched: result.matchedCount || 0,
+        updated: result.modifiedCount || 0,
+        status: nextStatus,
       });
+      // Broadcast to admin dashboards
+      const broadcast = req.app.get("broadcast");
+      if (broadcast && (result.modifiedCount || 0) > 0) {
+        broadcast("transactions_updated", {
+          updated: result.modifiedCount,
+          status: nextStatus,
+        });
+      }
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
     }
+  },
+);
 
-    const filter = {};
-    if (ids.length > 0) {
-      filter._id = { $in: ids };
-    } else if (worker) {
-      filter.Worker_Name = worker;
-    } else {
+router.post(
+  "/bulk-delete",
+  requireDB,
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const ids = Array.isArray(req.body?.ids)
+        ? [...new Set(req.body.ids.map((id) => String(id)).filter(Boolean))]
+        : [];
+      const worker = req.body?.worker
+        ? String(req.body.worker).trim().toUpperCase()
+        : "";
+
+      if (ids.length > 0) {
+        let deleted = 0;
+        for (const id of ids) {
+          const delResult = await Transaction.deleteOne({ _id: id });
+          deleted += delResult.deletedCount;
+        }
+        return res.json({ success: true, deleted });
+      }
+
+      if (worker) {
+        const delResult = await Transaction.deleteMany({ Worker_Name: worker });
+        return res.json({ success: true, deleted: delResult.deletedCount });
+      }
+
       return res.status(400).json({
         success: false,
         error: "Provide transaction ids or a worker name.",
       });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
     }
-
-    if (fromStatus !== "all") {
-      Object.assign(filter, buildStatusQuery(fromStatus));
-    }
-
-    const update = { syncStatus: nextStatus };
-    if (nextStatus === "processed") {
-      update.processedAt = new Date();
-      update.processedBy = req.user.username;
-      update.erpDocument = erpDocument;
-      update.erpBatch = erpBatch;
-      update.archivedAt = null;
-    } else if (nextStatus === "archived") {
-      update.archivedAt = new Date();
-    } else {
-      update.processedAt = null;
-      update.processedBy = "";
-      update.erpDocument = "";
-      update.erpBatch = "";
-      update.archivedAt = null;
-    }
-
-    const result = await Transaction.updateMany(filter, { $set: update });
-    res.json({
-      success: true,
-      matched: result.matchedCount || 0,
-      updated: result.modifiedCount || 0,
-      status: nextStatus,
-    });
-    // Broadcast to admin dashboards
-    const broadcast = req.app.get("broadcast");
-    if (broadcast && (result.modifiedCount || 0) > 0) {
-      broadcast("transactions_updated", { updated: result.modifiedCount, status: nextStatus });
-    }
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-router.post("/bulk-delete", requireDB, requireAuth, requireAdmin, async (req, res) => {
-  try {
-    const ids = Array.isArray(req.body?.ids)
-      ? [...new Set(req.body.ids.map((id) => String(id)).filter(Boolean))]
-      : [];
-    const worker = req.body?.worker
-      ? String(req.body.worker).trim().toUpperCase()
-      : "";
-
-    if (ids.length > 0) {
-      let deleted = 0;
-      for (const id of ids) {
-        const delResult = await Transaction.deleteOne({ _id: id });
-        deleted += delResult.deletedCount;
-      }
-      return res.json({ success: true, deleted });
-    }
-
-    if (worker) {
-      const delResult = await Transaction.deleteMany({ Worker_Name: worker });
-      return res.json({ success: true, deleted: delResult.deletedCount });
-    }
-
-    return res.status(400).json({
-      success: false,
-      error: "Provide transaction ids or a worker name.",
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+  },
+);
 
 router.put("/:id", requireAuth, async (req, res) => {
   try {
@@ -520,58 +545,66 @@ router.get("/stats", requireDB, requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/export", requireDB, requireAuth, requireAdmin, async (req, res) => {
-  try {
-    const { worker, json, status } = req.query;
-    const query = {
-      ...(worker ? { Worker_Name: worker } : {}),
-      ...buildStatusQuery(status || "all"),
-    };
-    const transactions = await Transaction.find(query)
-      .sort({ Timestamp: -1 })
-      .lean();
+router.get(
+  "/export",
+  requireDB,
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { worker, json, status } = req.query;
+      const query = {
+        ...(worker ? { Worker_Name: worker } : {}),
+        ...buildStatusQuery(status || "all"),
+      };
+      const transactions = await Transaction.find(query)
+        .sort({ Timestamp: -1 })
+        .lean();
 
-    if (json === "1") {
-      return res.json(transactions);
+      if (json === "1") {
+        return res.json(transactions);
+      }
+
+      const header =
+        "Status,Processed_At,Processed_By,ERP_Document,ERP_Batch,Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Notes,Timestamp\n";
+      const rows = transactions
+        .map((tx) => {
+          const escape = (value) =>
+            `"${String(value || "").replace(/"/g, '""')}"`;
+          return [
+            escape(tx.syncStatus || "pending"),
+            escape(
+              tx.processedAt ? new Date(tx.processedAt).toISOString() : "",
+            ),
+            escape(tx.processedBy || ""),
+            escape(tx.erpDocument || ""),
+            escape(tx.erpBatch || ""),
+            escape(tx.Item_Barcode),
+            escape(tx.Item_Code),
+            escape(tx.Item_Name),
+            escape(tx.Frombin),
+            escape(tx.Tobin),
+            tx.Qty,
+            escape(tx.Worker_Name),
+            escape(tx.Notes),
+            escape(tx.Timestamp ? new Date(tx.Timestamp).toISOString() : ""),
+          ].join(",");
+        })
+        .join("\n");
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=transactions_export.csv",
+      );
+      res.send(header + rows);
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
     }
+  },
+);
 
-    const header =
-      "Status,Processed_At,Processed_By,ERP_Document,ERP_Batch,Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Notes,Timestamp\n";
-    const rows = transactions
-      .map((tx) => {
-        const escape = (value) =>
-          `"${String(value || "").replace(/"/g, '""')}"`;
-        return [
-          escape(tx.syncStatus || "pending"),
-          escape(tx.processedAt ? new Date(tx.processedAt).toISOString() : ""),
-          escape(tx.processedBy || ""),
-          escape(tx.erpDocument || ""),
-          escape(tx.erpBatch || ""),
-          escape(tx.Item_Barcode),
-          escape(tx.Item_Code),
-          escape(tx.Item_Name),
-          escape(tx.Frombin),
-          escape(tx.Tobin),
-          tx.Qty,
-          escape(tx.Worker_Name),
-          escape(tx.Notes),
-          escape(tx.Timestamp ? new Date(tx.Timestamp).toISOString() : ""),
-        ].join(",");
-      })
-      .join("\n");
-
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=transactions_export.csv",
-    );
-    res.send(header + rows);
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-router.delete("/all", requireAuth, requireAdmin, async (req, res) => {
+router.delete("/all", requireAuth, requireSuperAdmin, async (req, res) => {
   try {
     const count = await Transaction.countDocuments({});
     await Transaction.deleteMany({});
@@ -580,5 +613,27 @@ router.delete("/all", requireAuth, requireAdmin, async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// Reset all dashboard data: transactions + worker sync records (SUPER ADMIN ONLY)
+router.delete(
+  "/reset-all-data",
+  requireAuth,
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const [txResult, wsResult] = await Promise.all([
+        Transaction.deleteMany({}),
+        WorkerSync.deleteMany({}),
+      ]);
+      res.json({
+        success: true,
+        deletedTransactions: txResult.deletedCount,
+        deletedWorkerSyncs: wsResult.deletedCount,
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
 
 module.exports = router;
