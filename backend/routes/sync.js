@@ -36,6 +36,13 @@ const toDate = (value, fallback = new Date()) => {
   return Number.isNaN(date.getTime()) ? fallback : date;
 };
 
+// Server timezone: IST (UTC+5:30) — used for "today" boundaries
+const SERVER_TZ = "Asia/Kolkata";
+const getTodayStr = (date = new Date()) => {
+  // Returns YYYY-MM-DD in the configured timezone (IST)
+  return date.toLocaleDateString("en-CA", { timeZone: SERVER_TZ });
+};
+
 const normalizeStatus = (value, fallback = "pending") => {
   const status = String(value || fallback)
     .trim()
@@ -105,7 +112,7 @@ const applyIncomingTransaction = (target, incoming) => {
 
 async function recordWorkerSync(workerName, count) {
   const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = getTodayStr(now);
   const doc = await WorkerSync.findOne({ worker: workerName });
   if (!doc) {
     await WorkerSync.create({
@@ -135,15 +142,17 @@ router.get(
   async (req, res) => {
     try {
       const docs = await WorkerSync.find().sort({ lastSync: -1 }).lean();
+      const todayStr = getTodayStr();
       const workers = docs.map((doc) => ({
         worker: doc.worker,
         lastSync: doc.lastSync,
-        totalToday: doc.totalToday,
+        // If lastResetDate is not today, show 0 (stale counter from previous day)
+        totalToday: doc.lastResetDate === todayStr ? (doc.totalToday || 0) : 0,
         minutesAgo: Math.round(
           (Date.now() - new Date(doc.lastSync).getTime()) / 60000,
         ),
       }));
-      res.json({ success: true, workers });
+      res.json({ success: true, workers, serverTime: new Date().toISOString(), timezone: SERVER_TZ });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }

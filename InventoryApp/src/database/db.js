@@ -3,6 +3,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 let db;
 
+// Get server-aligned time using stored offset from last health check
+const getServerNow = async () => {
+  try {
+    const offsetStr = await AsyncStorage.getItem("serverTimeOffset");
+    const offset = offsetStr ? Number(offsetStr) : 0;
+    return new Date(Date.now() + offset).toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+};
+
 const makeClientTxId = (
   workerName = "unknown",
   timestamp = new Date().toISOString(),
@@ -299,7 +310,7 @@ export const insertTransaction = async ({
   worker_name = "unknown",
   notes = "",
 }) => {
-  const timestamp = new Date().toISOString();
+  const timestamp = await getServerNow();
   const clientTxId = makeClientTxId(worker_name, timestamp);
   const result = await db.runAsync(
     `INSERT INTO transactions (
@@ -377,7 +388,7 @@ export const updateTransaction = async (
       throw new Error("You can only edit your own transactions.");
     }
   }
-  const updatedAt = new Date().toISOString();
+  const updatedAt = await getServerNow();
   await db.runAsync(
     `UPDATE transactions
      SET frombin = ?,

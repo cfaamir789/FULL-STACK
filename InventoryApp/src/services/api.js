@@ -190,19 +190,37 @@ healthClient.interceptors.response.use(
 export const checkHealth = async () => {
   // Try current server first, then failover picks up automatically via interceptor
   try {
+    const beforeMs = Date.now();
     const res = await healthClient.get("/health");
+    const afterMs = Date.now();
+    // Calculate server time offset (server - local) accounting for network latency
+    if (res.data?.serverTime) {
+      const roundTrip = afterMs - beforeMs;
+      const localAtResponse = beforeMs + Math.round(roundTrip / 2);
+      const offset = res.data.serverTime - localAtResponse;
+      await AsyncStorage.setItem("serverTimeOffset", String(offset));
+    }
     return res.data;
   } catch (err) {
     // If failover interceptor already switched, this will have been retried.
     // If still failing, try all servers explicitly
     for (const server of CLOUD_SERVERS) {
       try {
+        const beforeMs = Date.now();
         const res = await axios.get(`${server}/api/health`, { timeout: 5000 });
+        const afterMs = Date.now();
         if (res.data?.status === "ok") {
           // Switch to this working server
           currentBaseUrl = `${server}/api`;
           apiClient.defaults.baseURL = currentBaseUrl;
           healthClient.defaults.baseURL = currentBaseUrl;
+          // Calculate server time offset
+          if (res.data?.serverTime) {
+            const roundTrip = afterMs - beforeMs;
+            const localAtResponse = beforeMs + Math.round(roundTrip / 2);
+            const offset = res.data.serverTime - localAtResponse;
+            await AsyncStorage.setItem("serverTimeOffset", String(offset));
+          }
           console.log(
             `[Failover] Health check found working server: ${server}`,
           );
@@ -212,6 +230,22 @@ export const checkHealth = async () => {
     }
     throw err;
   }
+};
+
+// Get server-aligned timestamp (uses offset from last health check)
+export const getServerTime = async () => {
+  try {
+    const offsetStr = await AsyncStorage.getItem("serverTimeOffset");
+    const offset = offsetStr ? Number(offsetStr) : 0;
+    return new Date(Date.now() + offset);
+  } catch {
+    return new Date();
+  }
+};
+
+export const getServerTimeISO = async () => {
+  const t = await getServerTime();
+  return t.toISOString();
 };
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────

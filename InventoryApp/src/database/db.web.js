@@ -4,6 +4,17 @@
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// Get server-aligned time using stored offset from last health check
+const getServerNow = async () => {
+  try {
+    const offsetStr = await AsyncStorage.getItem("serverTimeOffset");
+    const offset = offsetStr ? Number(offsetStr) : 0;
+    return new Date(Date.now() + offset).toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+};
+
 const makeClientTxId = (
   workerName = "unknown",
   timestamp = new Date().toISOString(),
@@ -285,7 +296,7 @@ export const insertTransaction = async ({
 }) => {
   const txs = loadTx();
   const id = txs.length > 0 ? Math.max(...txs.map((t) => t.id)) + 1 : 1;
-  const timestamp = new Date().toISOString();
+  const timestamp = await getServerNow();
   let resolvedCode = item_code;
   if (!resolvedCode) {
     try {
@@ -354,7 +365,7 @@ export const updateTransaction = async (
   _username,
   _role,
 ) => {
-  const updatedAt = new Date().toISOString();
+  const updatedAt = await getServerNow();
   saveTx(
     loadTx().map((t) =>
       t.id === id

@@ -98,9 +98,12 @@ app.get("/", (req, res) => {
 // Health check — phone pings this to detect if backend is reachable
 app.get("/api/health", (req, res) => {
   const mongoose = require("mongoose");
+  const now = new Date();
   res.json({
     status: "ok",
-    timestamp: new Date().toISOString(),
+    timestamp: now.toISOString(),
+    serverTime: now.getTime(),
+    timezone: "Asia/Kolkata",
     commit: process.env.RENDER_GIT_COMMIT || process.env.GIT_COMMIT || "local",
     node: process.version,
     db: mongoose.connection.readyState === 1 ? "connected" : "disconnected",

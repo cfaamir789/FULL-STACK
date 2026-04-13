@@ -5,6 +5,7 @@ import {
   syncTransactions,
   fetchItemsBulk,
   fetchItemsVersion,
+  getServerTimeISO,
 } from "./api";
 import {
   getPendingTransactions,
@@ -123,7 +124,7 @@ export const attemptSync = async () => {
 
   const pending = await getPendingTransactions();
   if (pending.length === 0) {
-    const lastSync = new Date().toISOString();
+    const lastSync = await getServerTimeISO();
     notifyStatus({ online: true, lastSync, pendingCount: 0 });
     return { synced: 0, reason: "nothing_pending", lastSync };
   }
@@ -155,7 +156,7 @@ export const attemptSync = async () => {
     return { synced: 0, reason: "sync_failed", error: err.message };
   }
 
-  const lastSync = new Date().toISOString();
+  const lastSync = await getServerTimeISO();
   notifyStatus({ online: true, lastSync, pendingCount: 0 });
   return { synced, reason: "success", lastSync };
 };
