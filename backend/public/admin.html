@@ -354,12 +354,53 @@
         flex-shrink: 0;
       }
       .role-badge.admin {
-        background: #e8f5e9;
-        color: #2e7d32;
+        background: #e3f2fd;
+        color: #1565c0;
       }
       .role-badge.worker {
         background: #e8f5e9;
         color: #2e7d32;
+      }
+      /* --- Grouped user sections --- */
+      .user-section {
+        margin-bottom: 28px;
+      }
+      .user-section-title {
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .user-section-title.superadmin-title {
+        background: #FFF8E1;
+        color: #F9A825;
+        border-left: 4px solid #FFD700;
+      }
+      .user-section-title.admin-title {
+        background: #e3f2fd;
+        color: #1565c0;
+        border-left: 4px solid #1976d2;
+      }
+      .user-section-title.worker-title {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border-left: 4px solid #2e7d32;
+      }
+      .user-card.admin-card {
+        border: 2px solid #1976d2;
+      }
+      .user-card.admin-card:hover {
+        box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
+        border-color: #1565c0;
+      }
+      .user-avatar.admin-av-blue {
+        background: linear-gradient(135deg, #1565c0, #42a5f5);
       }
       .user-card-actions {
         display: flex;
@@ -3985,88 +4026,80 @@
             container.innerHTML = '<div class="loading">No users found.</div>';
             return;
           }
-          let html = "";
-          users.forEach((u) => {
+          const iAmSuperAdmin = adminRole === "superadmin";
+          const superadmins = users.filter(u => u.role === "superadmin");
+          const admins = users.filter(u => u.role === "admin");
+          const workers = users.filter(u => u.role === "worker");
+
+          function renderUserCard(u) {
             const initials = u.username.substring(0, 2).toUpperCase();
-            const avClass =
-              u.role === "superadmin"
-                ? "admin-av"
-                : u.role === "admin"
-                  ? "admin-av"
-                  : "worker-av";
             const isSuperAdmin = u.role === "superadmin";
             const isAdmin = u.role === "admin";
-            const iAmSuperAdmin = adminRole === "superadmin";
-            const dateStr = u.createdAt
-              ? new Date(u.createdAt).toLocaleDateString()
-              : "";
-            html +=
-              '<div class="user-card"' +
-              (isSuperAdmin ? ' style="border: 2px solid #FFD700;"' : "") +
-              ">";
-            html += '<div class="user-card-header">';
-            html +=
-              '<div class="user-avatar ' +
-              avClass +
-              '"' +
-              (isSuperAdmin ? ' style="background:#FFD700;color:#333;"' : "") +
-              ">" +
-              esc(initials) +
-              "</div>";
-            html += '<div class="user-info">';
-            html +=
-              '<div class="name">' +
-              esc(u.username) +
-              ' <span class="role-badge ' +
-              u.role +
-              '"' +
-              (isSuperAdmin ? ' style="background:#FFD700;color:#333;"' : "") +
-              ">" +
-              (isSuperAdmin ? "SUPER ADMIN" : u.role.toUpperCase()) +
-              "</span></div>";
-            html += '<div class="meta">Joined ' + dateStr + "</div>";
-            html += "</div>";
-            html += "</div>";
-            html += '<div class="user-card-actions">';
-            // PIN reset: only superadmin can reset superadmin/admin PINs
+            const dateStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "";
+            let cardClass = "user-card";
+            let cardStyle = "";
+            let avClass = "worker-av";
+            let avStyle = "";
+            let badgeStyle = "";
+            if (isSuperAdmin) {
+              cardStyle = ' style="border: 2px solid #FFD700;"';
+              avClass = "admin-av";
+              avStyle = ' style="background:#FFD700;color:#333;"';
+              badgeStyle = ' style="background:#FFD700;color:#333;"';
+            } else if (isAdmin) {
+              cardClass = "user-card admin-card";
+              avClass = "admin-av-blue";
+            }
+            let h = '<div class="' + cardClass + '"' + cardStyle + ">";
+            h += '<div class="user-card-header">';
+            h += '<div class="user-avatar ' + avClass + '"' + avStyle + ">" + esc(initials) + "</div>";
+            h += '<div class="user-info">';
+            h += '<div class="name">' + esc(u.username) + ' <span class="role-badge ' + u.role + '"' + badgeStyle + ">" + (isSuperAdmin ? "SUPER ADMIN" : u.role.toUpperCase()) + "</span></div>";
+            h += '<div class="meta">Joined ' + dateStr + "</div>";
+            h += "</div></div>";
+            h += '<div class="user-card-actions">';
             if (isSuperAdmin && !iAmSuperAdmin) {
-              // Don't show any actions for superadmin to regular admins
-              html +=
-                '<span style="color:#999;font-size:12px;">Protected account</span>';
+              h += '<span style="color:#999;font-size:12px;">Protected account</span>';
             } else if (isAdmin && !iAmSuperAdmin) {
-              // Regular admin can only reset own PIN
-              html +=
-                '<span style="color:#999;font-size:12px;">Admin — managed by Super Admin</span>';
+              h += '<span style="color:#999;font-size:12px;">Admin — managed by Super Admin</span>';
             } else {
-              html +=
-                '<button class="btn-sm btn-pin-reset" data-user="' +
-                esc(u.username) +
-                '" style="background:#e8f5e9;color:#2e7d32">&#128273; Reset PIN</button>';
+              h += '<button class="btn-sm btn-pin-reset" data-user="' + esc(u.username) + '" style="background:#e8f5e9;color:#2e7d32">&#128273; Reset PIN</button>';
               if (!isSuperAdmin) {
-                html +=
-                  '<button class="btn-sm btn-archive" data-user="' +
-                  esc(u.username) +
-                  '" style="background:#fff3e0;color:#e65100">&#128451; Archive Data</button>';
+                h += '<button class="btn-sm btn-archive" data-user="' + esc(u.username) + '" style="background:#fff3e0;color:#e65100">&#128451; Archive Data</button>';
               }
               if (!isSuperAdmin && !isAdmin) {
-                html +=
-                  '<button class="btn-sm btn-del-user" data-user="' +
-                  esc(u.username) +
-                  '" style="background:#fce4ec;color:#c62828">&#128100; Delete User</button>';
-                html +=
-                  '<button class="btn-sm btn-del-all" data-user="' +
-                  esc(u.username) +
-                  '" style="background:#d32f2f;color:#fff">&#128465; Delete User + Data</button>';
+                h += '<button class="btn-sm btn-del-user" data-user="' + esc(u.username) + '" style="background:#fce4ec;color:#c62828">&#128100; Delete User</button>';
+                h += '<button class="btn-sm btn-del-all" data-user="' + esc(u.username) + '" style="background:#d32f2f;color:#fff">&#128465; Delete User + Data</button>';
               } else if (isAdmin && iAmSuperAdmin) {
-                html +=
-                  '<button class="btn-sm btn-del-user" data-user="' +
-                  esc(u.username) +
-                  '" style="background:#fce4ec;color:#c62828">&#128100; Delete Admin</button>';
+                h += '<button class="btn-sm btn-del-user" data-user="' + esc(u.username) + '" style="background:#fce4ec;color:#c62828">&#128100; Delete Admin</button>';
               }
             }
-            html += "</div>";
-            html += "</div>";
-          });
+            h += "</div></div>";
+            return h;
+          }
+
+          let html = "";
+          // Super Admin section
+          if (superadmins.length) {
+            html += '<div class="user-section">';
+            html += '<div class="user-section-title superadmin-title">&#128081; Super Admin</div>';
+            superadmins.forEach(u => { html += renderUserCard(u); });
+            html += '</div>';
+          }
+          // Admins section
+          if (admins.length) {
+            html += '<div class="user-section">';
+            html += '<div class="user-section-title admin-title">&#128188; Admins (' + admins.length + ')</div>';
+            admins.forEach(u => { html += renderUserCard(u); });
+            html += '</div>';
+          }
+          // Workers section
+          if (workers.length) {
+            html += '<div class="user-section">';
+            html += '<div class="user-section-title worker-title">&#128119; Workers (' + workers.length + ')</div>';
+            workers.forEach(u => { html += renderUserCard(u); });
+            html += '</div>';
+          }
           container.innerHTML = html;
           // Bind events via addEventListener (more reliable than inline onclick)
           container.querySelectorAll(".btn-pin-reset").forEach(function (btn) {
