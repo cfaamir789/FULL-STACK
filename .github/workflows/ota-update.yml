@@ -24,6 +24,10 @@ jobs:
       cancel-in-progress: true
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      EXPO_TOKEN_PRIMARY: ${{ secrets.FULLSTACK }}
+      EXPO_TOKEN_SECONDARY: ${{ secrets.FULLSTACK2 }}
+      EXPO_TOKEN_TERTIARY: ${{ secrets.EXPO_TOKEN }}
+      EXPO_TOKEN_QUATERNARY: ${{ secrets.EXPO_TOKEN_2 }}
     defaults:
       run:
         working-directory: InventoryApp
@@ -47,19 +51,57 @@ jobs:
         with:
           eas-version: latest
           eas-cache: false
-          token: ${{ secrets.FULLSTACK }}
 
       - name: Validate Expo token exists
         run: |
-          if [ -z "${{ secrets.FULLSTACK }}" ]; then
-            echo "FULLSTACK secret is missing. Set an Expo access token in repository secrets."
+          if [ -z "${EXPO_TOKEN_PRIMARY}" ] && [ -z "${EXPO_TOKEN_SECONDARY}" ] && [ -z "${EXPO_TOKEN_TERTIARY}" ] && [ -z "${EXPO_TOKEN_QUATERNARY}" ]; then
+            echo "No Expo token found in secrets FULLSTACK/FULLSTACK2/EXPO_TOKEN/EXPO_TOKEN_2."
             exit 1
           fi
+
+      - name: Select authorized Expo account
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKENS=("${EXPO_TOKEN_PRIMARY}" "${EXPO_TOKEN_SECONDARY}" "${EXPO_TOKEN_TERTIARY}" "${EXPO_TOKEN_QUATERNARY}")
+          OWNER="aamirksa"
+          SELECTED=""
+          for token in "${TOKENS[@]}"; do
+            if [ -z "$token" ]; then
+              continue
+            fi
+            export EXPO_TOKEN="$token"
+            USERNAME="$(eas whoami 2>/dev/null || true)"
+            if [ -n "$USERNAME" ]; then
+              echo "Token login detected: $USERNAME"
+            fi
+            # Ownership rule: app owner is aamirksa, so direct owner token is preferred.
+            if [ "$USERNAME" = "$OWNER" ]; then
+              SELECTED="$token"
+              break
+            fi
+            # Fallback: collaborator token may still have access to this project.
+            if eas project:info --non-interactive >/dev/null 2>&1; then
+              SELECTED="$token"
+              break
+            fi
+          done
+
+          if [ -z "$SELECTED" ]; then
+            echo "No provided token can access Expo project cff8e8a6-b732-42e2-ae2c-068893f7296c (owner aamirksa)."
+            echo "Add owner token to one of: FULLSTACK, FULLSTACK2, EXPO_TOKEN, EXPO_TOKEN_2"
+            exit 1
+          fi
+
+          {
+            echo "EXPO_TOKEN=$SELECTED"
+          } >> "$GITHUB_ENV"
 
       - name: Push OTA update with retries (preview)
         shell: bash
         run: |
           set -euo pipefail
+          eas whoami
           MSG="${{ github.event.inputs.message || format('Auto OTA: {0}', github.event.head_commit.message) }}"
           for attempt in 1 2 3; do
             echo "Preview OTA attempt ${attempt}/3"
@@ -78,6 +120,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          eas whoami
           MSG="${{ github.event.inputs.message || format('Auto OTA: {0}', github.event.head_commit.message) }}"
           for attempt in 1 2 3; do
             echo "Production OTA attempt ${attempt}/3"
