@@ -272,6 +272,11 @@ router.post("/", requireDB, requireAuth, async (req, res) => {
       unchanged,
       locked,
     });
+    // Broadcast to admin dashboards
+    const broadcast = req.app.get("broadcast");
+    if (broadcast && (inserted > 0 || updated > 0)) {
+      broadcast("transactions_updated", { inserted, updated });
+    }
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -365,6 +370,11 @@ router.post("/bulk-status", requireDB, requireAuth, requireAdmin, async (req, re
       updated: result.modifiedCount || 0,
       status: nextStatus,
     });
+    // Broadcast to admin dashboards
+    const broadcast = req.app.get("broadcast");
+    if (broadcast && (result.modifiedCount || 0) > 0) {
+      broadcast("transactions_updated", { updated: result.modifiedCount, status: nextStatus });
+    }
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

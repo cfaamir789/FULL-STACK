@@ -2112,6 +2112,11 @@
               signal: AbortSignal.timeout(5000),
             });
             if (res.ok) {
+              // Also check if this server's DB is actually connected
+              const dbRes = await fetch(server + "/api/db-status", {
+                signal: AbortSignal.timeout(3000),
+              }).then(r => r.json()).catch(() => null);
+              if (dbRes && !dbRes.connected) continue; // skip servers with offline DB
               API = server + "/api";
               console.log("[Failover] Using server:", server);
               return server;
@@ -2135,6 +2140,66 @@
       let liveRefreshTimer = null;
       let currentPage = "dashboard";
       let workerRefreshInFlight = false;
+
+      // ─── WebSocket for real-time admin sync ──────────────────────────────────────
+      let ws = null;
+      let wsReconnectTimer = null;
+
+      function connectWebSocket() {
+        if (ws && ws.readyState <= 1) return; // already open or connecting
+        const proto = location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = proto + "//" + location.host + "/ws";
+        try {
+          ws = new WebSocket(wsUrl);
+        } catch { return; }
+
+        ws.onopen = () => {
+          console.log("[WS] Connected");
+          if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+        };
+
+        ws.onmessage = (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            console.log("[WS] Event:", msg.type, msg);
+            if (msg.type === "items_updated") {
+              // Refresh item counts, version, and item list on all admin panels
+              loadStats();
+              loadPushStats();
+              if (currentPage === "master" && pageLoaded.master) {
+                loadItems(currentItemsPage);
+              }
+              if (currentPage === "dashboard" && pageLoaded.dashboard) {
+                loadDashboardPanels(true);
+                refreshSystemStatus();
+              }
+            }
+            if (msg.type === "transactions_updated") {
+              // Refresh transaction list and worker status on all admin panels
+              loadStats();
+              if (currentPage === "workers" && pageLoaded.workers) {
+                refreshWorkersPage(true);
+              }
+              if (currentPage === "dashboard" && pageLoaded.dashboard) {
+                loadDashboardPanels(true);
+                refreshSystemStatus();
+              }
+            }
+          } catch {}
+        };
+
+        ws.onclose = () => {
+          console.log("[WS] Disconnected, reconnecting in 3s...");
+          ws = null;
+          if (!wsReconnectTimer) {
+            wsReconnectTimer = setTimeout(connectWebSocket, 3000);
+          }
+        };
+
+        ws.onerror = () => {
+          ws?.close();
+        };
+      }
 
       // ─── Auth ────────────────────────────────────────────────────────────────────
       async function apiFetch(path, opts = {}) {
@@ -2194,13 +2259,18 @@
         // Show loading state
         if (btn) { btn.disabled = true; btn.textContent = "Connecting..."; }
         try {
-          // Quick DB check first (< 50ms) — avoids 10s timeout
+          // Quick DB check first — if local DB is offline, failover to a Render server
           const dbCheck = await fetch(API + "/db-status").then(r => r.json()).catch(() => null);
           if (dbCheck && !dbCheck.connected) {
-            errEl.textContent = "Database is offline (" + dbCheck.stateLabel + "). Retrying connection...";
-            errEl.classList.remove("hidden");
-            if (btn) { btn.disabled = false; btn.textContent = "Login"; }
-            return;
+            console.log("[Failover] Local DB offline, trying remote servers...");
+            const working = await findWorkingServer();
+            if (!working) {
+              errEl.textContent = "Database is offline (" + dbCheck.stateLabel + "). All servers unreachable.";
+              errEl.classList.remove("hidden");
+              if (btn) { btn.disabled = false; btn.textContent = "Login"; }
+              return;
+            }
+            console.log("[Failover] Switched to:", API);
           }
           const data = await apiFetch("/auth/login", {
             method: "POST",
@@ -2267,6 +2337,7 @@
       async function showPanel() {
         document.getElementById("loginSection").classList.add("hidden");
         document.getElementById("mainPanel").classList.remove("hidden");
+        connectWebSocket();
         startLiveRefresh();
         switchPage("dashboard");
       }

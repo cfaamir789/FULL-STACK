@@ -1,5 +1,7 @@
 require("dotenv").config();
 const express = require("express");
+const http = require("http");
+const { WebSocketServer } = require("ws");
 const cors = require("cors");
 const path = require("path");
 const itemsRouter = require("./routes/items");
@@ -10,7 +12,41 @@ const connectDB = require("./config/database");
 const compression = require("compression");
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// ─── WebSocket Server ─────────────────────────────────────────────────────────
+const wss = new WebSocketServer({ server, path: "/ws" });
+
+// Track connected admin clients
+const adminClients = new Set();
+
+wss.on("connection", (ws) => {
+  adminClients.add(ws);
+  console.log(`WS client connected (${adminClients.size} total)`);
+
+  ws.on("close", () => {
+    adminClients.delete(ws);
+    console.log(`WS client disconnected (${adminClients.size} total)`);
+  });
+
+  ws.on("error", () => {
+    adminClients.delete(ws);
+  });
+});
+
+// Broadcast a message to all connected admin dashboards
+function broadcast(eventType, data = {}) {
+  const msg = JSON.stringify({ type: eventType, ...data, ts: Date.now() });
+  for (const ws of adminClients) {
+    if (ws.readyState === 1) {
+      ws.send(msg);
+    }
+  }
+}
+
+// Expose broadcast so routes can use it
+app.set("broadcast", broadcast);
 
 // Middleware
 app.use(compression());
@@ -93,10 +129,11 @@ app.use((err, req, res, next) => {
 
 // Connect to MongoDB, but start listening regardless
 // Start listening IMMEDIATELY so Render sees the port open
-app.listen(PORT, "0.0.0.0", () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on http://0.0.0.0:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/api/health`);
   console.log(`Admin panel:  http://localhost:${PORT}/admin`);
+  console.log(`WebSocket:    ws://localhost:${PORT}/ws`);
 
   // Keep-alive self-ping every 4 min to prevent Render free tier sleep
   if (process.env.NODE_ENV === "production") {

@@ -87,7 +87,7 @@ function parseCsvItems(csvText) {
   return items;
 }
 
-async function applyCsvItems(items, mode, onProgress) {
+async function applyCsvItems(items, mode, onProgress, req) {
   if (mode === "replace") {
     await Item.deleteMany({});
   }
@@ -140,36 +140,41 @@ async function applyCsvItems(items, mode, onProgress) {
     }
   }
 
-  await bumpItemsVersion();
+  await bumpItemsVersion(req);
   const totalItems = await Item.countDocuments({});
   return { inserted, modified, totalItems, processed, total };
 }
 
 // ─── Item Version Tracking ──────────────────────────────────────────────────
-let _itemsVersion = 0;
+// Always read from MongoDB so multiple server instances stay in sync.
 
-// Load persisted version on startup
-(async () => {
-  try {
-    const doc = await Meta.findOne({ key: "itemsVersion" });
-    if (doc) _itemsVersion = doc.version;
-  } catch (_) {}
-})();
+async function getItemsVersion() {
+  const doc = await Meta.findOne({ key: "itemsVersion" }).lean();
+  return doc ? doc.version : 0;
+}
 
-async function bumpItemsVersion() {
-  _itemsVersion++;
-  await Meta.findOneAndUpdate(
+async function bumpItemsVersion(req) {
+  const doc = await Meta.findOneAndUpdate(
     { key: "itemsVersion" },
-    { $set: { version: _itemsVersion } },
+    { $inc: { version: 1 } },
     { upsert: true, new: true },
   );
-  return _itemsVersion;
+  // Broadcast to all connected admin dashboards
+  const broadcast = req?.app?.get("broadcast");
+  if (broadcast) {
+    const count = await Item.countDocuments({});
+    broadcast("items_updated", { version: doc.version, totalItems: count });
+  }
+  return doc.version;
 }
 
 // GET /api/items/version — lightweight check for phones (no auth needed)
 router.get("/version", async (req, res) => {
-  const count = await Item.countDocuments({});
-  res.json({ success: true, version: _itemsVersion, totalItems: count });
+  const [count, version] = await Promise.all([
+    Item.countDocuments({}),
+    getItemsVersion(),
+  ]);
+  res.json({ success: true, version, totalItems: count });
 });
 
 // GET /api/items/bulk — download ALL items in a single compressed JSON response
@@ -182,9 +187,10 @@ router.get("/bulk", async (req, res) => {
     )
       .sort({ Item_Name: 1 })
       .lean();
+    const version = await getItemsVersion();
     res.json({
       success: true,
-      version: _itemsVersion,
+      version,
       total: items.length,
       items,
     });
@@ -206,7 +212,7 @@ router.post("/push-master", requireAuth, requireAdmin, async (req, res) => {
           error: "No items in database. Upload a CSV first.",
         });
     }
-    const newVersion = await bumpItemsVersion();
+    const newVersion = await bumpItemsVersion(req);
     res.json({ success: true, version: newVersion, totalItems: count });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -279,7 +285,7 @@ router.post("/", async (req, res) => {
       { $set: { ItemCode, Barcode, Item_Name } },
       { upsert: true, new: true },
     );
-    await bumpItemsVersion();
+    await bumpItemsVersion(req);
     res.status(201).json({ success: true, item });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -314,7 +320,7 @@ router.post("/import", requireAuth, requireAdmin, async (req, res) => {
         else modified++;
       }),
     );
-    await bumpItemsVersion();
+    await bumpItemsVersion(req);
     res.json({ success: true, inserted, modified });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -326,7 +332,7 @@ router.delete("/all", requireAuth, requireAdmin, async (req, res) => {
   try {
     const count = await Item.countDocuments({});
     await Item.deleteMany({});
-    await bumpItemsVersion();
+    await bumpItemsVersion(req);
     res.json({ success: true, deleted: count });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -356,7 +362,7 @@ router.post("/replace", requireAuth, requireAdmin, async (req, res) => {
         inserted++;
       }),
     );
-    await bumpItemsVersion();
+    await bumpItemsVersion(req);
     res.json({ success: true, inserted });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -478,7 +484,7 @@ router.post(
       }
 
       const totalItems = await Item.countDocuments({});
-      await bumpItemsVersion();
+      await bumpItemsVersion(req);
       res.json({ success: true, inserted, modified, totalItems });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
@@ -529,7 +535,7 @@ router.post(
               status: "processing",
               ...progress,
             });
-          });
+          }, req);
 
           setUploadJob(jobId, {
             status: "done",
