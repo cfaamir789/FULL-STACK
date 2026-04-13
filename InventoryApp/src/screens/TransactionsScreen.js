@@ -452,8 +452,8 @@ export default function TransactionsScreen({ username, role }) {
                   item={item}
                   onEdit={openEdit}
                   onDelete={openDelete}
-                  canEdit={role === "admin" || item.worker_name === username}
-                  canDelete={role === "admin" || item.worker_name === username}
+                  canEdit={role === "admin" || (item.worker_name === username && item.synced !== 1)}
+                  canDelete={role === "admin" || (item.worker_name === username && item.synced !== 1)}
                 />
               )}
               contentContainerStyle={{ paddingVertical: 8, paddingBottom: 24 }}

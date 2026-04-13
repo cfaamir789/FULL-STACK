@@ -311,6 +311,18 @@ export const syncTransactions = async (transactions) => {
   return res.data;
 };
 
+// Check if server wants us to clear synced data
+export const checkClearCommand = async () => {
+  const res = await apiClient.get("/sync/clear-check");
+  return res.data; // { success, clearBefore }
+};
+
+// Acknowledge clear completed
+export const ackClear = async () => {
+  const res = await apiClient.post("/sync/clear-ack");
+  return res.data;
+};
+
 export const importItemsToBackend = async (itemsArray) => {
   const res = await apiClient.post("/items/import", { items: itemsArray });
   return res.data;

@@ -6,11 +6,14 @@ import {
   fetchItemsBulk,
   fetchItemsVersion,
   getServerTimeISO,
+  checkClearCommand,
+  ackClear,
 } from "./api";
 import {
   getPendingTransactions,
   markTransactionsSynced,
   clearAndReplaceAllItems,
+  clearSyncedTransactions,
 } from "../database/db";
 
 let _onStatusChange = null;
@@ -124,6 +127,19 @@ export const attemptSync = async () => {
 
   const pending = await getPendingTransactions();
   if (pending.length === 0) {
+    // Even with nothing to sync, check for admin clear commands
+    try {
+      const clearRes = await checkClearCommand();
+      if (clearRes?.clearBefore) {
+        const cleared = await clearSyncedTransactions();
+        if (cleared > 0) {
+          console.log(`[Sync] Cleared ${cleared} synced transactions (admin command)`);
+        }
+        await ackClear();
+      }
+    } catch (e) {
+      console.log("[Sync] Clear check failed:", e.message);
+    }
     const lastSync = await getServerTimeISO();
     notifyStatus({ online: true, lastSync, pendingCount: 0 });
     return { synced: 0, reason: "nothing_pending", lastSync };
@@ -154,6 +170,20 @@ export const attemptSync = async () => {
     await markTransactionsSynced(ids);
   } catch (err) {
     return { synced: 0, reason: "sync_failed", error: err.message };
+  }
+
+  // Check for remote clear command from admin
+  try {
+    const clearRes = await checkClearCommand();
+    if (clearRes?.clearBefore) {
+      const cleared = await clearSyncedTransactions();
+      if (cleared > 0) {
+        console.log(`[Sync] Cleared ${cleared} synced transactions (admin command)`);
+      }
+      await ackClear();
+    }
+  } catch (e) {
+    console.log("[Sync] Clear check failed:", e.message);
   }
 
   const lastSync = await getServerTimeISO();

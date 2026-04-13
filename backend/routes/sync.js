@@ -288,6 +288,12 @@ router.post("/", requireDB, requireAuth, async (req, res) => {
       appendTransactions(sheetRows).catch(() => {});
     }
 
+    // Check if there's a clear command for this worker
+    const workerDoc = await WorkerSync.findOne({ worker: workerName }).lean();
+    const clearBefore = workerDoc?.clearBefore
+      ? workerDoc.clearBefore.toISOString()
+      : null;
+
     res.json({
       success: true,
       synced: docs.length,
@@ -295,6 +301,7 @@ router.post("/", requireDB, requireAuth, async (req, res) => {
       updated,
       unchanged,
       locked,
+      clearBefore,
     });
     // Broadcast to admin dashboards
     const broadcast = req.app.get("broadcast");
@@ -554,6 +561,85 @@ router.get("/stats", requireDB, requireAuth, requireAdmin, async (req, res) => {
       totalAll,
       workers,
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── Clear processed data from worker phones ─────────────────────────────────
+
+// Set clear command for specific workers (admin sets clearBefore timestamp)
+router.post(
+  "/clear-worker-data",
+  requireDB,
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { workers } = req.body; // array of worker names, or "all"
+      if (!workers) {
+        return res
+          .status(400)
+          .json({ success: false, error: "workers is required" });
+      }
+
+      const clearBefore = new Date();
+      let updated = 0;
+
+      if (workers === "all") {
+        const result = await WorkerSync.updateMany(
+          {},
+          { $set: { clearBefore } },
+        );
+        updated = result.modifiedCount || 0;
+      } else if (Array.isArray(workers) && workers.length > 0) {
+        const result = await WorkerSync.updateMany(
+          { worker: { $in: workers } },
+          { $set: { clearBefore } },
+        );
+        updated = result.modifiedCount || 0;
+      } else {
+        return res
+          .status(400)
+          .json({ success: false, error: "workers must be an array or 'all'" });
+      }
+
+      res.json({ success: true, updated, clearBefore: clearBefore.toISOString() });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
+
+// Worker checks for clear commands (called by app during sync)
+router.get("/clear-check", requireDB, requireAuth, async (req, res) => {
+  try {
+    const workerName = req.user?.username;
+    if (!workerName) {
+      return res.json({ success: true, clearBefore: null });
+    }
+    const doc = await WorkerSync.findOne({ worker: workerName }).lean();
+    res.json({
+      success: true,
+      clearBefore: doc?.clearBefore ? doc.clearBefore.toISOString() : null,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Worker confirms clear completed — removes the clearBefore flag
+router.post("/clear-ack", requireDB, requireAuth, async (req, res) => {
+  try {
+    const workerName = req.user?.username;
+    if (!workerName) {
+      return res.json({ success: true });
+    }
+    await WorkerSync.updateOne(
+      { worker: workerName },
+      { $unset: { clearBefore: 1 } },
+    );
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
