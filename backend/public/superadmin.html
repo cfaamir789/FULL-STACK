@@ -5,202 +5,529 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Super Admin Console</title>
     <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         background: #0f1923;
         color: #e0e6ed;
         min-height: 100vh;
       }
       .header {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+        background: linear-gradient(
+          135deg,
+          #1a1a2e 0%,
+          #16213e 60%,
+          #0f3460 100%
+        );
         padding: 20px 32px;
-        display: flex; align-items: center; justify-content: space-between;
-        flex-wrap: wrap; gap: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
         border-bottom: 2px solid #e94560;
-        box-shadow: 0 4px 20px rgba(233,69,96,0.15);
+        box-shadow: 0 4px 20px rgba(233, 69, 96, 0.15);
       }
-      .header h1 { font-size: 26px; font-weight: 700; color: #e94560; letter-spacing: -0.02em; }
-      .header p { opacity: 0.7; font-size: 13px; margin-top: 2px; }
-      .header-right { text-align: right; font-size: 13px; }
-      .header-right .clock { font-size: 20px; font-weight: 700; color: #e94560; }
-      .header-right .date { font-size: 11px; opacity: 0.6; }
-      .header-actions { display: flex; gap: 10px; align-items: center; }
-      .container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+      .header h1 {
+        font-size: 26px;
+        font-weight: 700;
+        color: #e94560;
+        letter-spacing: -0.02em;
+      }
+      .header p {
+        opacity: 0.7;
+        font-size: 13px;
+        margin-top: 2px;
+      }
+      .header-right {
+        text-align: right;
+        font-size: 13px;
+      }
+      .header-right .clock {
+        font-size: 20px;
+        font-weight: 700;
+        color: #e94560;
+      }
+      .header-right .date {
+        font-size: 11px;
+        opacity: 0.6;
+      }
+      .header-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 24px auto;
+        padding: 0 16px;
+      }
       .card {
         background: #1a2332;
         border: 1px solid #2a3a4a;
         border-radius: 14px;
         padding: 24px;
         margin-bottom: 20px;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
       }
       .card h2 {
-        font-size: 18px; margin-bottom: 16px; color: #e94560;
-        display: flex; align-items: center; gap: 8px;
+        font-size: 18px;
+        margin-bottom: 16px;
+        color: #e94560;
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
-      .card h3 { font-size: 15px; color: #7ec8e3; margin-bottom: 10px; }
-      .stats-row { display: flex; gap: 14px; flex-wrap: wrap; }
+      .card h3 {
+        font-size: 15px;
+        color: #7ec8e3;
+        margin-bottom: 10px;
+      }
+      .stats-row {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
       .stat {
-        flex: 1; min-width: 140px;
+        flex: 1;
+        min-width: 140px;
         background: #0f1923;
         border: 1px solid #2a3a4a;
-        border-radius: 10px; padding: 18px; text-align: center;
+        border-radius: 10px;
+        padding: 18px;
+        text-align: center;
       }
-      .stat .num { font-size: 30px; font-weight: 700; color: #e94560; }
-      .stat .label { font-size: 12px; color: #7a8a9a; margin-top: 4px; }
-      .stat.ok .num { color: #4caf50; }
-      .stat.warn .num { color: #ff9800; }
-      .stat.danger .num { color: #f44336; }
+      .stat .num {
+        font-size: 30px;
+        font-weight: 700;
+        color: #e94560;
+      }
+      .stat .label {
+        font-size: 12px;
+        color: #7a8a9a;
+        margin-top: 4px;
+      }
+      .stat.ok .num {
+        color: #4caf50;
+      }
+      .stat.warn .num {
+        color: #ff9800;
+      }
+      .stat.danger .num {
+        color: #f44336;
+      }
       .btn {
-        display: inline-flex; align-items: center; justify-content: center;
-        gap: 8px; padding: 12px 24px; border: none; border-radius: 8px;
-        font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
       }
-      .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-      .btn-primary { background: #e94560; color: #fff; }
-      .btn-primary:hover:not(:disabled) { background: #c73651; }
-      .btn-danger { background: #b71c1c; color: #fff; }
-      .btn-danger:hover:not(:disabled) { background: #8e1515; }
-      .btn-success { background: #2e7d32; color: #fff; }
-      .btn-success:hover:not(:disabled) { background: #1b5e20; }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn-primary {
+        background: #e94560;
+        color: #fff;
+      }
+      .btn-primary:hover:not(:disabled) {
+        background: #c73651;
+      }
+      .btn-danger {
+        background: #b71c1c;
+        color: #fff;
+      }
+      .btn-danger:hover:not(:disabled) {
+        background: #8e1515;
+      }
+      .btn-success {
+        background: #2e7d32;
+        color: #fff;
+      }
+      .btn-success:hover:not(:disabled) {
+        background: #1b5e20;
+      }
       .btn-outline {
-        background: transparent; color: #7ec8e3; border: 1px solid #2a3a4a;
+        background: transparent;
+        color: #7ec8e3;
+        border: 1px solid #2a3a4a;
       }
-      .btn-outline:hover:not(:disabled) { border-color: #7ec8e3; background: rgba(126,200,227,0.08); }
-      .btn-sm { padding: 8px 16px; font-size: 13px; }
-      .alert { padding: 12px 16px; border-radius: 8px; margin: 12px 0; font-size: 14px; }
-      .alert-success { background: rgba(46,125,50,0.15); color: #4caf50; border: 1px solid rgba(46,125,50,0.3); }
-      .alert-error { background: rgba(183,28,28,0.15); color: #ef5350; border: 1px solid rgba(183,28,28,0.3); }
-      .alert-info { background: rgba(126,200,227,0.1); color: #7ec8e3; border: 1px solid rgba(126,200,227,0.2); }
-      .hidden { display: none; }
+      .btn-outline:hover:not(:disabled) {
+        border-color: #7ec8e3;
+        background: rgba(126, 200, 227, 0.08);
+      }
+      .btn-sm {
+        padding: 8px 16px;
+        font-size: 13px;
+      }
+      .alert {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin: 12px 0;
+        font-size: 14px;
+      }
+      .alert-success {
+        background: rgba(46, 125, 50, 0.15);
+        color: #4caf50;
+        border: 1px solid rgba(46, 125, 50, 0.3);
+      }
+      .alert-error {
+        background: rgba(183, 28, 28, 0.15);
+        color: #ef5350;
+        border: 1px solid rgba(183, 28, 28, 0.3);
+      }
+      .alert-info {
+        background: rgba(126, 200, 227, 0.1);
+        color: #7ec8e3;
+        border: 1px solid rgba(126, 200, 227, 0.2);
+      }
+      .hidden {
+        display: none;
+      }
       /* Login */
-      .login-card { max-width: 420px; margin: 100px auto; }
-      .login-card input {
-        width: 100%; padding: 12px; border: 1px solid #2a3a4a;
-        border-radius: 8px; font-size: 15px; margin-bottom: 12px;
-        background: #0f1923; color: #e0e6ed;
+      .login-card {
+        max-width: 420px;
+        margin: 100px auto;
       }
-      .login-card input:focus { outline: none; border-color: #e94560; }
-      .login-card input::placeholder { color: #5a6a7a; }
+      .login-card input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #2a3a4a;
+        border-radius: 8px;
+        font-size: 15px;
+        margin-bottom: 12px;
+        background: #0f1923;
+        color: #e0e6ed;
+      }
+      .login-card input:focus {
+        outline: none;
+        border-color: #e94560;
+      }
+      .login-card input::placeholder {
+        color: #5a6a7a;
+      }
       /* Tab bar */
       .tab-bar {
-        display: flex; gap: 0; margin-bottom: 20px;
+        display: flex;
+        gap: 0;
+        margin-bottom: 20px;
         border-bottom: 2px solid #2a3a4a;
         overflow-x: auto;
       }
       .tab-bar button {
-        padding: 12px 22px; border: none; background: none; cursor: pointer;
-        font-size: 14px; font-weight: 600; color: #5a6a7a;
-        border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.2s;
+        padding: 12px 22px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        color: #5a6a7a;
+        border-bottom: 3px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.2s;
         white-space: nowrap;
       }
-      .tab-bar button.active { color: #e94560; border-bottom-color: #e94560; }
-      .tab-bar button:hover { color: #e94560; }
-      /* Tables */
-      table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
-      th {
-        background: #0f1923; text-align: left; padding: 10px 12px;
-        font-weight: 600; color: #7a8a9a; border-bottom: 2px solid #2a3a4a;
+      .tab-bar button.active {
+        color: #e94560;
+        border-bottom-color: #e94560;
       }
-      td { padding: 8px 12px; border-bottom: 1px solid #1e2d3d; color: #b0bec5; }
-      tr:hover td { background: rgba(233,69,96,0.04); }
+      .tab-bar button:hover {
+        color: #e94560;
+      }
+      /* Tables */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        font-size: 13px;
+      }
+      th {
+        background: #0f1923;
+        text-align: left;
+        padding: 10px 12px;
+        font-weight: 600;
+        color: #7a8a9a;
+        border-bottom: 2px solid #2a3a4a;
+      }
+      td {
+        padding: 8px 12px;
+        border-bottom: 1px solid #1e2d3d;
+        color: #b0bec5;
+      }
+      tr:hover td {
+        background: rgba(233, 69, 96, 0.04);
+      }
       /* User cards */
       .user-card {
-        background: #0f1923; border: 1px solid #2a3a4a; border-radius: 12px;
-        padding: 18px; margin-bottom: 12px; display: flex; align-items: center;
-        gap: 14px; flex-wrap: wrap;
+        background: #0f1923;
+        border: 1px solid #2a3a4a;
+        border-radius: 12px;
+        padding: 18px;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
       }
       .user-avatar {
-        width: 42px; height: 42px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-weight: 700; font-size: 16px; color: #fff; flex-shrink: 0;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 16px;
+        color: #fff;
+        flex-shrink: 0;
       }
-      .user-avatar.superadmin { background: linear-gradient(135deg, #e94560, #c73651); }
-      .user-avatar.admin { background: linear-gradient(135deg, #1565c0, #1976d2); }
-      .user-avatar.worker { background: linear-gradient(135deg, #455a64, #546e7a); }
-      .user-info { flex: 1; }
-      .user-info .name { font-weight: 700; font-size: 15px; color: #e0e6ed; }
-      .user-info .meta { font-size: 12px; color: #5a6a7a; margin-top: 2px; }
+      .user-avatar.superadmin {
+        background: linear-gradient(135deg, #e94560, #c73651);
+      }
+      .user-avatar.admin {
+        background: linear-gradient(135deg, #1565c0, #1976d2);
+      }
+      .user-avatar.worker {
+        background: linear-gradient(135deg, #455a64, #546e7a);
+      }
+      .user-info {
+        flex: 1;
+      }
+      .user-info .name {
+        font-weight: 700;
+        font-size: 15px;
+        color: #e0e6ed;
+      }
+      .user-info .meta {
+        font-size: 12px;
+        color: #5a6a7a;
+        margin-top: 2px;
+      }
       .role-badge {
-        font-size: 11px; padding: 4px 12px; border-radius: 20px;
-        font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+        font-size: 11px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
-      .role-badge.superadmin { background: rgba(233,69,96,0.15); color: #e94560; }
-      .role-badge.admin { background: rgba(21,101,192,0.15); color: #42a5f5; }
-      .role-badge.worker { background: rgba(69,90,100,0.15); color: #90a4ae; }
-      .user-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .role-badge.superadmin {
+        background: rgba(233, 69, 96, 0.15);
+        color: #e94560;
+      }
+      .role-badge.admin {
+        background: rgba(21, 101, 192, 0.15);
+        color: #42a5f5;
+      }
+      .role-badge.worker {
+        background: rgba(69, 90, 100, 0.15);
+        color: #90a4ae;
+      }
+      .user-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
       /* Danger zone */
       .danger-zone {
-        border: 2px solid rgba(183,28,28,0.4); border-radius: 14px;
-        padding: 24px; margin-top: 16px; background: rgba(183,28,28,0.05);
+        border: 2px solid rgba(183, 28, 28, 0.4);
+        border-radius: 14px;
+        padding: 24px;
+        margin-top: 16px;
+        background: rgba(183, 28, 28, 0.05);
       }
-      .danger-zone h3 { color: #ef5350; margin-bottom: 12px; }
+      .danger-zone h3 {
+        color: #ef5350;
+        margin-bottom: 12px;
+      }
       .danger-item {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 14px 0; border-bottom: 1px solid rgba(183,28,28,0.15);
-        flex-wrap: wrap; gap: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 0;
+        border-bottom: 1px solid rgba(183, 28, 28, 0.15);
+        flex-wrap: wrap;
+        gap: 10px;
       }
-      .danger-item:last-child { border-bottom: none; }
-      .danger-item .desc { font-size: 13px; color: #b0bec5; max-width: 500px; }
-      .danger-item .desc strong { color: #ef5350; }
+      .danger-item:last-child {
+        border-bottom: none;
+      }
+      .danger-item .desc {
+        font-size: 13px;
+        color: #b0bec5;
+        max-width: 500px;
+      }
+      .danger-item .desc strong {
+        color: #ef5350;
+      }
       /* Confirm modal */
       .modal-overlay {
-        display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.6); z-index: 1000;
-        align-items: center; justify-content: center;
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
       }
-      .modal-overlay.open { display: flex; }
+      .modal-overlay.open {
+        display: flex;
+      }
       .modal {
-        background: #1a2332; border: 1px solid #2a3a4a; border-radius: 16px;
-        width: 440px; max-width: 92vw; overflow: hidden;
+        background: #1a2332;
+        border: 1px solid #2a3a4a;
+        border-radius: 16px;
+        width: 440px;
+        max-width: 92vw;
+        overflow: hidden;
         animation: modalPop 0.2s ease-out;
       }
       @keyframes modalPop {
-        from { opacity: 0; transform: scale(0.92) translateY(10px); }
-        to { opacity: 1; transform: scale(1) translateY(0); }
+        from {
+          opacity: 0;
+          transform: scale(0.92) translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
       }
       .modal-header {
-        padding: 18px 24px; border-bottom: 1px solid #2a3a4a;
-        display: flex; align-items: center; justify-content: space-between;
+        padding: 18px 24px;
+        border-bottom: 1px solid #2a3a4a;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
       }
-      .modal-header h3 { font-size: 16px; font-weight: 700; color: #e94560; }
+      .modal-header h3 {
+        font-size: 16px;
+        font-weight: 700;
+        color: #e94560;
+      }
       .modal-close {
-        background: none; border: none; font-size: 22px; cursor: pointer;
-        color: #5a6a7a; padding: 0; line-height: 1;
+        background: none;
+        border: none;
+        font-size: 22px;
+        cursor: pointer;
+        color: #5a6a7a;
+        padding: 0;
+        line-height: 1;
       }
-      .modal-close:hover { color: #e0e6ed; }
-      .modal-body { padding: 24px; }
-      .modal-body p { font-size: 14px; color: #b0bec5; margin-bottom: 12px; }
-      .modal-body input {
-        width: 100%; padding: 12px; border: 1px solid #2a3a4a;
-        border-radius: 8px; font-size: 15px; background: #0f1923; color: #e0e6ed;
+      .modal-close:hover {
+        color: #e0e6ed;
+      }
+      .modal-body {
+        padding: 24px;
+      }
+      .modal-body p {
+        font-size: 14px;
+        color: #b0bec5;
         margin-bottom: 12px;
       }
-      .modal-body input:focus { outline: none; border-color: #e94560; }
-      .modal-body input::placeholder { color: #5a6a7a; }
-      .modal-footer { padding: 0 24px 24px; display: flex; gap: 10px; justify-content: flex-end; }
-      /* System health */
-      .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
-      .health-item {
-        background: #0f1923; border: 1px solid #2a3a4a; border-radius: 10px;
-        padding: 16px; display: flex; align-items: center; gap: 12px;
+      .modal-body input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #2a3a4a;
+        border-radius: 8px;
+        font-size: 15px;
+        background: #0f1923;
+        color: #e0e6ed;
+        margin-bottom: 12px;
       }
-      .health-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-      .health-dot.green { background: #4caf50; box-shadow: 0 0 8px rgba(76,175,80,0.4); }
-      .health-dot.red { background: #f44336; box-shadow: 0 0 8px rgba(244,67,54,0.4); }
-      .health-dot.yellow { background: #ff9800; box-shadow: 0 0 8px rgba(255,152,0,0.4); }
-      .health-label { font-size: 13px; color: #7a8a9a; }
-      .health-value { font-size: 14px; font-weight: 600; color: #e0e6ed; }
+      .modal-body input:focus {
+        outline: none;
+        border-color: #e94560;
+      }
+      .modal-body input::placeholder {
+        color: #5a6a7a;
+      }
+      .modal-footer {
+        padding: 0 24px 24px;
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+      /* System health */
+      .health-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 14px;
+      }
+      .health-item {
+        background: #0f1923;
+        border: 1px solid #2a3a4a;
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .health-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .health-dot.green {
+        background: #4caf50;
+        box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+      }
+      .health-dot.red {
+        background: #f44336;
+        box-shadow: 0 0 8px rgba(244, 67, 54, 0.4);
+      }
+      .health-dot.yellow {
+        background: #ff9800;
+        box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
+      }
+      .health-label {
+        font-size: 13px;
+        color: #7a8a9a;
+      }
+      .health-value {
+        font-size: 14px;
+        font-weight: 600;
+        color: #e0e6ed;
+      }
       /* Responsive */
       @media (max-width: 600px) {
-        .header { padding: 16px; }
-        .header h1 { font-size: 20px; }
-        .container { padding: 0 10px; }
-        .card { padding: 16px; }
-        .stats-row { gap: 8px; }
-        .stat { min-width: 100px; padding: 12px; }
-        .stat .num { font-size: 22px; }
+        .header {
+          padding: 16px;
+        }
+        .header h1 {
+          font-size: 20px;
+        }
+        .container {
+          padding: 0 10px;
+        }
+        .card {
+          padding: 16px;
+        }
+        .stats-row {
+          gap: 8px;
+        }
+        .stat {
+          min-width: 100px;
+          padding: 12px;
+        }
+        .stat .num {
+          font-size: 22px;
+        }
       }
     </style>
   </head>
@@ -220,15 +547,35 @@
     <div id="loginSection" class="container">
       <div class="card login-card">
         <h2>&#128274; Super Admin Login</h2>
-        <p style="color:#5a6a7a; font-size:13px; margin-bottom:14px">
+        <p style="color: #5a6a7a; font-size: 13px; margin-bottom: 14px">
           Only superadmin accounts can access this console.
         </p>
-        <input id="loginUser" type="text" placeholder="Username" autocomplete="username" />
-        <input id="loginPin" type="password" placeholder="PIN" autocomplete="current-password" />
+        <input
+          id="loginUser"
+          type="text"
+          placeholder="Username"
+          autocomplete="username"
+        />
+        <input
+          id="loginPin"
+          type="password"
+          placeholder="PIN"
+          autocomplete="current-password"
+        />
         <div id="loginError" class="alert alert-error hidden"></div>
-        <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Login</button>
-        <div style="margin-top:14px;text-align:center">
-          <a href="#" onclick="showRecovery();return false" style="color:#5a6a7a;font-size:12px">Forgot PIN? Use Recovery Key</a>
+        <button class="btn btn-primary" style="width: 100%" onclick="doLogin()">
+          Login
+        </button>
+        <div style="margin-top: 14px; text-align: center">
+          <a
+            href="#"
+            onclick="
+              showRecovery();
+              return false;
+            "
+            style="color: #5a6a7a; font-size: 12px"
+            >Forgot PIN? Use Recovery Key</a
+          >
         </div>
       </div>
     </div>
@@ -237,33 +584,83 @@
     <div id="recoverySection" class="container hidden">
       <div class="card login-card">
         <h2>&#128273; Recovery</h2>
-        <input id="recoverUser" type="text" placeholder="Username" autocomplete="username" />
-        <input id="recoverKey" type="text" placeholder="Recovery Key" autocomplete="off" style="font-family:monospace" />
-        <input id="recoverNewPin" type="password" placeholder="New PIN (min 4 digits)" autocomplete="new-password" />
+        <input
+          id="recoverUser"
+          type="text"
+          placeholder="Username"
+          autocomplete="username"
+        />
+        <input
+          id="recoverKey"
+          type="text"
+          placeholder="Recovery Key"
+          autocomplete="off"
+          style="font-family: monospace"
+        />
+        <input
+          id="recoverNewPin"
+          type="password"
+          placeholder="New PIN (min 4 digits)"
+          autocomplete="new-password"
+        />
         <div id="recoverError" class="alert alert-error hidden"></div>
         <div id="recoverSuccess" class="alert alert-success hidden"></div>
-        <button class="btn btn-primary" style="width:100%" onclick="doRecover()">Reset PIN &amp; Login</button>
-        <div style="margin-top:12px;text-align:center">
-          <a href="#" onclick="hideRecovery();return false" style="color:#5a6a7a;font-size:12px">Back to Login</a>
+        <button
+          class="btn btn-primary"
+          style="width: 100%"
+          onclick="doRecover()"
+        >
+          Reset PIN &amp; Login
+        </button>
+        <div style="margin-top: 12px; text-align: center">
+          <a
+            href="#"
+            onclick="
+              hideRecovery();
+              return false;
+            "
+            style="color: #5a6a7a; font-size: 12px"
+            >Back to Login</a
+          >
         </div>
       </div>
     </div>
 
     <!-- MAIN PANEL -->
     <div id="mainPanel" class="container hidden">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px">
-        <div style="font-size:14px;color:#5a6a7a">
-          Logged in as <strong id="displayUser" style="color:#e94560"></strong>
-          <span class="role-badge superadmin" style="margin-left:6px">SUPERADMIN</span>
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-bottom: 6px;
+        "
+      >
+        <div style="font-size: 14px; color: #5a6a7a">
+          Logged in as <strong id="displayUser" style="color: #e94560"></strong>
+          <span class="role-badge superadmin" style="margin-left: 6px"
+            >SUPERADMIN</span
+          >
         </div>
         <div class="header-actions">
-          <button class="btn btn-outline btn-sm" onclick="window.open('/admin','_blank')">Open Admin Panel &#8599;</button>
-          <button class="btn btn-outline btn-sm" onclick="doLogout()">Logout</button>
+          <button
+            class="btn btn-outline btn-sm"
+            onclick="window.open('/admin', '_blank')"
+          >
+            Open Admin Panel &#8599;
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="doLogout()">
+            Logout
+          </button>
         </div>
       </div>
 
       <div class="tab-bar" id="tabBar">
-        <button class="active" onclick="switchPage('overview')">Overview</button>
+        <button class="active" onclick="switchPage('overview')">
+          Overview
+        </button>
         <button onclick="switchPage('users')">Users</button>
         <button onclick="switchPage('reports')">Reports</button>
         <button onclick="switchPage('data')">Data Management</button>
@@ -274,30 +671,51 @@
         <div class="card">
           <h2>&#128200; System Overview</h2>
           <div class="stats-row" id="overviewStats">
-            <div class="stat"><div class="num" id="statItems">--</div><div class="label">Total Items</div></div>
-            <div class="stat"><div class="num" id="statTransactions">--</div><div class="label">Transactions</div></div>
-            <div class="stat"><div class="num" id="statWorkers">--</div><div class="label">Workers</div></div>
-            <div class="stat"><div class="num" id="statUsers">--</div><div class="label">Users</div></div>
+            <div class="stat">
+              <div class="num" id="statItems">--</div>
+              <div class="label">Total Items</div>
+            </div>
+            <div class="stat">
+              <div class="num" id="statTransactions">--</div>
+              <div class="label">Transactions</div>
+            </div>
+            <div class="stat">
+              <div class="num" id="statWorkers">--</div>
+              <div class="label">Workers</div>
+            </div>
+            <div class="stat">
+              <div class="num" id="statUsers">--</div>
+              <div class="label">Users</div>
+            </div>
           </div>
         </div>
 
         <div class="card">
           <h2>&#9889; Multi-Server Health</h2>
-          <p style="color:#5a6a7a;font-size:12px;margin-bottom:14px">All failover servers are checked in parallel. Green = online &amp; DB connected.</p>
-          <div id="multiServerHealth" style="display:flex;flex-direction:column;gap:10px;">
-            <p style="color:#5a6a7a">Checking servers...</p>
+          <p style="color: #5a6a7a; font-size: 12px; margin-bottom: 14px">
+            All failover servers are checked in parallel. Green = online &amp;
+            DB connected.
+          </p>
+          <div
+            id="multiServerHealth"
+            style="display: flex; flex-direction: column; gap: 10px"
+          >
+            <p style="color: #5a6a7a">Checking servers...</p>
           </div>
         </div>
 
         <div class="card">
           <h2>&#128241; Worker Devices &amp; Clear Status</h2>
-          <p style="color:#5a6a7a;font-size:12px;margin-bottom:14px">Live worker sync status. Orange clock = clear command pending (waiting for phone to sync).</p>
-          <div id="workerDevices" style="color:#5a6a7a">Loading...</div>
+          <p style="color: #5a6a7a; font-size: 12px; margin-bottom: 14px">
+            Live worker sync status. Orange clock = clear command pending
+            (waiting for phone to sync).
+          </p>
+          <div id="workerDevices" style="color: #5a6a7a">Loading...</div>
         </div>
 
         <div class="card">
           <h2>&#128101; Worker Activity (Last Sync)</h2>
-          <div id="workerActivity" style="color:#5a6a7a">Loading...</div>
+          <div id="workerActivity" style="color: #5a6a7a">Loading...</div>
         </div>
       </div>
 
@@ -305,9 +723,20 @@
       <div id="pageUsers" class="hidden">
         <div class="card">
           <h2>&#128101; User Management</h2>
-          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-            <button class="btn btn-primary btn-sm" onclick="showCreateUser()">+ Create User</button>
-            <button class="btn btn-outline btn-sm" onclick="loadUsers()">&#x21bb; Refresh</button>
+          <div
+            style="
+              display: flex;
+              gap: 10px;
+              margin-bottom: 16px;
+              flex-wrap: wrap;
+            "
+          >
+            <button class="btn btn-primary btn-sm" onclick="showCreateUser()">
+              + Create User
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="loadUsers()">
+              &#x21bb; Refresh
+            </button>
           </div>
           <div id="usersList">Loading...</div>
         </div>
@@ -317,7 +746,9 @@
       <div id="pageReports" class="hidden">
         <div class="card">
           <h2>&#128202; Reports</h2>
-          <p style="color:#5a6a7a;margin-bottom:16px">Transaction summaries and analytics.</p>
+          <p style="color: #5a6a7a; margin-bottom: 16px">
+            Transaction summaries and analytics.
+          </p>
         </div>
         <div class="card">
           <h3>Transaction Summary by Worker</h3>
@@ -337,29 +768,69 @@
       <div id="pageData" class="hidden">
         <div class="card">
           <h2>&#128451; Data Management</h2>
-          <p style="color:#5a6a7a;margin-bottom:16px">Critical operations that affect all system data.</p>
+          <p style="color: #5a6a7a; margin-bottom: 16px">
+            Critical operations that affect all system data.
+          </p>
         </div>
         <div class="card">
           <h3>Quick Actions</h3>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-            <button class="btn btn-success btn-sm" onclick="exportData('items')">&#128229; Export Items JSON</button>
-            <button class="btn btn-success btn-sm" onclick="exportData('transactions')">&#128229; Export Transactions JSON</button>
+          <div
+            style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px"
+          >
+            <button
+              class="btn btn-success btn-sm"
+              onclick="exportData('items')"
+            >
+              &#128229; Export Items JSON
+            </button>
+            <button
+              class="btn btn-success btn-sm"
+              onclick="exportData('transactions')"
+            >
+              &#128229; Export Transactions JSON
+            </button>
           </div>
         </div>
         <div class="danger-zone">
           <h3>&#9888; Danger Zone</h3>
-          <p style="font-size:13px;color:#7a8a9a;margin-bottom:16px">These actions are permanent and cannot be undone.</p>
+          <p style="font-size: 13px; color: #7a8a9a; margin-bottom: 16px">
+            These actions are permanent and cannot be undone.
+          </p>
           <div class="danger-item">
-            <div class="desc"><strong>Delete All Transactions</strong><br>Remove every transaction and worker sync record from the system.</div>
-            <button class="btn btn-danger btn-sm" onclick="confirmDanger('resetAll')">Reset All Data</button>
+            <div class="desc">
+              <strong>Delete All Transactions</strong><br />Remove every
+              transaction and worker sync record from the system.
+            </div>
+            <button
+              class="btn btn-danger btn-sm"
+              onclick="confirmDanger('resetAll')"
+            >
+              Reset All Data
+            </button>
           </div>
           <div class="danger-item">
-            <div class="desc"><strong>Delete All Items</strong><br>Remove every item from the master inventory list.</div>
-            <button class="btn btn-danger btn-sm" onclick="confirmDanger('deleteItems')">Delete All Items</button>
+            <div class="desc">
+              <strong>Delete All Items</strong><br />Remove every item from the
+              master inventory list.
+            </div>
+            <button
+              class="btn btn-danger btn-sm"
+              onclick="confirmDanger('deleteItems')"
+            >
+              Delete All Items
+            </button>
           </div>
           <div class="danger-item">
-            <div class="desc"><strong>Delete All Transactions Only</strong><br>Remove only transactions, keep worker sync records.</div>
-            <button class="btn btn-danger btn-sm" onclick="confirmDanger('deleteTx')">Delete Transactions</button>
+            <div class="desc">
+              <strong>Delete All Transactions Only</strong><br />Remove only
+              transactions, keep worker sync records.
+            </div>
+            <button
+              class="btn btn-danger btn-sm"
+              onclick="confirmDanger('deleteTx')"
+            >
+              Delete Transactions
+            </button>
           </div>
         </div>
       </div>
@@ -374,13 +845,28 @@
         </div>
         <div class="modal-body">
           <p id="confirmMessage">Are you sure?</p>
-          <p style="font-size:13px;color:#ef5350">Type <strong id="confirmWord">CONFIRM</strong> to proceed:</p>
-          <input id="confirmInput" type="text" placeholder="Type here..." autocomplete="off" />
+          <p style="font-size: 13px; color: #ef5350">
+            Type <strong id="confirmWord">CONFIRM</strong> to proceed:
+          </p>
+          <input
+            id="confirmInput"
+            type="text"
+            placeholder="Type here..."
+            autocomplete="off"
+          />
           <div id="confirmError" class="alert alert-error hidden"></div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-outline btn-sm" onclick="closeConfirm()">Cancel</button>
-          <button class="btn btn-danger btn-sm" id="confirmBtn" onclick="execDanger()">Confirm</button>
+          <button class="btn btn-outline btn-sm" onclick="closeConfirm()">
+            Cancel
+          </button>
+          <button
+            class="btn btn-danger btn-sm"
+            id="confirmBtn"
+            onclick="execDanger()"
+          >
+            Confirm
+          </button>
         </div>
       </div>
     </div>
@@ -390,14 +876,45 @@
       <div class="modal">
         <div class="modal-header">
           <h3>Create New User</h3>
-          <button class="modal-close" onclick="closeCreateUser()">&times;</button>
+          <button class="modal-close" onclick="closeCreateUser()">
+            &times;
+          </button>
         </div>
         <div class="modal-body">
-          <input id="newUsername" type="text" placeholder="Username" autocomplete="off" />
-          <input id="newPin" type="password" placeholder="PIN (min 4 digits)" autocomplete="new-password" />
-          <div style="margin-bottom:12px">
-            <label style="font-size:13px;color:#7a8a9a;display:block;margin-bottom:6px">Role</label>
-            <select id="newRole" style="width:100%;padding:10px;border:1px solid #2a3a4a;border-radius:8px;background:#0f1923;color:#e0e6ed;font-size:14px">
+          <input
+            id="newUsername"
+            type="text"
+            placeholder="Username"
+            autocomplete="off"
+          />
+          <input
+            id="newPin"
+            type="password"
+            placeholder="PIN (min 4 digits)"
+            autocomplete="new-password"
+          />
+          <div style="margin-bottom: 12px">
+            <label
+              style="
+                font-size: 13px;
+                color: #7a8a9a;
+                display: block;
+                margin-bottom: 6px;
+              "
+              >Role</label
+            >
+            <select
+              id="newRole"
+              style="
+                width: 100%;
+                padding: 10px;
+                border: 1px solid #2a3a4a;
+                border-radius: 8px;
+                background: #0f1923;
+                color: #e0e6ed;
+                font-size: 14px;
+              "
+            >
               <option value="worker">Worker</option>
               <option value="admin">Admin</option>
             </select>
@@ -406,8 +923,12 @@
           <div id="createUserSuccess" class="alert alert-success hidden"></div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-outline btn-sm" onclick="closeCreateUser()">Cancel</button>
-          <button class="btn btn-primary btn-sm" onclick="createUser()">Create</button>
+          <button class="btn btn-outline btn-sm" onclick="closeCreateUser()">
+            Cancel
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="createUser()">
+            Create
+          </button>
         </div>
       </div>
     </div>
@@ -421,13 +942,22 @@
         </div>
         <div class="modal-body">
           <p>Reset PIN for <strong id="resetPinUser"></strong></p>
-          <input id="resetPinValue" type="password" placeholder="New PIN (min 4 digits)" autocomplete="new-password" />
+          <input
+            id="resetPinValue"
+            type="password"
+            placeholder="New PIN (min 4 digits)"
+            autocomplete="new-password"
+          />
           <div id="resetPinError" class="alert alert-error hidden"></div>
           <div id="resetPinSuccess" class="alert alert-success hidden"></div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-outline btn-sm" onclick="closeResetPin()">Cancel</button>
-          <button class="btn btn-primary btn-sm" onclick="doResetPin()">Reset</button>
+          <button class="btn btn-outline btn-sm" onclick="closeResetPin()">
+            Cancel
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="doResetPin()">
+            Reset
+          </button>
         </div>
       </div>
     </div>
@@ -445,10 +975,15 @@
       async function findWorkingServer() {
         for (const server of UNIQUE_SERVERS) {
           try {
-            const res = await fetch(server + "/api/health", { signal: AbortSignal.timeout(5000) });
+            const res = await fetch(server + "/api/health", {
+              signal: AbortSignal.timeout(5000),
+            });
             if (res.ok) {
-              const dbRes = await fetch(server + "/api/db-status", { signal: AbortSignal.timeout(3000) })
-                .then(r => r.json()).catch(() => null);
+              const dbRes = await fetch(server + "/api/db-status", {
+                signal: AbortSignal.timeout(3000),
+              })
+                .then((r) => r.json())
+                .catch(() => null);
               if (dbRes && !dbRes.connected) continue;
               API = server + "/api";
               return server;
@@ -461,12 +996,17 @@
       async function apiFetch(path, opts = {}) {
         const headers = { ...(opts.headers || {}) };
         if (authToken) headers["Authorization"] = "Bearer " + authToken;
-        if (!(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
+        if (!(opts.body instanceof FormData))
+          headers["Content-Type"] = "application/json";
         try {
           const res = await fetch(API + path, { ...opts, headers });
           const raw = await res.text();
           let data = {};
-          try { data = raw ? JSON.parse(raw) : {}; } catch { data = { error: raw || "Request failed" }; }
+          try {
+            data = raw ? JSON.parse(raw) : {};
+          } catch {
+            data = { error: raw || "Request failed" };
+          }
           if (!res.ok) throw new Error(data.error || "Request failed");
           return data;
         } catch (err) {
@@ -475,7 +1015,11 @@
             const res2 = await fetch(API + path, { ...opts, headers });
             const raw2 = await res2.text();
             let data2 = {};
-            try { data2 = raw2 ? JSON.parse(raw2) : {}; } catch { data2 = { error: raw2 || "Request failed" }; }
+            try {
+              data2 = raw2 ? JSON.parse(raw2) : {};
+            } catch {
+              data2 = { error: raw2 || "Request failed" };
+            }
             if (!res2.ok) throw new Error(data2.error || "Request failed");
             return data2;
           }
@@ -492,10 +1036,15 @@
       // ─── Clock ─────────────────────────────────────────────────────────
       function tickClock() {
         const now = new Date();
-        document.getElementById("headerClock").textContent = now.toLocaleTimeString();
-        document.getElementById("headerDate").textContent = now.toLocaleDateString(undefined, {
-          weekday: "long", year: "numeric", month: "short", day: "numeric"
-        });
+        document.getElementById("headerClock").textContent =
+          now.toLocaleTimeString();
+        document.getElementById("headerDate").textContent =
+          now.toLocaleDateString(undefined, {
+            weekday: "long",
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          });
       }
       tickClock();
       setInterval(tickClock, 1000);
@@ -505,7 +1054,10 @@
         if (authToken) {
           try {
             const data = await apiFetch("/auth/users");
-            if (data && adminRole === "superadmin") { showPanel(); return; }
+            if (data && adminRole === "superadmin") {
+              showPanel();
+              return;
+            }
           } catch (_) {}
           // Token invalid
           doLogout();
@@ -518,17 +1070,31 @@
         const pin = document.getElementById("loginPin").value.trim();
         const errEl = document.getElementById("loginError");
         errEl.classList.add("hidden");
-        if (!username || !pin) { errEl.textContent = "Enter username and PIN"; errEl.classList.remove("hidden"); return; }
+        if (!username || !pin) {
+          errEl.textContent = "Enter username and PIN";
+          errEl.classList.remove("hidden");
+          return;
+        }
 
         try {
-          const dbCheck = await fetch(API + "/db-status").then(r => r.json()).catch(() => null);
+          const dbCheck = await fetch(API + "/db-status")
+            .then((r) => r.json())
+            .catch(() => null);
           if (dbCheck && !dbCheck.connected) {
             const working = await findWorkingServer();
-            if (!working) { errEl.textContent = "Database offline. All servers unreachable."; errEl.classList.remove("hidden"); return; }
+            if (!working) {
+              errEl.textContent = "Database offline. All servers unreachable.";
+              errEl.classList.remove("hidden");
+              return;
+            }
           }
-          const data = await apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ username, pin }) });
+          const data = await apiFetch("/auth/login", {
+            method: "POST",
+            body: JSON.stringify({ username, pin }),
+          });
           if (data.role !== "superadmin") {
-            errEl.textContent = "Only superadmin accounts can access this console.";
+            errEl.textContent =
+              "Only superadmin accounts can access this console.";
             errEl.classList.remove("hidden");
             return;
           }
@@ -560,12 +1126,22 @@
         const newPin = document.getElementById("recoverNewPin").value.trim();
         const errEl = document.getElementById("recoverError");
         const succEl = document.getElementById("recoverSuccess");
-        errEl.classList.add("hidden"); succEl.classList.add("hidden");
-        if (!username || !recoveryKey || !newPin) { errEl.textContent = "All fields are required."; errEl.classList.remove("hidden"); return; }
-        if (newPin.length < 4) { errEl.textContent = "PIN must be at least 4 digits."; errEl.classList.remove("hidden"); return; }
+        errEl.classList.add("hidden");
+        succEl.classList.add("hidden");
+        if (!username || !recoveryKey || !newPin) {
+          errEl.textContent = "All fields are required.";
+          errEl.classList.remove("hidden");
+          return;
+        }
+        if (newPin.length < 4) {
+          errEl.textContent = "PIN must be at least 4 digits.";
+          errEl.classList.remove("hidden");
+          return;
+        }
         try {
           const data = await apiFetch("/auth/recover-superadmin", {
-            method: "POST", body: JSON.stringify({ username, recoveryKey, newPin })
+            method: "POST",
+            body: JSON.stringify({ username, recoveryKey, newPin }),
           });
           authToken = data.token;
           localStorage.setItem("saToken", authToken);
@@ -575,8 +1151,14 @@
           localStorage.setItem("saRole", data.role);
           succEl.textContent = "PIN reset successful! Logging you in...";
           succEl.classList.remove("hidden");
-          setTimeout(() => { hideRecovery(); showPanel(); }, 2000);
-        } catch (err) { errEl.textContent = err.message; errEl.classList.remove("hidden"); }
+          setTimeout(() => {
+            hideRecovery();
+            showPanel();
+          }, 2000);
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.classList.remove("hidden");
+        }
       }
 
       // ─── Panel ─────────────────────────────────────────────────────────
@@ -588,7 +1170,9 @@
         switchPage("overview");
       }
       function doLogout() {
-        authToken = ""; adminUsername = ""; adminRole = "";
+        authToken = "";
+        adminUsername = "";
+        adminRole = "";
         localStorage.removeItem("saToken");
         localStorage.removeItem("saUsername");
         localStorage.removeItem("saRole");
@@ -600,13 +1184,19 @@
       // ─── Tab switching ─────────────────────────────────────────────────
       function switchPage(page) {
         currentPage = page;
-        ["Overview", "Users", "Reports", "Data"].forEach(p => {
+        ["Overview", "Users", "Reports", "Data"].forEach((p) => {
           document.getElementById("page" + p).classList.add("hidden");
         });
-        document.getElementById("page" + page.charAt(0).toUpperCase() + page.slice(1)).classList.remove("hidden");
-        document.querySelectorAll("#tabBar button").forEach(b => b.classList.remove("active"));
+        document
+          .getElementById("page" + page.charAt(0).toUpperCase() + page.slice(1))
+          .classList.remove("hidden");
+        document
+          .querySelectorAll("#tabBar button")
+          .forEach((b) => b.classList.remove("active"));
         const idx = { overview: 0, users: 1, reports: 2, data: 3 }[page];
-        document.querySelectorAll("#tabBar button")[idx].classList.add("active");
+        document
+          .querySelectorAll("#tabBar button")
+          [idx].classList.add("active");
         // Load data for the page
         if (page === "overview") loadOverview();
         if (page === "users") loadUsers();
@@ -622,10 +1212,12 @@
             apiFetch("/sync?limit=1"),
             apiFetch("/auth/users"),
           ]);
-          document.getElementById("statItems").textContent = items.count ?? "--";
-          document.getElementById("statTransactions").textContent = txData.total ?? "--";
+          document.getElementById("statItems").textContent =
+            items.count ?? "--";
+          document.getElementById("statTransactions").textContent =
+            txData.total ?? "--";
           const users = usersData.users || [];
-          const workerCount = users.filter(u => u.role === "worker").length;
+          const workerCount = users.filter((u) => u.role === "worker").length;
           document.getElementById("statWorkers").textContent = workerCount;
           document.getElementById("statUsers").textContent = users.length;
         } catch (err) {
@@ -643,18 +1235,23 @@
           const data = await apiFetch("/sync/worker-status");
           const workers = data.workers || [];
           if (workers.length > 0) {
-            let html = '<table><tr><th>Worker</th><th>Last Sync</th><th>Today\'s Txns</th></tr>';
-            workers.forEach(w => {
-              const lastSync = w.lastSync ? new Date(w.lastSync).toLocaleString() : "Never";
+            let html =
+              "<table><tr><th>Worker</th><th>Last Sync</th><th>Today's Txns</th></tr>";
+            workers.forEach((w) => {
+              const lastSync = w.lastSync
+                ? new Date(w.lastSync).toLocaleString()
+                : "Never";
               html += `<tr><td style="color:#e0e6ed;font-weight:600">${esc(w.worker)}</td><td>${lastSync}</td><td>${w.totalToday || 0}</td></tr>`;
             });
-            html += '</table>';
+            html += "</table>";
             document.getElementById("workerActivity").innerHTML = html;
           } else {
-            document.getElementById("workerActivity").innerHTML = '<p style="color:#5a6a7a">No worker activity yet.</p>';
+            document.getElementById("workerActivity").innerHTML =
+              '<p style="color:#5a6a7a">No worker activity yet.</p>';
           }
         } catch (_) {
-          document.getElementById("workerActivity").innerHTML = '<p style="color:#ef5350">Failed to load worker data.</p>';
+          document.getElementById("workerActivity").innerHTML =
+            '<p style="color:#ef5350">Failed to load worker data.</p>';
         }
       }
 
@@ -663,28 +1260,47 @@
         const container = document.getElementById("multiServerHealth");
         const results = await Promise.allSettled(
           UNIQUE_SERVERS.map(async (server) => {
-            const label = server.replace(/^https?:\/\//, "").replace(/\.onrender\.com$/, "");
+            const label = server
+              .replace(/^https?:\/\//, "")
+              .replace(/\.onrender\.com$/, "");
             try {
-              const health = await fetch(server + "/api/health", { signal: AbortSignal.timeout(6000) }).then(r => r.json());
-              const dbRes = await fetch(server + "/api/db-status", { signal: AbortSignal.timeout(4000) }).then(r => r.json()).catch(() => null);
+              const health = await fetch(server + "/api/health", {
+                signal: AbortSignal.timeout(6000),
+              }).then((r) => r.json());
+              const dbRes = await fetch(server + "/api/db-status", {
+                signal: AbortSignal.timeout(4000),
+              })
+                .then((r) => r.json())
+                .catch(() => null);
               return {
-                server, label, online: true,
-                db: dbRes?.connected ?? (health.db === "connected"),
+                server,
+                label,
+                online: true,
+                db: dbRes?.connected ?? health.db === "connected",
                 dbLabel: dbRes?.stateLabel || health.db || "unknown",
                 node: health.node || "--",
                 commit: (health.commit || "--").substring(0, 8),
                 isCurrent: server === window.location.origin,
               };
             } catch {
-              return { server, label, online: false, isCurrent: server === window.location.origin };
+              return {
+                server,
+                label,
+                online: false,
+                isCurrent: server === window.location.origin,
+              };
             }
-          })
+          }),
         );
         let html = '<div class="health-grid">';
-        results.forEach(r => {
+        results.forEach((r) => {
           const s = r.value;
           const dotColor = s.online ? (s.db ? "green" : "yellow") : "red";
-          const statusText = s.online ? (s.db ? "Online" : "API OK / DB down") : "Offline";
+          const statusText = s.online
+            ? s.db
+              ? "Online"
+              : "API OK / DB down"
+            : "Offline";
           html += `<div class="health-item" style="flex-direction:column;align-items:flex-start;gap:6px;${s.isCurrent ? "border-color:#e94560;" : ""}">
             <div style="display:flex;align-items:center;gap:8px;width:100%">
               <div class="health-dot ${dotColor}"></div>
@@ -693,9 +1309,13 @@
                 <div class="health-label">${statusText}</div>
               </div>
             </div>
-            ${s.online ? `<div style="font-size:11px;color:#5a6a7a;padding-left:20px">
+            ${
+              s.online
+                ? `<div style="font-size:11px;color:#5a6a7a;padding-left:20px">
               Node ${esc(s.node)} &bull; Commit ${esc(s.commit)} &bull; DB: ${esc(s.dbLabel)}
-            </div>` : ""}
+            </div>`
+                : ""
+            }
           </div>`;
         });
         html += "</div>";
@@ -712,27 +1332,53 @@
           ]);
           const workers = wsData.workers || [];
           const users = usersData.users || [];
-          const workerUsers = users.filter(u => u.role === "worker");
+          const workerUsers = users.filter((u) => u.role === "worker");
 
           if (workerUsers.length === 0 && workers.length === 0) {
-            container.innerHTML = '<p style="color:#5a6a7a">No workers registered yet.</p>';
+            container.innerHTML =
+              '<p style="color:#5a6a7a">No workers registered yet.</p>';
             return;
           }
 
           // Merge user data with sync data
           const syncMap = {};
-          workers.forEach(w => { syncMap[w.worker] = w; });
+          workers.forEach((w) => {
+            syncMap[w.worker] = w;
+          });
 
-          let html = '<table><tr><th>Worker</th><th>Status</th><th>Last Sync</th><th>Minutes Ago</th><th>Today</th><th>Clear Pending</th><th>Action</th></tr>';
-          workerUsers.forEach(u => {
+          let html =
+            "<table><tr><th>Worker</th><th>Status</th><th>Last Sync</th><th>Minutes Ago</th><th>Today</th><th>Clear Pending</th><th>Action</th></tr>";
+          workerUsers.forEach((u) => {
             const w = syncMap[u.username];
-            const lastSync = w?.lastSync ? new Date(w.lastSync).toLocaleString() : "Never synced";
+            const lastSync = w?.lastSync
+              ? new Date(w.lastSync).toLocaleString()
+              : "Never synced";
             const ago = w?.minutesAgo != null ? w.minutesAgo : "--";
-            const agoColor = !w ? "#5a6a7a" : w.minutesAgo < 5 ? "#4caf50" : w.minutesAgo < 30 ? "#ff9800" : "#f44336";
-            const statusDot = !w ? "&#9899;" : w.minutesAgo < 5 ? "&#128994;" : w.minutesAgo < 30 ? "&#128992;" : "&#128308;";
-            const statusLabel = !w ? "Never" : w.minutesAgo < 5 ? "Active" : w.minutesAgo < 30 ? "Idle" : "Offline";
+            const agoColor = !w
+              ? "#5a6a7a"
+              : w.minutesAgo < 5
+                ? "#4caf50"
+                : w.minutesAgo < 30
+                  ? "#ff9800"
+                  : "#f44336";
+            const statusDot = !w
+              ? "&#9899;"
+              : w.minutesAgo < 5
+                ? "&#128994;"
+                : w.minutesAgo < 30
+                  ? "&#128992;"
+                  : "&#128308;";
+            const statusLabel = !w
+              ? "Never"
+              : w.minutesAgo < 5
+                ? "Active"
+                : w.minutesAgo < 30
+                  ? "Idle"
+                  : "Offline";
             // clearBefore from WorkerSync - now included in worker-status response
-            const clearPending = w?.clearBefore ? '&#128992; Pending' : '&#9989; None';
+            const clearPending = w?.clearBefore
+              ? "&#128992; Pending"
+              : "&#9989; None";
             html += `<tr>
               <td style="color:#e0e6ed;font-weight:600">${esc(u.username)}</td>
               <td>${statusDot} ${statusLabel}</td>
@@ -743,7 +1389,7 @@
               <td><button class="btn btn-outline btn-sm" style="font-size:11px;padding:4px 10px" onclick="saClearWorker('${esc(u.username)}')">&#128465; Clear</button></td>
             </tr>`;
           });
-          html += '</table>';
+          html += "</table>";
           container.innerHTML = html;
         } catch (err) {
           container.innerHTML = `<p style="color:#ef5350">Failed: ${esc(err.message)}</p>`;
@@ -751,12 +1397,28 @@
       }
 
       async function saClearWorker(workerName) {
-        if (!confirm("Clear all synced data from " + workerName + "'s phone?\\nThis takes effect on their next sync (within ~15 seconds).")) return;
+        if (
+          !confirm(
+            "Clear all synced data from " +
+              workerName +
+              "'s phone?\\nThis takes effect on their next sync (within ~15 seconds).",
+          )
+        )
+          return;
         try {
-          await apiFetch("/sync/clear-worker-data", { method: "POST", body: JSON.stringify({ workers: [workerName] }) });
-          alert("Clear command sent for " + workerName + ".\\nTheir phone will clear on next sync.");
+          await apiFetch("/sync/clear-worker-data", {
+            method: "POST",
+            body: JSON.stringify({ workers: [workerName] }),
+          });
+          alert(
+            "Clear command sent for " +
+              workerName +
+              ".\\nTheir phone will clear on next sync.",
+          );
           loadWorkerDevices();
-        } catch (err) { alert("Error: " + err.message); }
+        } catch (err) {
+          alert("Error: " + err.message);
+        }
       }
 
       // ─── Users ─────────────────────────────────────────────────────────
@@ -765,14 +1427,15 @@
           const data = await apiFetch("/auth/users");
           const users = data.users || [];
           if (!users.length) {
-            document.getElementById("usersList").innerHTML = '<p style="color:#5a6a7a">No users found.</p>';
+            document.getElementById("usersList").innerHTML =
+              '<p style="color:#5a6a7a">No users found.</p>';
             return;
           }
           // Sort: superadmin first, then admin, then worker
           const order = { superadmin: 0, admin: 1, worker: 2 };
           users.sort((a, b) => (order[a.role] ?? 3) - (order[b.role] ?? 3));
           let html = "";
-          users.forEach(u => {
+          users.forEach((u) => {
             const isSA = u.role === "superadmin";
             const initial = (u.username || "?")[0].toUpperCase();
             html += `<div class="user-card">
@@ -783,14 +1446,15 @@
               </div>
               <span class="role-badge ${u.role}">${u.role}</span>
               <div class="user-actions">
-                ${isSA ? '' : `<button class="btn btn-outline btn-sm" onclick="showResetPin('${esc(u.username)}')">Reset PIN</button>`}
-                ${isSA ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteUser('${esc(u.username)}')">Delete</button>`}
+                ${isSA ? "" : `<button class="btn btn-outline btn-sm" onclick="showResetPin('${esc(u.username)}')">Reset PIN</button>`}
+                ${isSA ? "" : `<button class="btn btn-danger btn-sm" onclick="deleteUser('${esc(u.username)}')">Delete</button>`}
               </div>
             </div>`;
           });
           document.getElementById("usersList").innerHTML = html;
         } catch (err) {
-          document.getElementById("usersList").innerHTML = `<p style="color:#ef5350">${esc(err.message)}</p>`;
+          document.getElementById("usersList").innerHTML =
+            `<p style="color:#ef5350">${esc(err.message)}</p>`;
         }
       }
 
@@ -803,23 +1467,40 @@
         document.getElementById("createUserError").classList.add("hidden");
         document.getElementById("createUserSuccess").classList.add("hidden");
       }
-      function closeCreateUser() { document.getElementById("createUserModal").classList.remove("open"); }
+      function closeCreateUser() {
+        document.getElementById("createUserModal").classList.remove("open");
+      }
       async function createUser() {
         const username = document.getElementById("newUsername").value.trim();
         const pin = document.getElementById("newPin").value.trim();
         const role = document.getElementById("newRole").value;
         const errEl = document.getElementById("createUserError");
         const succEl = document.getElementById("createUserSuccess");
-        errEl.classList.add("hidden"); succEl.classList.add("hidden");
-        if (!username || !pin) { errEl.textContent = "Username and PIN required."; errEl.classList.remove("hidden"); return; }
-        if (pin.length < 4) { errEl.textContent = "PIN must be at least 4 digits."; errEl.classList.remove("hidden"); return; }
+        errEl.classList.add("hidden");
+        succEl.classList.add("hidden");
+        if (!username || !pin) {
+          errEl.textContent = "Username and PIN required.";
+          errEl.classList.remove("hidden");
+          return;
+        }
+        if (pin.length < 4) {
+          errEl.textContent = "PIN must be at least 4 digits.";
+          errEl.classList.remove("hidden");
+          return;
+        }
         try {
-          await apiFetch("/auth/register", { method: "POST", body: JSON.stringify({ username, pin, role }) });
+          await apiFetch("/auth/register", {
+            method: "POST",
+            body: JSON.stringify({ username, pin, role }),
+          });
           succEl.textContent = `User "${username}" created as ${role}.`;
           succEl.classList.remove("hidden");
           loadUsers();
           setTimeout(closeCreateUser, 1500);
-        } catch (err) { errEl.textContent = err.message; errEl.classList.remove("hidden"); }
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.classList.remove("hidden");
+        }
       }
 
       // Reset PIN
@@ -832,30 +1513,49 @@
         document.getElementById("resetPinSuccess").classList.add("hidden");
         document.getElementById("resetPinModal").classList.add("open");
       }
-      function closeResetPin() { document.getElementById("resetPinModal").classList.remove("open"); }
+      function closeResetPin() {
+        document.getElementById("resetPinModal").classList.remove("open");
+      }
       async function doResetPin() {
         const newPin = document.getElementById("resetPinValue").value.trim();
         const errEl = document.getElementById("resetPinError");
         const succEl = document.getElementById("resetPinSuccess");
-        errEl.classList.add("hidden"); succEl.classList.add("hidden");
-        if (!newPin || newPin.length < 4) { errEl.textContent = "PIN must be at least 4 digits."; errEl.classList.remove("hidden"); return; }
+        errEl.classList.add("hidden");
+        succEl.classList.add("hidden");
+        if (!newPin || newPin.length < 4) {
+          errEl.textContent = "PIN must be at least 4 digits.";
+          errEl.classList.remove("hidden");
+          return;
+        }
         try {
-          await apiFetch(`/auth/users/${encodeURIComponent(resetPinTarget)}/reset-pin`, {
-            method: "POST", body: JSON.stringify({ newPin })
-          });
+          await apiFetch(
+            `/auth/users/${encodeURIComponent(resetPinTarget)}/reset-pin`,
+            {
+              method: "POST",
+              body: JSON.stringify({ newPin }),
+            },
+          );
           succEl.textContent = "PIN reset successfully.";
           succEl.classList.remove("hidden");
           setTimeout(closeResetPin, 1500);
-        } catch (err) { errEl.textContent = err.message; errEl.classList.remove("hidden"); }
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.classList.remove("hidden");
+        }
       }
 
       // Delete user
       async function deleteUser(username) {
-        if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
+        if (!confirm(`Delete user "${username}"? This cannot be undone.`))
+          return;
         try {
-          await apiFetch(`/auth/users/${encodeURIComponent(username)}`, { method: "DELETE" });
+          await apiFetch(`/auth/users/${encodeURIComponent(username)}`, {
+            method: "DELETE",
+          });
           loadUsers();
-        } catch (err) { alert(err.message); }
+        } catch (err) {
+          alert(err.message);
+        }
       }
 
       // ─── Reports ───────────────────────────────────────────────────────
@@ -865,21 +1565,24 @@
           const data = await apiFetch("/sync/worker-status");
           const workers = data.workers || [];
           if (workers.length > 0) {
-            let html = '<table><tr><th>Worker</th><th>Total Today</th><th>Last Activity</th></tr>';
-            workers.forEach(w => {
+            let html =
+              "<table><tr><th>Worker</th><th>Total Today</th><th>Last Activity</th></tr>";
+            workers.forEach((w) => {
               html += `<tr>
                 <td style="color:#e0e6ed;font-weight:600">${esc(w.worker)}</td>
                 <td>${w.totalToday || 0}</td>
                 <td>${w.lastSync ? new Date(w.lastSync).toLocaleString() : "Never"}</td>
               </tr>`;
             });
-            html += '</table>';
+            html += "</table>";
             document.getElementById("reportWorkerSummary").innerHTML = html;
           } else {
-            document.getElementById("reportWorkerSummary").innerHTML = '<p style="color:#5a6a7a">No worker data.</p>';
+            document.getElementById("reportWorkerSummary").innerHTML =
+              '<p style="color:#5a6a7a">No worker data.</p>';
           }
         } catch (_) {
-          document.getElementById("reportWorkerSummary").innerHTML = '<p style="color:#ef5350">Failed to load.</p>';
+          document.getElementById("reportWorkerSummary").innerHTML =
+            '<p style="color:#ef5350">Failed to load.</p>';
         }
 
         // Status summary
@@ -891,19 +1594,26 @@
           let html = '<div class="stats-row" style="margin-top:8px">';
           html += `<div class="stat warn"><div class="num">${pending.total ?? 0}</div><div class="label">Pending</div></div>`;
           html += `<div class="stat ok"><div class="num">${processed.total ?? 0}</div><div class="label">Processed</div></div>`;
-          html += '</div>';
+          html += "</div>";
           document.getElementById("reportStatusSummary").innerHTML = html;
         } catch (_) {
-          document.getElementById("reportStatusSummary").innerHTML = '<p style="color:#ef5350">Failed to load.</p>';
+          document.getElementById("reportStatusSummary").innerHTML =
+            '<p style="color:#ef5350">Failed to load.</p>';
         }
 
         // Recent transactions
         try {
           const tx = await apiFetch("/sync?limit=20&sort=-createdAt");
           if (tx.transactions && tx.transactions.length > 0) {
-            let html = '<table><tr><th>Worker</th><th>Barcode</th><th>Item</th><th>Qty</th><th>Status</th><th>Date</th></tr>';
-            tx.transactions.forEach(t => {
-              const statusColor = t.status === "processed" ? "#4caf50" : t.status === "pending" ? "#ff9800" : "#90a4ae";
+            let html =
+              "<table><tr><th>Worker</th><th>Barcode</th><th>Item</th><th>Qty</th><th>Status</th><th>Date</th></tr>";
+            tx.transactions.forEach((t) => {
+              const statusColor =
+                t.status === "processed"
+                  ? "#4caf50"
+                  : t.status === "pending"
+                    ? "#ff9800"
+                    : "#90a4ae";
               html += `<tr>
                 <td style="color:#e0e6ed">${esc(t.workerName || "--")}</td>
                 <td>${esc(t.barcode || "--")}</td>
@@ -913,13 +1623,15 @@
                 <td>${t.createdAt ? new Date(t.createdAt).toLocaleString() : "--"}</td>
               </tr>`;
             });
-            html += '</table>';
+            html += "</table>";
             document.getElementById("reportRecentTx").innerHTML = html;
           } else {
-            document.getElementById("reportRecentTx").innerHTML = '<p style="color:#5a6a7a">No transactions yet.</p>';
+            document.getElementById("reportRecentTx").innerHTML =
+              '<p style="color:#5a6a7a">No transactions yet.</p>';
           }
         } catch (_) {
-          document.getElementById("reportRecentTx").innerHTML = '<p style="color:#ef5350">Failed to load.</p>';
+          document.getElementById("reportRecentTx").innerHTML =
+            '<p style="color:#ef5350">Failed to load.</p>';
         }
       }
 
@@ -928,19 +1640,22 @@
       const DANGER_MAP = {
         resetAll: {
           title: "Reset All Data",
-          message: "This will permanently delete ALL transactions and worker sync records.",
+          message:
+            "This will permanently delete ALL transactions and worker sync records.",
           word: "RESET",
           exec: () => apiFetch("/sync/reset-all-data", { method: "DELETE" }),
         },
         deleteItems: {
           title: "Delete All Items",
-          message: "This will permanently delete ALL items from the inventory master list.",
+          message:
+            "This will permanently delete ALL items from the inventory master list.",
           word: "DELETE",
           exec: () => apiFetch("/items/all", { method: "DELETE" }),
         },
         deleteTx: {
           title: "Delete All Transactions",
-          message: "This will permanently delete ALL transactions (worker sync records will remain).",
+          message:
+            "This will permanently delete ALL transactions (worker sync records will remain).",
           word: "DELETE",
           exec: () => apiFetch("/sync/all", { method: "DELETE" }),
         },
@@ -971,7 +1686,8 @@
           return;
         }
         const btn = document.getElementById("confirmBtn");
-        btn.disabled = true; btn.textContent = "Processing...";
+        btn.disabled = true;
+        btn.textContent = "Processing...";
         try {
           const result = await pendingDanger.exec();
           closeConfirm();
@@ -981,7 +1697,8 @@
           errEl.textContent = err.message;
           errEl.classList.remove("hidden");
         }
-        btn.disabled = false; btn.textContent = "Confirm";
+        btn.disabled = false;
+        btn.textContent = "Confirm";
       }
 
       // ─── Export ────────────────────────────────────────────────────────
@@ -994,14 +1711,18 @@
             data = await apiFetch("/sync?limit=100000");
             data = data.transactions || data;
           }
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          const blob = new Blob([JSON.stringify(data, null, 2)], {
+            type: "application/json",
+          });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
           a.download = `${type}_export_${new Date().toISOString().split("T")[0]}.json`;
           a.click();
           URL.revokeObjectURL(url);
-        } catch (err) { alert("Export failed: " + err.message); }
+        } catch (err) {
+          alert("Export failed: " + err.message);
+        }
       }
 
       // ─── Utilities ─────────────────────────────────────────────────────

@@ -799,68 +799,68 @@ export default function ScannerScreen({ role = "worker" }) {
             (mode === "barcode" || mode === "itemcode") &&
             showCamera &&
             cameraActive && (
-            <View style={styles.cameraWrap}>
-              <CameraView
-                style={StyleSheet.absoluteFillObject}
-                onBarcodeScanned={
-                  scanned
-                    ? undefined
-                    : mode === "itemcode"
-                      ? handleItemCodeScanned
-                      : handleBarCodeScanned
-                }
-                enableTorch={torchOn}
-                barcodeScannerSettings={{
-                  barcodeTypes:
-                    mode === "itemcode"
-                      ? ["qr", "code128", "code39", "datamatrix"]
-                      : [
-                          "qr",
-                          "ean13",
-                          "ean8",
-                          "code128",
-                          "code39",
-                          "upc_a",
-                          "upc_e",
-                        ],
-                }}
-              />
-              <View style={styles.overlay}>
-                <View style={styles.overlayDark} />
-                <View style={styles.scanRow}>
+              <View style={styles.cameraWrap}>
+                <CameraView
+                  style={StyleSheet.absoluteFillObject}
+                  onBarcodeScanned={
+                    scanned
+                      ? undefined
+                      : mode === "itemcode"
+                        ? handleItemCodeScanned
+                        : handleBarCodeScanned
+                  }
+                  enableTorch={torchOn}
+                  barcodeScannerSettings={{
+                    barcodeTypes:
+                      mode === "itemcode"
+                        ? ["qr", "code128", "code39", "datamatrix"]
+                        : [
+                            "qr",
+                            "ean13",
+                            "ean8",
+                            "code128",
+                            "code39",
+                            "upc_a",
+                            "upc_e",
+                          ],
+                  }}
+                />
+                <View style={styles.overlay}>
                   <View style={styles.overlayDark} />
-                  <View style={styles.scanFrame}>
-                    <View style={[styles.corner, styles.cornerTL]} />
-                    <View style={[styles.corner, styles.cornerTR]} />
-                    <View style={[styles.corner, styles.cornerBL]} />
-                    <View style={[styles.corner, styles.cornerBR]} />
-                    <View style={styles.scanLine} />
+                  <View style={styles.scanRow}>
+                    <View style={styles.overlayDark} />
+                    <View style={styles.scanFrame}>
+                      <View style={[styles.corner, styles.cornerTL]} />
+                      <View style={[styles.corner, styles.cornerTR]} />
+                      <View style={[styles.corner, styles.cornerBL]} />
+                      <View style={[styles.corner, styles.cornerBR]} />
+                      <View style={styles.scanLine} />
+                    </View>
+                    <View style={styles.overlayDark} />
                   </View>
-                  <View style={styles.overlayDark} />
-                </View>
-                <View style={styles.overlayDark}>
-                  <Text style={styles.scanHint}>
-                    {mode === "itemcode"
-                      ? "Point camera at item-code QR/barcode"
-                      : "Point camera at barcode"}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.torchBtn}
-                    onPress={() => setTorchOn((v) => !v)}
-                  >
-                    <MaterialCommunityIcons
-                      name={torchOn ? "flashlight-off" : "flashlight"}
-                      size={16}
-                      color="#fff"
-                    />
-                    <Text style={styles.torchBtnText}>
-                      {torchOn ? "Torch Off" : "Torch On"}
+                  <View style={styles.overlayDark}>
+                    <Text style={styles.scanHint}>
+                      {mode === "itemcode"
+                        ? "Point camera at item-code QR/barcode"
+                        : "Point camera at barcode"}
                     </Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.torchBtn}
+                      onPress={() => setTorchOn((v) => !v)}
+                    >
+                      <MaterialCommunityIcons
+                        name={torchOn ? "flashlight-off" : "flashlight"}
+                        size={16}
+                        color="#fff"
+                      />
+                      <Text style={styles.torchBtnText}>
+                        {torchOn ? "Torch Off" : "Torch On"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
+            )}
 
           <ScrollView
             style={styles.form}

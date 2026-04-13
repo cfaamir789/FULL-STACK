@@ -208,7 +208,11 @@ export async function saveBackup(
     format === "xlsx" ? xlsxBase64 : csv,
   );
   if (downloadWrite) {
-    return { uri: downloadWrite.uri, filename, location: downloadWrite.location };
+    return {
+      uri: downloadWrite.uri,
+      filename,
+      location: downloadWrite.location,
+    };
   }
 
   if (format === "xlsx") {
@@ -221,7 +225,11 @@ export async function saveBackup(
     });
   }
 
-  return { uri: fileUri, filename, location: `AppDocuments/InventoryManager/${filename}` };
+  return {
+    uri: fileUri,
+    filename,
+    location: `AppDocuments/InventoryManager/${filename}`,
+  };
 }
 
 /**
