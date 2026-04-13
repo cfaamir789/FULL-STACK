@@ -98,7 +98,7 @@ export default function TransactionsScreen({ username, role }) {
   const [deleting, setDeleting] = useState(false);
 
   // ─── Export handler ─────────────────────────────────────────────────────────
-  const handleExport = async () => {
+  const handleExportByFormat = async (format = "csv") => {
     setExporting(true);
     try {
       const txns = await getAllTransactions();
@@ -106,49 +106,84 @@ export default function TransactionsScreen({ username, role }) {
         Alert.alert("No Data", "No transactions to export.");
         return;
       }
+
+      const worker =
+        (await AsyncStorage.getItem("workerName")) || username || "worker";
+      const datePart = new Date().toISOString().slice(0, 10);
+      const baseName = `${worker}_${datePart}`;
+
       if (IS_WEB) {
-        // Build CSV in browser and trigger download
-        const header =
-          "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
-        const rows = txns.map((tx) =>
-          [
-            tx.worker_name || "",
-            tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "",
-            tx.item_barcode || "",
-            tx.item_code || "",
-            `"${(tx.item_name || "").replace(/"/g, '""')}"`,
-            tx.frombin || "",
-            tx.tobin || "",
-            tx.qty ?? "",
-            `"${(tx.notes || "").replace(/"/g, '""')}"`,
-            tx.synced ? "Yes" : "No",
-          ].join(","),
-        );
-        const csv = [header, ...rows].join("\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `transactions_${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        if (format === "xlsx") {
+          const XLSX = require("xlsx");
+          const rows = txns.map((tx) => ({
+            Worker: tx.worker_name || "",
+            Date: tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "",
+            Barcode: tx.item_barcode || "",
+            ItemCode: tx.item_code || "",
+            ItemName: tx.item_name || "",
+            From: tx.frombin || "",
+            To: tx.tobin || "",
+            Qty: tx.qty ?? "",
+            Notes: tx.notes || "",
+            Synced: tx.synced ? "Yes" : "No",
+          }));
+          const ws = XLSX.utils.json_to_sheet(rows);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "Transactions");
+          const out = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+          const blob = new Blob([out], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${baseName}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } else {
+          const header =
+            "Worker,Date,Barcode,ItemCode,ItemName,From,To,Qty,Notes,Synced";
+          const rows = txns.map((tx) =>
+            [
+              tx.worker_name || "",
+              tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "",
+              tx.item_barcode || "",
+              tx.item_code || "",
+              `"${(tx.item_name || "").replace(/"/g, '""')}"`,
+              tx.frombin || "",
+              tx.tobin || "",
+              tx.qty ?? "",
+              `"${(tx.notes || "").replace(/"/g, '""')}"`,
+              tx.synced ? "Yes" : "No",
+            ].join(","),
+          );
+          const csv = [header, ...rows].join("\n");
+          const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${baseName}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
         Alert.alert(
           "Exported",
-          `${txns.length} transactions downloaded as CSV.`,
+          `${txns.length} transactions downloaded as ${format.toUpperCase()}.`,
         );
       } else {
-        const name = (await AsyncStorage.getItem("workerName")) || "export";
-        const { filename } = await backupSvc.saveAndShareBackup(
+        const { filename, location } = await backupSvc.saveBackup(
           txns,
-          name,
-          "csv",
+          worker,
+          format,
           false,
         );
         Alert.alert(
           "Exported",
-          `${txns.length} transactions saved as:\n${filename}`,
+          `${txns.length} transactions saved as ${format.toUpperCase()}.\n\nFile: ${filename}\nLocation: ${location}`,
         );
       }
     } catch (err) {
@@ -156,6 +191,15 @@ export default function TransactionsScreen({ username, role }) {
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleExport = () => {
+    if (exporting) return;
+    Alert.alert("Export Transactions", "Choose format", [
+      { text: "CSV", onPress: () => handleExportByFormat("csv") },
+      { text: "XLSX", onPress: () => handleExportByFormat("xlsx") },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   const loadTransactions = useCallback(async () => {

@@ -42,8 +42,10 @@ import { attemptSync } from "../services/syncService";
 import CalcInput from "../components/CalcInput";
 import VoiceMic from "../components/VoiceMic";
 import Colors from "../theme/colors";
+import { isAdminRole } from "../utils/roles";
 
-export default function ScannerScreen() {
+export default function ScannerScreen({ role = "worker" }) {
+  const canUseAdvancedModes = isAdminRole(role);
   const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
   const [mode, setMode] = useState("barcode");
@@ -59,6 +61,7 @@ export default function ScannerScreen() {
   const [saving, setSaving] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const [searching, setSearching] = useState(false);
   const [itemName, setItemName] = useState("");
   const [nameResults, setNameResults] = useState([]);
@@ -80,7 +83,9 @@ export default function ScannerScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (mode === "barcode" && showCamera) setCameraActive(true);
+      if ((mode === "barcode" || mode === "itemcode") && showCamera) {
+        setCameraActive(true);
+      }
       return () => setCameraActive(false);
     }, [mode, showCamera]),
   );
@@ -100,6 +105,7 @@ export default function ScannerScreen() {
     setNotes("");
     setShowCamera(true);
     setCameraActive(true);
+    setTorchOn(false);
   };
 
   const switchMode = (m) => {
@@ -116,8 +122,9 @@ export default function ScannerScreen() {
     setTobin("");
     setQty("");
     setNotes("");
-    setShowCamera(m === "barcode");
-    setCameraActive(m === "barcode");
+    setShowCamera(m === "barcode" || m === "itemcode");
+    setCameraActive(m === "barcode" || m === "itemcode");
+    setTorchOn(false);
   };
 
   const applySelectedItem = (item) => {
@@ -167,6 +174,18 @@ export default function ScannerScreen() {
     const item = await getItemByItemCode(itemCode.trim());
     applySelectedItem(item);
     setSearching(false);
+  };
+
+  const handleItemCodeScanned = async ({ data }) => {
+    if (scanned) return;
+    setScanned(true);
+    setShowCamera(false);
+    setCameraActive(false);
+    const code = digitsOnly(data.trim());
+    setItemCode(code);
+    if (!IS_WEB) Vibration.vibrate(100);
+    const item = await getItemByItemCode(code);
+    applySelectedItem(item);
   };
 
   const handleQuickCodeSearch = async () => {
@@ -280,8 +299,12 @@ export default function ScannerScreen() {
       {[
         { key: "barcode", icon: "barcode-scan", label: "Barcode" },
         { key: "itemcode", icon: "pound-box", label: "Item Code" },
-        { key: "quickcode", icon: "dialpad", label: "Quick Code" },
-        { key: "itemname", icon: "text-search", label: "Item Name" },
+        ...(canUseAdvancedModes
+          ? [
+              { key: "quickcode", icon: "dialpad", label: "Quick Code" },
+              { key: "itemname", icon: "text-search", label: "Item Name" },
+            ]
+          : []),
       ].map((t) => (
         <TouchableOpacity
           key={t.key}
@@ -384,6 +407,22 @@ export default function ScannerScreen() {
                 <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
               )}
             </TouchableOpacity>
+            {!IS_WEB && (
+              <TouchableOpacity
+                style={styles.searchBtn}
+                onPress={() => {
+                  setShowCamera(true);
+                  setCameraActive(true);
+                  setScanned(false);
+                }}
+              >
+                <MaterialCommunityIcons
+                  name="barcode-scan"
+                  size={22}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+            )}
           </View>
         </>
       );
@@ -756,21 +795,34 @@ export default function ScannerScreen() {
         <View style={styles.container}>
           {renderTabs()}
 
-          {isFocused && mode === "barcode" && showCamera && cameraActive && (
+          {isFocused &&
+            (mode === "barcode" || mode === "itemcode") &&
+            showCamera &&
+            cameraActive && (
             <View style={styles.cameraWrap}>
               <CameraView
                 style={StyleSheet.absoluteFillObject}
-                onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                onBarcodeScanned={
+                  scanned
+                    ? undefined
+                    : mode === "itemcode"
+                      ? handleItemCodeScanned
+                      : handleBarCodeScanned
+                }
+                enableTorch={torchOn}
                 barcodeScannerSettings={{
-                  barcodeTypes: [
-                    "qr",
-                    "ean13",
-                    "ean8",
-                    "code128",
-                    "code39",
-                    "upc_a",
-                    "upc_e",
-                  ],
+                  barcodeTypes:
+                    mode === "itemcode"
+                      ? ["qr", "code128", "code39", "datamatrix"]
+                      : [
+                          "qr",
+                          "ean13",
+                          "ean8",
+                          "code128",
+                          "code39",
+                          "upc_a",
+                          "upc_e",
+                        ],
                 }}
               />
               <View style={styles.overlay}>
@@ -787,7 +839,24 @@ export default function ScannerScreen() {
                   <View style={styles.overlayDark} />
                 </View>
                 <View style={styles.overlayDark}>
-                  <Text style={styles.scanHint}>Point camera at barcode</Text>
+                  <Text style={styles.scanHint}>
+                    {mode === "itemcode"
+                      ? "Point camera at item-code QR/barcode"
+                      : "Point camera at barcode"}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.torchBtn}
+                    onPress={() => setTorchOn((v) => !v)}
+                  >
+                    <MaterialCommunityIcons
+                      name={torchOn ? "flashlight-off" : "flashlight"}
+                      size={16}
+                      color="#fff"
+                    />
+                    <Text style={styles.torchBtnText}>
+                      {torchOn ? "Torch Off" : "Torch On"}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -798,7 +867,7 @@ export default function ScannerScreen() {
             contentContainerStyle={{ paddingBottom: 40 }}
             keyboardShouldPersistTaps="handled"
           >
-            {!showCamera && mode === "barcode" && (
+            {!showCamera && (mode === "barcode" || mode === "itemcode") && (
               <TouchableOpacity style={styles.rescanBtn} onPress={resetForm}>
                 <MaterialCommunityIcons
                   name="camera-retake"
@@ -923,6 +992,17 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
   scanHint: { color: "#fff", fontWeight: "700", fontSize: 14, marginTop: 8 },
+  torchBtn: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  torchBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
 
   form: { flex: 1, paddingHorizontal: 16, paddingTop: 4 },
   rescanBtn: {

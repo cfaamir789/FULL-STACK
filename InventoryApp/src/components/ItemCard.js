@@ -1,11 +1,27 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Colors from '../theme/colors';
 
 export default function ItemCard({ item }) {
   const [expanded, setExpanded] = useState(false);
   const count = item.barcodes ? item.barcodes.length : 1;
+
+  const copyValue = async (value, label) => {
+    const text = String(value || '').trim();
+    if (!text) return;
+    try {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const Clipboard = require('expo-clipboard');
+        await Clipboard.setStringAsync(text);
+      }
+      Alert.alert('Copied', `${label} copied:\n${text}`);
+    } catch {
+      Alert.alert('Copy Failed', `Could not copy ${label}.`);
+    }
+  };
 
   return (
     <View style={styles.card}>
@@ -15,7 +31,15 @@ export default function ItemCard({ item }) {
         </View>
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={2}>{item.item_name}</Text>
-          <Text style={styles.sub}>Item Code: {item.item_code}</Text>
+          <View style={styles.inlineRow}>
+            <Text style={styles.sub}>Item Code: {item.item_code}</Text>
+            <TouchableOpacity
+              style={styles.copyBtn}
+              onPress={() => copyValue(item.item_code, 'Item code')}
+            >
+              <MaterialCommunityIcons name="content-copy" size={14} color={Colors.primary} />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.sub}>
             {count} barcode{count !== 1 ? 's' : ''}
           </Text>
@@ -40,6 +64,12 @@ export default function ItemCard({ item }) {
             <View key={b} style={styles.barcodeRow}>
               <MaterialCommunityIcons name="barcode" size={14} color={Colors.textLight} />
               <Text style={styles.barcodeText}>{b}</Text>
+              <TouchableOpacity
+                style={styles.copyBtn}
+                onPress={() => copyValue(b, 'Barcode')}
+              >
+                <MaterialCommunityIcons name="content-copy" size={14} color={Colors.primary} />
+              </TouchableOpacity>
             </View>
           ))}
         </View>
@@ -76,8 +106,21 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   info: { flex: 1 },
+  inlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   name: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
   sub: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
+  copyBtn: {
+    borderWidth: 1,
+    borderColor: Colors.primary + '40',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    backgroundColor: Colors.primary + '10',
+  },
   viewBtn: {
     flexDirection: 'row',
     alignItems: 'center',

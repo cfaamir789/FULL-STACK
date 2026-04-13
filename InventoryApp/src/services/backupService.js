@@ -13,16 +13,67 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 import Papa from "papaparse";
 import { restoreTransactions } from "../database/db";
 
 // ─── Folder ───────────────────────────────────────────────────────────────────
 const BACKUP_DIR = FileSystem.documentDirectory + "InventoryManager/";
+const DOWNLOAD_URI_KEY = "androidDownloadsDirectoryUri";
 
 async function ensureBackupDir() {
   const info = await FileSystem.getInfoAsync(BACKUP_DIR);
   if (!info.exists) {
     await FileSystem.makeDirectoryAsync(BACKUP_DIR, { intermediates: true });
+  }
+}
+
+async function getAndroidDownloadsUri() {
+  if (Platform.OS !== "android") return null;
+  const SAF = FileSystem.StorageAccessFramework;
+  if (!SAF) return null;
+
+  const cached = await AsyncStorage.getItem(DOWNLOAD_URI_KEY);
+  if (cached) return cached;
+
+  const perm = await SAF.requestDirectoryPermissionsAsync();
+  if (!perm.granted || !perm.directoryUri) {
+    return null;
+  }
+  await AsyncStorage.setItem(DOWNLOAD_URI_KEY, perm.directoryUri);
+  return perm.directoryUri;
+}
+
+async function tryWriteToAndroidDownloads(filename, format, content) {
+  if (Platform.OS !== "android") return null;
+  const SAF = FileSystem.StorageAccessFramework;
+  if (!SAF) return null;
+
+  const dirUri = await getAndroidDownloadsUri();
+  if (!dirUri) return null;
+
+  try {
+    const mime =
+      format === "xlsx"
+        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        : "text/csv";
+    const fileUri = await SAF.createFileAsync(dirUri, filename, mime);
+    if (format === "xlsx") {
+      await SAF.writeAsStringAsync(fileUri, content, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+    } else {
+      await SAF.writeAsStringAsync(fileUri, content, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+    }
+    return {
+      uri: fileUri,
+      location: `Download/${filename}`,
+    };
+  } catch {
+    await AsyncStorage.removeItem(DOWNLOAD_URI_KEY);
+    return null;
   }
 }
 
@@ -143,19 +194,34 @@ export async function saveBackup(
   const filename = `${baseName}.${ext}`;
   const fileUri = BACKUP_DIR + filename;
 
+  let csv = null;
+  let xlsxBase64 = null;
   if (format === "xlsx") {
-    const base64 = await transactionsToXLSX(transactions);
-    await FileSystem.writeAsStringAsync(fileUri, base64, {
+    xlsxBase64 = await transactionsToXLSX(transactions);
+  } else {
+    csv = transactionsToCSV(transactions);
+  }
+
+  const downloadWrite = await tryWriteToAndroidDownloads(
+    filename,
+    format,
+    format === "xlsx" ? xlsxBase64 : csv,
+  );
+  if (downloadWrite) {
+    return { uri: downloadWrite.uri, filename, location: downloadWrite.location };
+  }
+
+  if (format === "xlsx") {
+    await FileSystem.writeAsStringAsync(fileUri, xlsxBase64, {
       encoding: FileSystem.EncodingType.Base64,
     });
   } else {
-    const csv = transactionsToCSV(transactions);
     await FileSystem.writeAsStringAsync(fileUri, csv, {
       encoding: FileSystem.EncodingType.UTF8,
     });
   }
 
-  return { uri: fileUri, filename };
+  return { uri: fileUri, filename, location: `AppDocuments/InventoryManager/${filename}` };
 }
 
 /**
@@ -167,7 +233,7 @@ export async function saveAndShareBackup(
   format = "csv",
   isEntireDay = false,
 ) {
-  const { uri, filename } = await saveBackup(
+  const { uri, filename, location } = await saveBackup(
     transactions,
     username,
     format,
@@ -184,7 +250,7 @@ export async function saveAndShareBackup(
       dialogTitle: `Save ${filename}`,
     });
   }
-  return { uri, filename };
+  return { uri, filename, location };
 }
 
 /**

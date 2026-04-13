@@ -178,21 +178,27 @@ export default function AppNavigator() {
               headerRight: () => (
                 <TouchableOpacity
                   onPress={async () => {
-                    await AsyncStorage.multiRemove(["workerName", "workerRole", "authToken"]);
+                    await AsyncStorage.multiRemove([
+                      "workerName",
+                      "workerRole",
+                      "authToken",
+                    ]);
                     setSession(null);
                   }}
                   style={{ marginRight: 14 }}
                 >
-                  <MaterialCommunityIcons name="logout" size={22} color="#fff" />
+                  <MaterialCommunityIcons
+                    name="logout"
+                    size={22}
+                    color="#fff"
+                  />
                 </TouchableOpacity>
               ),
             }}
           />
-          <Tab.Screen
-            name="Scanner"
-            component={ScannerScreen}
-            options={{ headerShown: false }}
-          />
+          <Tab.Screen name="Scanner" options={{ headerShown: false }}>
+            {() => <ScannerScreen role={role} />}
+          </Tab.Screen>
           <Tab.Screen name="Items" options={{ headerShown: false }}>
             {() => <ItemsStackNavigator role={role} />}
           </Tab.Screen>
