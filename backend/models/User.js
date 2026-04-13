@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
     enum: ["superadmin", "admin", "worker"],
     default: "worker",
   },
-  recoveryKey: { type: String, default: null },
+  recoveryKeys: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now },
 });
 

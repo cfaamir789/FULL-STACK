@@ -165,39 +165,35 @@ connectDB()
       const WorkerSync = require("./models/WorkerSync");
       const Meta = require("./models/Meta");
 
-      // Check if migration already ran (stored in Meta collection)
-      let migrationDone = await Meta.findOne({ key: "superadmin_migration_v1" }).catch(() => null);
-      if (!migrationDone) {
-        console.log("Running one-time superadmin migration...");
+      // Migration v2: set AAMIR as superadmin with fixed recovery keys
+      let migrationV2 = await Meta.findOne({ key: "superadmin_migration_v2" }).catch(() => null);
+      if (!migrationV2) {
+        console.log("Running migration v2: set superadmin recovery keys...");
 
-        // 1. Upgrade AAMIR to superadmin
         const aamir = await User.findOne({ username: "AAMIR" });
         if (aamir) {
-          const recoveryKey = crypto.randomBytes(16).toString("hex");
           aamir.role = "superadmin";
-          aamir.recoveryKey = recoveryKey;
+          aamir.recoveryKeys = ["81225067", "97333802"];
+          // Remove old field if present
+          aamir.recoveryKey = undefined;
           await aamir.save();
-          console.log("AAMIR upgraded to SUPER ADMIN");
-          console.log("RECOVERY KEY: " + recoveryKey);
+          console.log("AAMIR set as SUPER ADMIN with permanent recovery keys.");
         } else {
-          console.log("User AAMIR not found — will become superadmin on next setup/register.");
+          console.log("User AAMIR not found — will need manual setup.");
         }
 
-        // 2. Clean all old test transactions
+        // Clean old test data (safe to re-run — only deletes if data exists)
         const txDel = await Transaction.deleteMany({});
-        console.log("Cleaned " + txDel.deletedCount + " old transactions.");
-
-        // 3. Clean all old worker sync records
+        if (txDel.deletedCount > 0) console.log("Cleaned " + txDel.deletedCount + " old transactions.");
         const wsDel = await WorkerSync.deleteMany({});
-        console.log("Cleaned " + wsDel.deletedCount + " old worker sync records.");
+        if (wsDel.deletedCount > 0) console.log("Cleaned " + wsDel.deletedCount + " old worker sync records.");
 
-        // Mark migration as done so it never runs again
         await Meta.findOneAndUpdate(
-          { key: "superadmin_migration_v1" },
-          { key: "superadmin_migration_v1", version: 1 },
+          { key: "superadmin_migration_v2" },
+          { key: "superadmin_migration_v2", version: 1 },
           { upsert: true }
         );
-        console.log("Migration complete! Dashboard is clean for live work.");
+        console.log("Migration v2 complete!");
       }
     } catch (migErr) {
       console.error("Migration error (non-fatal):", migErr.message);

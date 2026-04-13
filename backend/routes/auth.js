@@ -50,12 +50,11 @@ router.post("/setup", requireDB, async (req, res) => {
     }
     const hash = await bcrypt.hash(String(pin), 10);
     // First user created via setup is always superadmin
-    const recoveryKey = crypto.randomBytes(16).toString("hex");
     const user = await User.create({
       username: username.trim().toUpperCase(),
       pin_hash: hash,
       role: "superadmin",
-      recoveryKey,
+      recoveryKeys: [],
       createdAt: new Date(),
     });
     const token = jwt.sign(
@@ -68,10 +67,6 @@ router.post("/setup", requireDB, async (req, res) => {
       token,
       username: user.username,
       role: user.role,
-      recoveryKey,
-      message:
-        "SAVE THIS RECOVERY KEY! You will need it if you forget your PIN: " +
-        recoveryKey,
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -142,16 +137,15 @@ router.post("/recover-superadmin", requireDB, async (req, res) => {
         .status(404)
         .json({ success: false, error: "Super Admin not found." });
     }
-    if (!user.recoveryKey || user.recoveryKey !== recoveryKey.trim()) {
+    const keys = user.recoveryKeys || [];
+    if (!keys.length || !keys.includes(recoveryKey.trim())) {
       return res
         .status(403)
         .json({ success: false, error: "Invalid recovery key." });
     }
-    // Reset PIN and generate a new recovery key
+    // Reset PIN — recovery keys stay the same (permanent)
     const hash = await bcrypt.hash(String(newPin), 10);
-    const newRecoveryKey = crypto.randomBytes(16).toString("hex");
     user.pin_hash = hash;
-    user.recoveryKey = newRecoveryKey;
     await user.save();
     const token = jwt.sign(
       { userId: user._id, username: user.username, role: user.role },
@@ -163,9 +157,7 @@ router.post("/recover-superadmin", requireDB, async (req, res) => {
       token,
       username: user.username,
       role: user.role,
-      recoveryKey: newRecoveryKey,
-      message:
-        "PIN reset successful! SAVE YOUR NEW RECOVERY KEY: " + newRecoveryKey,
+      message: "PIN reset successful! You are now logged in.",
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

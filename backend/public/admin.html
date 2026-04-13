@@ -2405,13 +2405,6 @@
           localStorage.setItem("adminUsername", username);
           adminRole = data.role || "superadmin";
           localStorage.setItem("adminRole", adminRole);
-          if (data.recoveryKey) {
-            alert(
-              "IMPORTANT! Save this Recovery Key securely.\nYou will need it if you forget your PIN.\n\nRecovery Key: " +
-                data.recoveryKey +
-                "\n\nCopy it now and store it safely!",
-            );
-          }
           showPanel();
         } catch (err) {
           errEl.textContent = err.message;
@@ -2473,9 +2466,7 @@
           adminRole = data.role;
           localStorage.setItem("adminRole", data.role);
           succEl.innerHTML =
-            "PIN reset! <strong>NEW Recovery Key: " +
-            esc(data.recoveryKey) +
-            "</strong><br>Save this key securely! Redirecting...";
+            "PIN reset successful! Logging you in...";
           succEl.classList.remove("hidden");
           setTimeout(function () {
             document.getElementById("recoverySection").classList.add("hidden");
