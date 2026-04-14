@@ -227,7 +227,7 @@ export default function AppNavigator() {
               ),
             }}
           >
-            {() => <TransactionsScreen username={workerName} role="worker" />}
+            {() => <TransactionsScreen username={workerName} role={role} />}
           </Tab.Screen>
           {isAdminRole(role) && (
             <Tab.Screen
