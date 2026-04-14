@@ -103,8 +103,15 @@ export default function ScannerScreen({ role = "worker" }) {
     setTobin("");
     setQty("");
     setNotes("");
+    setShowCamera(false);
+    setCameraActive(false);
+    setTorchOn(false);
+  };
+
+  const openScanner = () => {
     setShowCamera(true);
     setCameraActive(true);
+    setScanned(false);
     setTorchOn(false);
   };
 
@@ -122,8 +129,8 @@ export default function ScannerScreen({ role = "worker" }) {
     setTobin("");
     setQty("");
     setNotes("");
-    setShowCamera(m === "barcode" || m === "itemcode");
-    setCameraActive(m === "barcode" || m === "itemcode");
+    setShowCamera(false);
+    setCameraActive(false);
     setTorchOn(false);
   };
 
@@ -813,7 +820,14 @@ export default function ScannerScreen({ role = "worker" }) {
                   barcodeScannerSettings={{
                     barcodeTypes:
                       mode === "itemcode"
-                        ? ["qr", "code128", "code39", "datamatrix", "codabar", "itf14"]
+                        ? [
+                            "qr",
+                            "code128",
+                            "code39",
+                            "datamatrix",
+                            "codabar",
+                            "itf14",
+                          ]
                         : [
                             "qr",
                             "ean13",
@@ -870,13 +884,19 @@ export default function ScannerScreen({ role = "worker" }) {
             keyboardShouldPersistTaps="handled"
           >
             {!showCamera && (mode === "barcode" || mode === "itemcode") && (
-              <TouchableOpacity style={styles.rescanBtn} onPress={resetForm}>
+              <TouchableOpacity style={styles.rescanBtn} onPress={openScanner}>
                 <MaterialCommunityIcons
-                  name="camera-retake"
+                  name={scanned ? "camera-retake" : "barcode-scan"}
                   size={20}
                   color="#fff"
                 />
-                <Text style={styles.rescanText}>Scan Again</Text>
+                <Text style={styles.rescanText}>
+                  {scanned
+                    ? "Scan Again"
+                    : mode === "barcode"
+                      ? "Scan Barcode"
+                      : "Scan Item Code"}
+                </Text>
               </TouchableOpacity>
             )}
             {renderSearchInput()}
