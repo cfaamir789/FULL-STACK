@@ -357,6 +357,10 @@
         background: #e3f2fd;
         color: #1565c0;
       }
+      .role-badge.superadmin {
+        background: #fff8e1;
+        color: #f9a825;
+      }
       .role-badge.worker {
         background: #e8f5e9;
         color: #2e7d32;
@@ -1255,6 +1259,9 @@
     <div id="loginSection" class="container">
       <div class="card login-card">
         <h2>&#128274; Admin Login</h2>
+        <p style="color: #5a6a7a; font-size: 13px; margin-bottom: 14px">
+          Only admin and superadmin accounts can access this dashboard.
+        </p>
         <input
           id="loginUser"
           type="text"
@@ -1339,6 +1346,24 @@
     <!-- MAIN PANEL -->
     <div id="mainPanel" class="container hidden">
       <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-bottom: 12px;
+        "
+      >
+        <div style="font-size: 14px; color: #5a6a7a">
+          Logged in as
+          <strong id="displayUser" style="color: #2e7d32"></strong>
+          <span id="displayRole" class="role-badge admin" style="margin-left: 6px"
+            >ADMIN</span
+          >
+        </div>
+      </div>
+      <div
         class="tab-bar panel-nav"
         style="border-bottom: 0; margin-bottom: 20px"
       >
@@ -1348,6 +1373,9 @@
           onclick="switchPage('dashboard')"
         >
           Dashboard
+        </button>
+        <button id="navProcessed" onclick="switchPage('processed')">
+          Processed Items
         </button>
         <button id="navWorkers" onclick="switchPage('workers')">
           Worker Status
@@ -1401,8 +1429,6 @@
               a glance.
             </p>
             <div class="hero-tag-row">
-              <span class="hero-tag">Render API</span>
-              <span class="hero-tag">MongoDB Data</span>
               <span class="hero-tag">Live Worker Queue</span>
             </div>
             <div class="health-row" id="healthRow">
@@ -1426,9 +1452,20 @@
               <div class="num" id="statTx">-</div>
               <div class="label">Pending Queue</div>
             </div>
-            <div class="stat">
+            <div
+              class="stat"
+              role="button"
+              tabindex="0"
+              title="Open processed item details"
+              onclick="openProcessedItemsPage()"
+              onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openProcessedItemsPage(); }"
+              style="cursor: pointer"
+            >
               <div class="num" id="statProcessed">-</div>
               <div class="label">Processed History</div>
+              <div style="margin-top: 8px; font-size: 11px; opacity: 0.8">
+                View details
+              </div>
             </div>
             <div class="stat">
               <div class="num" id="statArchived">-</div>
@@ -1552,6 +1589,84 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pageProcessed" class="panel-page hidden">
+        <div class="section-rail">
+          <button
+            class="section-chip"
+            onclick="scrollToBlock('processedSummaryBlock')"
+          >
+            Summary
+          </button>
+          <button
+            class="section-chip"
+            onclick="scrollToBlock('processedTableBlock')"
+          >
+            Audit Table
+          </button>
+        </div>
+
+        <div class="card" id="processedSummaryBlock">
+          <div class="panel-head">
+            <div class="head-copy">
+              <h2>&#128203; Processed Items</h2>
+              <p>
+                Review completed rows by worker and by the admin who marked
+                them done.
+              </p>
+            </div>
+            <button class="btn-sm btn-export" onclick="loadProcessedTransactions()">
+              &#128260; Refresh
+            </button>
+          </div>
+          <div class="stats-row" id="processedSummaryCards">
+            <div class="stat">
+              <div class="num">--</div>
+              <div class="label">Processed Rows</div>
+            </div>
+            <div class="stat">
+              <div class="num">--</div>
+              <div class="label">Workers Covered</div>
+            </div>
+            <div class="stat">
+              <div class="num">--</div>
+              <div class="label">Admins Involved</div>
+            </div>
+            <div class="stat">
+              <div class="num">--</div>
+              <div class="label">Last Admin</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card table-card" id="processedTableBlock">
+          <div class="tx-header">
+            <h2>&#128269; Processed Audit Trail</h2>
+          </div>
+          <p style="color: #888; margin-bottom: 12px; font-size: 13px">
+            Filter completed rows by worker and by admin to inspect who closed
+            each item.
+          </p>
+          <div class="tx-filters">
+            <select id="processedWorkerFilter" onchange="filterProcessedTransactions()">
+              <option value="">All Workers</option>
+            </select>
+            <select id="processedAdminFilter" onchange="filterProcessedTransactions()">
+              <option value="">All Admins</option>
+            </select>
+            <input
+              type="text"
+              id="processedSearch"
+              placeholder="Search item code, barcode, name, ERP doc..."
+              oninput="filterProcessedTransactions()"
+              style="flex: 1; min-width: 220px"
+            />
+          </div>
+          <div id="processedContainer">
+            <div class="loading">Loading processed items...</div>
           </div>
         </div>
       </div>
@@ -2229,6 +2344,7 @@
       let selectedFile = null;
       let pageLoaded = {
         dashboard: false,
+        processed: false,
         master: false,
         workers: false,
         users: false,
@@ -2282,6 +2398,9 @@
               loadStats();
               if (currentPage === "workers" && pageLoaded.workers) {
                 refreshWorkersPage(true);
+              }
+              if (currentPage === "processed" && pageLoaded.processed) {
+                loadProcessedTransactions(true);
               }
               if (currentPage === "dashboard" && pageLoaded.dashboard) {
                 loadDashboardPanels(true);
@@ -2340,6 +2459,46 @@
         }
       }
 
+      function showLoginMessage(message) {
+        const errEl = document.getElementById("loginError");
+        if (!errEl) return;
+        document.getElementById("mainPanel").classList.add("hidden");
+        document.getElementById("recoverySection").classList.add("hidden");
+        document.getElementById("loginSection").classList.remove("hidden");
+        errEl.textContent = message;
+        errEl.classList.remove("hidden");
+      }
+
+      function applyAdminIdentity() {
+        const displayUser = document.getElementById("displayUser");
+        const displayRole = document.getElementById("displayRole");
+        if (displayUser) {
+          displayUser.textContent = adminUsername || "ADMIN";
+        }
+        if (displayRole) {
+          const roleClass = adminRole === "superadmin" ? "superadmin" : "admin";
+          const roleLabel = adminRole === "superadmin" ? "SUPERADMIN" : "ADMIN";
+          displayRole.className = "role-badge " + roleClass;
+          displayRole.textContent = roleLabel;
+        }
+      }
+
+      async function syncAdminSession() {
+        const data = await apiFetch("/auth/me");
+        const user = data.user || {};
+        if (user.role !== "admin" && user.role !== "superadmin") {
+          throw new Error(
+            "Only admin and superadmin accounts can access this dashboard.",
+          );
+        }
+        adminUsername = user.username || adminUsername;
+        adminRole = user.role || adminRole;
+        localStorage.setItem("adminUsername", adminUsername);
+        localStorage.setItem("adminRole", adminRole);
+        applyAdminIdentity();
+        return user;
+      }
+
       async function checkSetup() {
         try {
           const data = await apiFetch("/auth/check-setup");
@@ -2395,7 +2554,8 @@
             body: JSON.stringify({ username, pin }),
           });
           if (data.role !== "admin" && data.role !== "superadmin") {
-            errEl.textContent = "Only admins can access this panel";
+            errEl.textContent =
+              "Only admin and superadmin accounts can access this dashboard.";
             errEl.classList.remove("hidden");
             if (btn) {
               btn.disabled = false;
@@ -2405,12 +2565,13 @@
           }
           authToken = data.token;
           localStorage.setItem("adminToken", authToken);
-          adminUsername = username;
-          localStorage.setItem("adminUsername", username);
+          adminUsername = data.username || username.toUpperCase();
+          localStorage.setItem("adminUsername", adminUsername);
           adminRole = data.role;
           localStorage.setItem("adminRole", data.role);
-          showPanel();
+          await showPanel();
         } catch (err) {
+          doLogout();
           errEl.textContent = err.message;
           errEl.classList.remove("hidden");
         }
@@ -2442,12 +2603,13 @@
           });
           authToken = data.token;
           localStorage.setItem("adminToken", authToken);
-          adminUsername = username;
-          localStorage.setItem("adminUsername", username);
+          adminUsername = data.username || username.toUpperCase();
+          localStorage.setItem("adminUsername", adminUsername);
           adminRole = data.role || "superadmin";
           localStorage.setItem("adminRole", adminRole);
-          showPanel();
+          await showPanel();
         } catch (err) {
+          doLogout();
           errEl.textContent = err.message;
           errEl.classList.remove("hidden");
         }
@@ -2460,9 +2622,14 @@
         localStorage.removeItem("adminToken");
         localStorage.removeItem("adminUsername");
         localStorage.removeItem("adminRole");
+        processedTransactions = [];
+        filteredProcessedTransactions = [];
+        processedPageNumber = 1;
         document.getElementById("mainPanel").classList.add("hidden");
         document.getElementById("loginSection").classList.remove("hidden");
         document.getElementById("recoverySection").classList.add("hidden");
+        const displayUser = document.getElementById("displayUser");
+        if (displayUser) displayUser.textContent = "";
       }
 
       function showRecovery() {
@@ -2508,9 +2675,13 @@
           localStorage.setItem("adminRole", data.role);
           succEl.innerHTML = "PIN reset successful! Logging you in...";
           succEl.classList.remove("hidden");
-          setTimeout(function () {
-            document.getElementById("recoverySection").classList.add("hidden");
-            showPanel();
+          setTimeout(async function () {
+            hideRecovery();
+            try {
+              await showPanel();
+            } catch (err) {
+              showLoginMessage(err.message);
+            }
           }, 4000);
         } catch (err) {
           errEl.textContent = err.message;
@@ -2519,17 +2690,30 @@
       }
 
       async function showPanel() {
+        await syncAdminSession();
+        document.getElementById("recoverySection").classList.add("hidden");
         document.getElementById("loginSection").classList.add("hidden");
         document.getElementById("mainPanel").classList.remove("hidden");
         connectWebSocket();
         startLiveRefresh();
-        switchPage("dashboard");
+        await switchPage("dashboard");
       }
 
       function scrollToBlock(id) {
         const element = document.getElementById(id);
         if (!element) return;
         element.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      async function openProcessedItemsPage() {
+        await switchPage("processed");
+        const workerFilter = document.getElementById("processedWorkerFilter");
+        const adminFilter = document.getElementById("processedAdminFilter");
+        const searchInput = document.getElementById("processedSearch");
+        if (workerFilter) workerFilter.value = "";
+        if (adminFilter) adminFilter.value = "";
+        if (searchInput) searchInput.value = "";
+        filterProcessedTransactions();
       }
 
       async function refreshWorkersPage(silent = false) {
@@ -2553,6 +2737,9 @@
             workerRefreshInFlight = true;
             tasks.push(refreshWorkersPage(true));
           }
+          if (currentPage === "processed" && pageLoaded.processed) {
+            tasks.push(loadProcessedTransactions(true));
+          }
           Promise.allSettled(tasks).finally(() => {
             workerRefreshInFlight = false;
           });
@@ -2561,7 +2748,7 @@
 
       async function switchPage(page) {
         currentPage = page;
-        const pages = ["dashboard", "master", "workers", "users"];
+        const pages = ["dashboard", "processed", "master", "workers", "users"];
         pages.forEach((p) => {
           document
             .getElementById("page" + p.charAt(0).toUpperCase() + p.slice(1))
@@ -2574,6 +2761,10 @@
         if (page === "dashboard") {
           await Promise.allSettled([loadStats(), loadDashboardPanels()]);
           pageLoaded.dashboard = true;
+        }
+        if (page === "processed") {
+          await Promise.allSettled([loadStats(), loadProcessedTransactions()]);
+          pageLoaded.processed = true;
         }
         if (page === "master") {
           await Promise.allSettled([
@@ -2621,6 +2812,268 @@
         const archivedEl = document.getElementById("statArchived");
         if (processedEl) processedEl.textContent = processed;
         if (archivedEl) archivedEl.textContent = archived;
+      }
+
+      let processedTransactions = [];
+      let filteredProcessedTransactions = [];
+      let processedPageNumber = 1;
+
+      function renderProcessedSummary(txs) {
+        const summaryEl = document.getElementById("processedSummaryCards");
+        if (!summaryEl) return;
+
+        const workerSet = new Set();
+        const adminSet = new Set();
+        let latestTx = null;
+
+        txs.forEach((tx) => {
+          if (tx.Worker_Name) workerSet.add(tx.Worker_Name);
+          if (tx.processedBy) adminSet.add(tx.processedBy);
+          if (tx.processedAt) {
+            if (
+              !latestTx ||
+              new Date(tx.processedAt).getTime() >
+                new Date(latestTx.processedAt || 0).getTime()
+            ) {
+              latestTx = tx;
+            }
+          }
+        });
+
+        const lastAdmin = latestTx?.processedBy || "--";
+        const lastProcessedAt = latestTx?.processedAt
+          ? new Date(latestTx.processedAt).toLocaleString()
+          : "No processed rows yet";
+        const lastAdminFontSize = lastAdmin.length > 14 ? 18 : 22;
+
+        summaryEl.innerHTML =
+          '<div class="stat"><div class="num">' +
+          txs.length +
+          '</div><div class="label">Processed Rows</div></div>' +
+          '<div class="stat"><div class="num">' +
+          workerSet.size +
+          '</div><div class="label">Workers Covered</div></div>' +
+          '<div class="stat"><div class="num">' +
+          adminSet.size +
+          '</div><div class="label">Admins Involved</div></div>' +
+          '<div class="stat"><div class="num" style="font-size:' +
+          lastAdminFontSize +
+          'px">' +
+          esc(lastAdmin) +
+          '</div><div class="label">Last Admin</div><div style="margin-top:6px;font-size:12px;color:#888">' +
+          esc(lastProcessedAt) +
+          "</div></div>";
+      }
+
+      function populateProcessedFilters() {
+        const workerFilter = document.getElementById("processedWorkerFilter");
+        const adminFilter = document.getElementById("processedAdminFilter");
+        if (!workerFilter || !adminFilter) return;
+
+        const prevWorker = workerFilter.value;
+        const prevAdmin = adminFilter.value;
+        const workers = [
+          ...new Set(processedTransactions.map((tx) => tx.Worker_Name).filter(Boolean)),
+        ].sort();
+        const admins = [
+          ...new Set(processedTransactions.map((tx) => tx.processedBy).filter(Boolean)),
+        ].sort();
+
+        workerFilter.innerHTML =
+          '<option value="">All Workers (' +
+          processedTransactions.length +
+          ")</option>" +
+          workers
+            .map((worker) => {
+              const count = processedTransactions.filter(
+                (tx) => tx.Worker_Name === worker,
+              ).length;
+              return (
+                '<option value="' +
+                esc(worker) +
+                '">' +
+                esc(worker) +
+                " (" +
+                count +
+                ")</option>"
+              );
+            })
+            .join("");
+
+        adminFilter.innerHTML =
+          '<option value="">All Admins (' +
+          admins.length +
+          ")</option>" +
+          admins
+            .map((admin) => {
+              const count = processedTransactions.filter(
+                (tx) => tx.processedBy === admin,
+              ).length;
+              return (
+                '<option value="' +
+                esc(admin) +
+                '">' +
+                esc(admin) +
+                " (" +
+                count +
+                ")</option>"
+              );
+            })
+            .join("");
+
+        workerFilter.value = workers.includes(prevWorker) ? prevWorker : "";
+        adminFilter.value = admins.includes(prevAdmin) ? prevAdmin : "";
+      }
+
+      async function loadProcessedTransactions(silent = false) {
+        const container = document.getElementById("processedContainer");
+        if (!container) return;
+        if (!silent) {
+          container.innerHTML =
+            '<div class="loading">Loading processed items...</div>';
+        }
+        try {
+          let all = [];
+          let page = 1;
+          while (true) {
+            const data = await apiFetch(
+              "/transactions?page=" + page + "&limit=200&status=processed",
+            );
+            all = all.concat(data.transactions || []);
+            if (all.length >= (data.total || 0)) break;
+            page += 1;
+            if (page > 100) break;
+          }
+          processedTransactions = all;
+          populateProcessedFilters();
+          filterProcessedTransactions();
+        } catch (err) {
+          renderProcessedSummary([]);
+          container.innerHTML =
+            '<div class="alert alert-error">' + esc(err.message) + "</div>";
+        }
+      }
+
+      function filterProcessedTransactions(resetPage = true) {
+        const workerFilter =
+          document.getElementById("processedWorkerFilter")?.value || "";
+        const adminFilter =
+          document.getElementById("processedAdminFilter")?.value || "";
+        const search = (
+          document.getElementById("processedSearch")?.value || ""
+        ).toLowerCase();
+
+        filteredProcessedTransactions = processedTransactions.filter((tx) => {
+          if (workerFilter && tx.Worker_Name !== workerFilter) return false;
+          if (adminFilter && tx.processedBy !== adminFilter) return false;
+          if (search) {
+            const hay = [
+              tx.processedBy,
+              tx.Worker_Name,
+              tx.Item_Code,
+              tx.Item_Barcode,
+              tx.Item_Name,
+              tx.Frombin,
+              tx.Tobin,
+              tx.erpDocument,
+              tx.erpBatch,
+              tx.Notes,
+            ]
+              .join(" ")
+              .toLowerCase();
+            if (!hay.includes(search)) return false;
+          }
+          return true;
+        });
+
+        if (resetPage) processedPageNumber = 1;
+        renderProcessedSummary(filteredProcessedTransactions);
+        renderProcessedTable();
+      }
+
+      function setProcessedPage(page) {
+        processedPageNumber = page;
+        renderProcessedTable();
+      }
+
+      function renderProcessedTable() {
+        const container = document.getElementById("processedContainer");
+        if (!container) return;
+        if (!filteredProcessedTransactions.length) {
+          container.innerHTML =
+            '<div class="loading">No processed items found.</div>';
+          return;
+        }
+
+        const pageSize = 40;
+        const totalPages = Math.max(
+          1,
+          Math.ceil(filteredProcessedTransactions.length / pageSize),
+        );
+        if (processedPageNumber > totalPages) {
+          processedPageNumber = totalPages;
+        }
+
+        const start = (processedPageNumber - 1) * pageSize;
+        const rows = filteredProcessedTransactions.slice(start, start + pageSize);
+        let html =
+          '<div class="preview-count" style="display:flex;justify-content:space-between;align-items:center">Showing ' +
+          (start + 1) +
+          "-" +
+          (start + rows.length) +
+          " of " +
+          filteredProcessedTransactions.length +
+          " processed rows</div>";
+
+        html +=
+          '<div class="table-shell wide"><div class="table-wrap tall"><table><thead><tr><th>Processed At</th><th>Admin</th><th>User / Worker</th><th>Item Code</th><th>Item Name</th><th>Barcode</th><th>From</th><th>To</th><th>Qty</th><th>ERP Doc</th><th>ERP Batch</th><th>Notes</th></tr></thead><tbody>';
+
+        rows.forEach((tx) => {
+          html += "<tr>";
+          html +=
+            '<td style="white-space:nowrap">' +
+            esc(tx.processedAt ? new Date(tx.processedAt).toLocaleString() : "") +
+            "</td>";
+          html += "<td>" + esc(tx.processedBy || "") + "</td>";
+          html += "<td>" + esc(tx.Worker_Name || "") + "</td>";
+          html += "<td>" + esc(tx.Item_Code || "") + "</td>";
+          html += "<td>" + esc(tx.Item_Name || "") + "</td>";
+          html += "<td>" + esc(tx.Item_Barcode || "") + "</td>";
+          html += "<td>" + esc(tx.Frombin || "") + "</td>";
+          html += "<td>" + esc(tx.Tobin || "") + "</td>";
+          html += "<td>" + esc(String(tx.Qty ?? "")) + "</td>";
+          html += "<td>" + esc(tx.erpDocument || "") + "</td>";
+          html += "<td>" + esc(tx.erpBatch || "") + "</td>";
+          html += "<td>" + esc(tx.Notes || "") + "</td>";
+          html += "</tr>";
+        });
+
+        html += "</tbody></table></div></div>";
+
+        if (totalPages > 1) {
+          html += '<div class="pagination">';
+          html +=
+            '<button ' +
+            (processedPageNumber <= 1 ? "disabled" : "") +
+            ' onclick="setProcessedPage(' +
+            (processedPageNumber - 1) +
+            ')">Prev</button>';
+          html +=
+            '<span class="page-info">Page ' +
+            processedPageNumber +
+            " / " +
+            totalPages +
+            "</span>";
+          html +=
+            '<button ' +
+            (processedPageNumber >= totalPages ? "disabled" : "") +
+            ' onclick="setProcessedPage(' +
+            (processedPageNumber + 1) +
+            ')">Next</button>';
+          html += "</div>";
+        }
+
+        container.innerHTML = html;
       }
 
       function renderWorkerStatusMarkup(workers, compact = false) {
@@ -4633,8 +5086,7 @@
       async function init() {
         if (authToken) {
           try {
-            await apiFetch("/auth/users");
-            showPanel();
+            await showPanel();
             return;
           } catch {
             doLogout();

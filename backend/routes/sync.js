@@ -67,6 +67,17 @@ const buildStatusQuery = (status) => {
   return PENDING_QUERY;
 };
 
+const buildStatusSort = (status) => {
+  const normalized = normalizeStatus(status, "pending");
+  if (normalized === "processed") {
+    return { processedAt: -1, Timestamp: -1, createdAt: -1 };
+  }
+  if (normalized === "archived") {
+    return { archivedAt: -1, processedAt: -1, Timestamp: -1, createdAt: -1 };
+  }
+  return { Timestamp: -1, createdAt: -1 };
+};
+
 const makeLegacyClientTxId = (tx) => {
   const barcode = String(tx.Item_Barcode || "unknown").trim();
   const deviceId = String(tx.deviceId || tx.Worker_Name || "unknown").trim();
@@ -322,11 +333,13 @@ router.get("/", requireDB, requireAuth, requireAdmin, async (req, res) => {
       Math.max(1, parseInt(req.query.limit, 10) || 50),
     );
     const skip = (page - 1) * limit;
-    const query = buildStatusQuery(req.query.status || "pending");
+    const status = req.query.status || "pending";
+    const query = buildStatusQuery(status);
+    const sort = buildStatusSort(status);
 
     const [transactions, total] = await Promise.all([
       Transaction.find(query)
-        .sort({ Timestamp: -1, createdAt: -1 })
+        .sort(sort)
         .skip(skip)
         .limit(limit),
       Transaction.countDocuments(query),
@@ -662,8 +675,9 @@ router.get(
         ...(worker ? { Worker_Name: worker } : {}),
         ...buildStatusQuery(status || "all"),
       };
+      const sort = buildStatusSort(status || "all");
       const transactions = await Transaction.find(query)
-        .sort({ Timestamp: -1 })
+        .sort(sort)
         .lean();
 
       if (json === "1") {

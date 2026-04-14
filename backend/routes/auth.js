@@ -230,6 +230,17 @@ router.post(
 
 // ─── GET /api/auth/users ─────────────────────────────────────────────────────
 // Admin-only: list all users (no hashes returned)
+router.get("/me", requireDB, requireAuth, async (req, res) => {
+  res.json({
+    success: true,
+    user: {
+      userId: req.user.userId,
+      username: req.user.username,
+      role: req.user.role,
+    },
+  });
+});
+
 router.get("/users", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
     const users = await User.find({});
