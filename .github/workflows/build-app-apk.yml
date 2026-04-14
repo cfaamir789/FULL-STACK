@@ -54,20 +54,18 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       - name: Generate signing keystore
-        working-directory: InventoryApp/android/app
         run: |
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "Using keystore from GitHub Secrets"
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
-          else
-            echo "Generating ephemeral debug keystore for signing"
-            keytool -genkeypair -v \
-              -keystore debug.keystore \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -alias androiddebugkey \
-              -storepass android -keypass android \
-              -dname "CN=Inventory Manager,O=CityFlower,L=Riyadh,C=SA"
-          fi
+          echo "=== Checking directory exists ==="
+          ls -la InventoryApp/android/app/ || echo "Directory not found!"
+          cd InventoryApp/android/app
+          echo "=== Generating debug keystore ==="
+          keytool -genkeypair \
+            -keystore debug.keystore \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -alias androiddebugkey \
+            -storepass android -keypass android \
+            -dname "CN=Android,O=Android,C=US"
+          echo "=== Keystore created ==="
           ls -la debug.keystore
 
       - name: Make gradlew executable
