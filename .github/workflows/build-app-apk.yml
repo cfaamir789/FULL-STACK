@@ -63,6 +63,7 @@ jobs:
             KEYTOOL="$(find /usr -name keytool -type f 2>/dev/null | head -1)"
           fi
           echo "Using keytool: $KEYTOOL"
+          rm -f InventoryApp/android/app/debug.keystore
           "$KEYTOOL" -genkeypair \
             -keystore InventoryApp/android/app/debug.keystore \
             -keyalg RSA -keysize 2048 -validity 10000 \
