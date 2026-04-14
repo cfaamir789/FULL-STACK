@@ -54,19 +54,22 @@ jobs:
           restore-keys: gradle-${{ runner.os }}-
 
       - name: Generate signing keystore
+        shell: bash
         run: |
-          echo "=== Checking directory exists ==="
-          ls -la InventoryApp/android/app/ || echo "Directory not found!"
-          cd InventoryApp/android/app
-          echo "=== Generating debug keystore ==="
-          keytool -genkeypair \
-            -keystore debug.keystore \
+          echo "JAVA_HOME=$JAVA_HOME"
+          which keytool 2>/dev/null && echo "keytool found" || echo "keytool NOT in PATH"
+          KEYTOOL="${JAVA_HOME}/bin/keytool"
+          if [ ! -f "$KEYTOOL" ]; then
+            KEYTOOL="$(find /usr -name keytool -type f 2>/dev/null | head -1)"
+          fi
+          echo "Using keytool: $KEYTOOL"
+          "$KEYTOOL" -genkeypair \
+            -keystore InventoryApp/android/app/debug.keystore \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -alias androiddebugkey \
             -storepass android -keypass android \
             -dname "CN=Android,O=Android,C=US"
-          echo "=== Keystore created ==="
-          ls -la debug.keystore
+          ls -la InventoryApp/android/app/debug.keystore
 
       - name: Make gradlew executable
         run: chmod +x InventoryApp/android/gradlew
