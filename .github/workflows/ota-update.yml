@@ -64,7 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           TOKENS=("${EXPO_TOKEN_PRIMARY}" "${EXPO_TOKEN_SECONDARY}" "${EXPO_TOKEN_TERTIARY}" "${EXPO_TOKEN_QUATERNARY}")
-          OWNER="aamirksa"
+          OWNER="aamircf"
           SELECTED=""
           for token in "${TOKENS[@]}"; do
             if [ -z "$token" ]; then
@@ -88,7 +88,7 @@ jobs:
           done
 
           if [ -z "$SELECTED" ]; then
-            echo "No provided token can access Expo project cff8e8a6-b732-42e2-ae2c-068893f7296c (owner aamirksa)."
+            echo "No provided token can access Expo project e6076914-b4b5-459d-b12b-7f478259ceea (owner aamircf)."
             echo "Add owner token to one of: FULLSTACK, FULLSTACK2, EXPO_TOKEN, EXPO_TOKEN_2"
             exit 1
           fi

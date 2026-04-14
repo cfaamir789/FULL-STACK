@@ -54,14 +54,14 @@
       "expo-font"
     ],
     "updates": {
-      "url": "https://u.expo.dev/cff8e8a6-b732-42e2-ae2c-068893f7296c",
+      "url": "https://u.expo.dev/e6076914-b4b5-459d-b12b-7f478259ceea",
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 5000
     },
     "runtimeVersion": "inventory-launch-v1",
     "extra": {
       "eas": {
-        "projectId": "cff8e8a6-b732-42e2-ae2c-068893f7296c"
+        "projectId": "e6076914-b4b5-459d-b12b-7f478259ceea"
       }
     }
   }
