@@ -382,11 +382,14 @@ export const updateTransaction = async (
 ) => {
   if (!isAdminRole(role)) {
     const tx = await db.getFirstAsync(
-      "SELECT worker_name FROM transactions WHERE id = ?",
+      "SELECT worker_name, synced FROM transactions WHERE id = ?",
       [id],
     );
     if (tx && tx.worker_name !== username) {
       throw new Error("You can only edit your own transactions.");
+    }
+    if (tx && tx.synced === 1) {
+      throw new Error("Synced transactions cannot be edited.");
     }
   }
   const updatedAt = await getServerNow();
@@ -413,11 +416,14 @@ export const updateTransaction = async (
 export const deleteTransaction = async (id, username, role) => {
   if (!isAdminRole(role)) {
     const tx = await db.getFirstAsync(
-      "SELECT worker_name FROM transactions WHERE id = ?",
+      "SELECT worker_name, synced FROM transactions WHERE id = ?",
       [id],
     );
     if (tx && tx.worker_name !== username) {
       throw new Error("You can only delete your own transactions.");
+    }
+    if (tx && tx.synced === 1) {
+      throw new Error("Synced transactions cannot be deleted.");
     }
   }
   await db.runAsync("DELETE FROM transactions WHERE id = ?", [id]);

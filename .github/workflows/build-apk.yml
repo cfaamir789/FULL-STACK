@@ -1,0 +1,110 @@
+name: Build & Release InventoryApp APK
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile"
+        required: false
+        default: "production"
+
+jobs:
+  build:
+    name: Build APK (EAS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      EXPO_TOKEN_PRIMARY: ${{ secrets.FULLSTACK }}
+      EXPO_TOKEN_SECONDARY: ${{ secrets.FULLSTACK2 }}
+      EXPO_TOKEN_TERTIARY: ${{ secrets.EXPO_TOKEN }}
+      EXPO_TOKEN_QUATERNARY: ${{ secrets.EXPO_TOKEN_2 }}
+    defaults:
+      run:
+        working-directory: InventoryApp
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: InventoryApp/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          eas-cache: false
+
+      - name: Select authorized Expo account
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKENS=("${EXPO_TOKEN_PRIMARY}" "${EXPO_TOKEN_SECONDARY}" "${EXPO_TOKEN_TERTIARY}" "${EXPO_TOKEN_QUATERNARY}")
+          OWNER="aamircf"
+          SELECTED=""
+          for token in "${TOKENS[@]}"; do
+            if [ -z "$token" ]; then
+              continue
+            fi
+            export EXPO_TOKEN="$token"
+            USERNAME="$(eas whoami 2>/dev/null || true)"
+            if [ "$USERNAME" = "$OWNER" ]; then
+              SELECTED="$token"
+              break
+            fi
+            if eas project:info --non-interactive >/dev/null 2>&1; then
+              SELECTED="$token"
+              break
+            fi
+          done
+
+          if [ -z "$SELECTED" ]; then
+            echo "No provided token can access Expo project (owner aamircf)."
+            echo "Add owner token to one of: FULLSTACK, FULLSTACK2, EXPO_TOKEN, EXPO_TOKEN_2"
+            exit 1
+          fi
+
+          echo "EXPO_TOKEN=$SELECTED" >> "$GITHUB_ENV"
+
+      - name: Build APK via EAS
+        shell: bash
+        run: |
+          PROFILE="${{ github.event.inputs.profile || 'production' }}"
+          echo "Building profile: $PROFILE"
+          eas build \
+            --platform android \
+            --profile "$PROFILE" \
+            --non-interactive \
+            --output ../app-release.apk \
+            --wait
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: app-release.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Attach APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
