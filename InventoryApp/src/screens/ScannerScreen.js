@@ -813,7 +813,7 @@ export default function ScannerScreen({ role = "worker" }) {
                   barcodeScannerSettings={{
                     barcodeTypes:
                       mode === "itemcode"
-                        ? ["qr", "code128", "code39", "datamatrix"]
+                        ? ["qr", "code128", "code39", "datamatrix", "codabar", "itf14"]
                         : [
                             "qr",
                             "ean13",
@@ -822,6 +822,8 @@ export default function ScannerScreen({ role = "worker" }) {
                             "code39",
                             "upc_a",
                             "upc_e",
+                            "itf14",
+                            "codabar",
                           ],
                   }}
                 />
