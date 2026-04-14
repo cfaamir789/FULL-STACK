@@ -2,7 +2,7 @@
       // --- Failover: list of backend servers (same MongoDB) --------------------
       const SERVERS = [
         window.location.origin,
-        "https://full-stack-4m9b.onrender.com",
+        "https://fullstck.onrender.com",
         "https://inventory-backend-fdex.onrender.com",
       ];
       // Remove duplicates (if we're already on one of them)
@@ -58,7 +58,7 @@
           if (!res.ok) throw new Error(data.error || "Request failed");
           return data;
         } catch (err) {
-          // Network failure — try failover
+          // Network failure ï¿½ try failover
           const working = await findWorkingServer();
           if (working) {
             const res2 = await fetch(API + path, { ...opts, headers });
@@ -267,7 +267,7 @@
           resultDiv.innerHTML =
             '<div style="color:#2e7d32;font-weight:600;padding:8px;background:#c8e6c9;border-radius:6px">? Pushed! Version: v' +
             data.version +
-            " · " +
+            " ï¿½ " +
             data.totalItems +
             " items ready for phones</div>";
           document.getElementById("pushVersion").textContent =
@@ -969,7 +969,7 @@
           let html =
             '<div class="preview-count" style="display:flex;justify-content:space-between;align-items:center">Showing ' +
             (start + 1) +
-            "–" +
+            "ï¿½" +
             (start + slice.length) +
             " of " +
             txs.length +
@@ -1608,7 +1608,7 @@
         let html =
           '<div class="preview-count">Showing ' +
           (start + 1) +
-          "–" +
+          "ï¿½" +
           (start + items.length) +
           " of " +
           total +

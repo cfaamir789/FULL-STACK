@@ -1,0 +1,90 @@
+name: Build Inventory App APK
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "InventoryApp/**"
+      - ".github/workflows/build-app-apk.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: InventoryApp/package-lock.json
+
+      - name: Install JS dependencies
+        working-directory: InventoryApp
+        run: npm ci
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('InventoryApp/android/**/*.gradle*', 'InventoryApp/android/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Make gradlew executable
+        run: chmod +x InventoryApp/android/gradlew
+
+      - name: Build Release APK
+        working-directory: InventoryApp/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InventoryManager-v${{ github.run_number }}
+          path: InventoryApp/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Read version from app.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./InventoryApp/app.json').expo.version")
+          CODE=$(node -p "require('./InventoryApp/app.json').expo.android.versionCode")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}-build.${{ github.run_number }}
+          name: "Inventory Manager v${{ steps.version.outputs.version }} (Build #${{ github.run_number }})"
+          body: |
+            ### Inventory Manager APK
+            - **Version**: ${{ steps.version.outputs.version }}
+            - **Version Code**: ${{ steps.version.outputs.code }}
+            - **Commit**: ${{ github.sha }}
+            - **Built**: ${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
+
+            Download the APK below and install it on any Android device.
+          files: InventoryApp/android/app/build/outputs/apk/release/app-release.apk
+          draft: false
+          prerelease: false
