@@ -53,6 +53,23 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('InventoryApp/android/**/*.gradle*', 'InventoryApp/android/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
 
+      - name: Generate signing keystore
+        working-directory: InventoryApp/android/app
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "Using keystore from GitHub Secrets"
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
+          else
+            echo "Generating ephemeral debug keystore for signing"
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -alias androiddebugkey \
+              -storepass android -keypass android \
+              -dname "CN=Inventory Manager,O=CityFlower,L=Riyadh,C=SA"
+          fi
+          ls -la debug.keystore
+
       - name: Make gradlew executable
         run: chmod +x InventoryApp/android/gradlew
 
@@ -87,6 +104,8 @@ jobs:
             - **Version Code**: ${{ steps.version.outputs.code }}
             - **Commit**: ${{ github.sha }}
             - **Built**: ${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
+
+            > ⚠️ If you have a previous version from Expo/EAS, **uninstall it first** before installing this APK (different signing key).
 
             Download the APK below and install it on any Android device.
           files: InventoryApp/android/app/build/outputs/apk/release/app-release.apk

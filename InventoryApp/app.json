@@ -2,8 +2,8 @@
   "expo": {
     "name": "Inventory Manager",
     "slug": "newfullstack",
-    "owner": "aamircf",
-    "version": "1.2.0",
+    "owner": "aamirksa",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
       "bundleIdentifier": "com.inventory.manager"
     },
     "android": {
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#D9D9D9"
@@ -54,14 +54,14 @@
       "expo-font"
     ],
     "updates": {
-      "url": "https://u.expo.dev/e6076914-b4b5-459d-b12b-7f478259ceea",
+      "url": "https://u.expo.dev/cff8e8a6-b732-42e2-ae2c-068893f7296c",
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 5000
     },
     "runtimeVersion": "inventory-launch-v1",
     "extra": {
       "eas": {
-        "projectId": "e6076914-b4b5-459d-b12b-7f478259ceea"
+        "projectId": "cff8e8a6-b732-42e2-ae2c-068893f7296c"
       }
     }
   }
