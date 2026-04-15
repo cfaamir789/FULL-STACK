@@ -43,10 +43,10 @@ const toDate = (value, fallback = new Date()) => {
   return Number.isNaN(date.getTime()) ? fallback : date;
 };
 
-// Server timezone: IST (UTC+5:30) — used for "today" boundaries
-const SERVER_TZ = "Asia/Kolkata";
+// Server timezone: Riyadh (UTC+3) — day resets at midnight Riyadh time
+const SERVER_TZ = "Asia/Riyadh";
 const getTodayStr = (date = new Date()) => {
-  // Returns YYYY-MM-DD in the configured timezone (IST)
+  // Returns YYYY-MM-DD in Riyadh timezone
   return date.toLocaleDateString("en-CA", { timeZone: SERVER_TZ });
 };
 
@@ -161,8 +161,8 @@ router.get(
   async (req, res) => {
     try {
       const todayStr = getTodayStr();
-      // IST day boundaries (UTC offsets: IST = UTC+5:30)
-      const todayStart = new Date(todayStr + "T00:00:00+05:30");
+      // Riyadh day boundaries (UTC+3)
+      const todayStart = new Date(todayStr + "T00:00:00+03:00");
       const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
       // Fetch WorkerSync docs and live today-counts from Transaction in parallel
