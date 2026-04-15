@@ -1646,6 +1646,35 @@
               </div>
             </div>
           </div>
+          </div>
+          <!-- System Status row merged into Overview -->
+          <div class="sys-grid" id="sysGrid" style="margin-top:16px; background:rgba(255,255,255,0.10); border-radius:14px; padding:12px 16px;">
+            <div class="sys-item" style="color:#fff">
+              <div class="sys-label" style="color:rgba(255,255,255,0.7)">API Status</div>
+              <div class="sys-val" id="sysApiStatus" style="color:#fff">--</div>
+            </div>
+            <div class="sys-item" style="color:#fff">
+              <div class="sys-label" style="color:rgba(255,255,255,0.7)">Master Version</div>
+              <div class="sys-val" id="sysMasterVer" style="color:#fff">--</div>
+            </div>
+            <div class="sys-item" style="color:#fff">
+              <div class="sys-label" style="color:rgba(255,255,255,0.7)">Total Items</div>
+              <div class="sys-val" id="sysTotalItems" style="color:#fff">--</div>
+            </div>
+            <div class="sys-item" style="color:#fff">
+              <div class="sys-label" style="color:rgba(255,255,255,0.7)">Pending Queue</div>
+              <div class="sys-val" id="sysPending" style="color:#fff">--</div>
+            </div>
+            <div class="sys-item" style="color:#fff">
+              <div class="sys-label" style="color:rgba(255,255,255,0.7)">Processed</div>
+              <div class="sys-val" id="sysProcessed" style="color:#fff">--</div>
+            </div>
+            <div class="sys-item" style="color:#fff">
+              <div class="sys-label" style="color:rgba(255,255,255,0.7)">Active Workers</div>
+              <div class="sys-val" id="sysWorkers" style="color:#fff">--</div>
+            </div>
+          </div>
+          <div class="refresh-ts" id="sysRefreshTs" style="color:rgba(255,255,255,0.6); margin-top:8px; font-size:12px;">Last checked: --</div>
           <div class="daily-msg" id="dailyMsgBox">
             <span class="msg-icon">&#127808;</span>
             <span id="dailyMsgText">Loading today's thought...</span>
@@ -1681,44 +1710,7 @@
           </div>
         </div>
 
-        <div class="card" id="dashboardSysBlock">
-          <div class="panel-head">
-            <div class="head-copy">
-              <h2>&#9881;&#65039; System Status</h2>
-              <p>Live backend health, queue depth, and data freshness.</p>
-            </div>
-            <button class="btn-sm btn-export" onclick="refreshSystemStatus()">
-              &#128260; Refresh
-            </button>
-          </div>
-          <div class="sys-grid" id="sysGrid">
-            <div class="sys-item">
-              <div class="sys-label">API Status</div>
-              <div class="sys-val" id="sysApiStatus">--</div>
-            </div>
-            <div class="sys-item">
-              <div class="sys-label">Master Version</div>
-              <div class="sys-val" id="sysMasterVer">--</div>
-            </div>
-            <div class="sys-item">
-              <div class="sys-label">Total Items</div>
-              <div class="sys-val" id="sysTotalItems">--</div>
-            </div>
-            <div class="sys-item">
-              <div class="sys-label">Pending Queue</div>
-              <div class="sys-val" id="sysPending">--</div>
-            </div>
-            <div class="sys-item">
-              <div class="sys-label">Processed</div>
-              <div class="sys-val" id="sysProcessed">--</div>
-            </div>
-            <div class="sys-item">
-              <div class="sys-label">Active Workers</div>
-              <div class="sys-val" id="sysWorkers">--</div>
-            </div>
-          </div>
-          <div class="refresh-ts" id="sysRefreshTs">Last checked: --</div>
-        </div>
+        <!-- System Status moved into Overview hero above -->
 
         <div class="card" id="dashboardGuideBlock">
           <h2>&#128161; What Each Action Means</h2>
