@@ -51,7 +51,7 @@ app.set("broadcast", broadcast);
 // Middleware
 app.use(compression());
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "50mb" }));
 
 // Serve admin web panel — cached for 1 hour
 app.use(

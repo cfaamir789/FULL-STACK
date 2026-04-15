@@ -15,8 +15,9 @@ const connectDB = async (retries = 5) => {
       console.log("Connecting to MongoDB... (attempt " + (i + 1) + ")");
       await mongoose.connect(uri, {
         serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 10000,
-        connectTimeoutMS: 5000,
+        socketTimeoutMS: 120000,
+        connectTimeoutMS: 10000,
+        maxPoolSize: 20,
         family: 4,
       });
       console.log("MongoDB Connected Successfully!");
@@ -44,8 +45,9 @@ const connectDB = async (retries = 5) => {
     try {
       await mongoose.connect(process.env.MONGODB_URI, {
         serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 10000,
-        connectTimeoutMS: 5000,
+        socketTimeoutMS: 120000,
+        connectTimeoutMS: 10000,
+        maxPoolSize: 20,
         family: 4,
       });
       console.log("MongoDB background reconnect succeeded!");

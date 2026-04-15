@@ -100,8 +100,18 @@ function parseCsvItems(csvText) {
 }
 
 async function applyCsvItems(items, mode, onProgress, req) {
+  const rawCol = Item.collection; // raw MongoDB driver — skips Mongoose overhead
+
   if (mode === "replace") {
-    await Item.deleteMany({});
+    // drop() is instant vs deleteMany which scans every doc
+    try {
+      await rawCol.drop();
+    } catch (e) {
+      // Collection may not exist yet, that's fine
+      if (e.codeName !== "NamespaceNotFound") throw e;
+    }
+    // Recreate indexes after drop
+    await Item.ensureIndexes();
   }
 
   let inserted = 0;
@@ -110,26 +120,27 @@ async function applyCsvItems(items, mode, onProgress, req) {
   const total = items.length;
 
   if (mode === "replace") {
-    const chunks = chunkArray(items, 3000);
+    // Raw driver insertMany with large chunks — bypasses Mongoose validation
+    const CHUNK = 5000;
+    const chunks = chunkArray(items, CHUNK);
     for (const chunk of chunks) {
       try {
-        const result = await Item.insertMany(chunk, { ordered: false });
-        inserted += result.length;
+        const result = await rawCol.insertMany(chunk, {
+          ordered: false,
+          writeConcern: { w: 1 },
+        });
+        inserted += result.insertedCount;
       } catch (err) {
-        // BulkWriteError — some inserted, some skipped as duplicates
-        if (err.insertedDocs !== undefined) {
-          inserted += err.insertedDocs.length || 0;
-        } else if (err.result?.nInserted !== undefined) {
-          inserted += err.result.nInserted;
-        } else {
-          inserted += chunk.length - (err.writeErrors?.length || 0);
-        }
+        // Some dupes may fail; count successes
+        inserted += err.result?.nInserted ?? (chunk.length - (err.writeErrors?.length || 0));
       }
       processed += chunk.length;
       onProgress?.({ processed, total, inserted, modified });
     }
   } else {
-    const chunks = chunkArray(items, 1000);
+    // Merge mode — upsert with raw bulkWrite
+    const CHUNK = 3000;
+    const chunks = chunkArray(items, CHUNK);
     for (const chunk of chunks) {
       const ops = chunk.map((item) => ({
         updateOne: {
@@ -145,7 +156,7 @@ async function applyCsvItems(items, mode, onProgress, req) {
           upsert: true,
         },
       }));
-      const result = await Item.bulkWrite(ops, { ordered: false });
+      const result = await rawCol.bulkWrite(ops, { ordered: false });
       inserted += result.upsertedCount || 0;
       modified += result.modifiedCount || 0;
       processed += chunk.length;
@@ -314,23 +325,26 @@ router.post("/import", requireAuth, requireAdmin, async (req, res) => {
     }
     let inserted = 0;
     let modified = 0;
-    await Promise.all(
-      items.map(async (item) => {
-        const result = await Item.updateOne(
-          { Barcode: item.Barcode },
-          {
+    const rawCol = Item.collection;
+    const chunks = chunkArray(items, 3000);
+    for (const chunk of chunks) {
+      const ops = chunk.map((item) => ({
+        updateOne: {
+          filter: { Barcode: item.Barcode },
+          update: {
             $set: {
               ItemCode: item.ItemCode,
               Barcode: item.Barcode,
               Item_Name: item.Item_Name,
             },
           },
-          { upsert: true },
-        );
-        if (result.upsertedId) inserted++;
-        else modified++;
-      }),
-    );
+          upsert: true,
+        },
+      }));
+      const result = await rawCol.bulkWrite(ops, { ordered: false });
+      inserted += result.upsertedCount || 0;
+      modified += result.modifiedCount || 0;
+    }
     await bumpItemsVersion(req);
     res.json({ success: true, inserted, modified });
   } catch (err) {
@@ -367,20 +381,23 @@ router.post("/replace", requireAuth, requireAdmin, async (req, res) => {
         .status(400)
         .json({ success: false, error: "items array is required" });
     }
-    // Clear old items
-    await Item.deleteMany({});
-    // Insert new
+    const rawCol = Item.collection;
+    try {
+      await rawCol.drop();
+    } catch (e) {
+      if (e.codeName !== "NamespaceNotFound") throw e;
+    }
+    await Item.ensureIndexes();
     let inserted = 0;
-    await Promise.all(
-      items.map(async (item) => {
-        await Item.create({
-          ItemCode: item.ItemCode,
-          Barcode: item.Barcode,
-          Item_Name: item.Item_Name,
-        });
-        inserted++;
-      }),
-    );
+    const chunks = chunkArray(items, 5000);
+    for (const chunk of chunks) {
+      try {
+        const result = await rawCol.insertMany(chunk, { ordered: false });
+        inserted += result.insertedCount;
+      } catch (err) {
+        inserted += err.result?.nInserted ?? (chunk.length - (err.writeErrors?.length || 0));
+      }
+    }
     await bumpItemsVersion(req);
     res.json({ success: true, inserted });
   } catch (err) {
@@ -391,7 +408,7 @@ router.post("/replace", requireAuth, requireAdmin, async (req, res) => {
 // POST /api/items/upload-csv — admin web panel: upload a CSV file
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 },
 });
 router.post(
   "/upload-csv",
@@ -466,22 +483,32 @@ router.post(
       }
 
       const mode = req.query.mode || "replace"; // 'replace' or 'merge'
+      const rawCol = Item.collection;
 
       if (mode === "replace") {
-        await Item.deleteMany({});
+        try {
+          await rawCol.drop();
+        } catch (e) {
+          if (e.codeName !== "NamespaceNotFound") throw e;
+        }
+        await Item.ensureIndexes();
       }
 
       let inserted = 0;
       let modified = 0;
 
       if (mode === "replace") {
-        const chunks = chunkArray(items, 2000);
+        const chunks = chunkArray(items, 5000);
         for (const chunk of chunks) {
-          await Item.insertMany(chunk, { ordered: false });
+          try {
+            const result = await rawCol.insertMany(chunk, { ordered: false });
+            inserted += result.insertedCount;
+          } catch (err) {
+            inserted += err.result?.nInserted ?? (chunk.length - (err.writeErrors?.length || 0));
+          }
         }
-        inserted = items.length;
       } else {
-        const chunks = chunkArray(items, 1000);
+        const chunks = chunkArray(items, 3000);
         for (const chunk of chunks) {
           const ops = chunk.map((item) => ({
             updateOne: {
@@ -496,7 +523,7 @@ router.post(
               upsert: true,
             },
           }));
-          const result = await Item.bulkWrite(ops, { ordered: false });
+          const result = await rawCol.bulkWrite(ops, { ordered: false });
           inserted += result.upsertedCount || 0;
           modified += result.modifiedCount || 0;
         }
