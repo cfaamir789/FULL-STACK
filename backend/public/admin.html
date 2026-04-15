@@ -3698,10 +3698,42 @@
         });
         html += "</div>";
         if (sorted.length > 3) {
+          const rest = sorted.slice(3);
+          const restId = "topPerformersRest";
           html +=
-            '<div style="margin-top:10px;font-size:12px;color:var(--muted)">+' +
-            (sorted.length - 3) +
-            " more active worker(s)</div>";
+            '<div id="' + restId + '" style="display:none;margin-top:8px"><div class="podium-list">';
+          rest.forEach((w, i) => {
+            const rank = i + 4;
+            const pct = Math.round(((w.totalToday || 0) / maxScore) * 100);
+            const ago =
+              w.minutesAgo < 60
+                ? w.minutesAgo + " min ago"
+                : Math.round(w.minutesAgo / 60) + " hr ago";
+            html +=
+              '<div class="podium-row">' +
+              '<div class="podium-rank" style="background:linear-gradient(135deg,#90a4ae,#607d8b);font-size:12px">#' +
+              rank +
+              "</div>" +
+              '<div class="podium-info"><div class="podium-name">' +
+              esc(w.worker) +
+              "</div>" +
+              '<div class="podium-meta">Last sync: ' +
+              esc(ago) +
+              "</div>" +
+              '<div class="podium-bar"><div class="podium-bar-fill" style="width:' +
+              pct +
+              '%"></div></div></div>' +
+              '<div class="podium-score">' +
+              esc(String(w.totalToday || 0)) +
+              "</div></div>";
+          });
+          html += "</div></div>";
+          html +=
+            '<button onclick="(function(){var el=document.getElementById(\'' + restId + '\');var btn=event.currentTarget;if(el.style.display===\'none\'){el.style.display=\'block\';btn.textContent=\'▲ Show less\';}else{el.style.display=\'none\';btn.textContent=\'▼ Show +' +
+            rest.length +
+            " more worker(s)';}})()" style="margin-top:10px;background:none;border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:12px;color:var(--brand);cursor:pointer;font-weight:600\">▼ Show +" +
+            rest.length +
+            " more worker(s)</button>";
         }
         container.innerHTML = html;
       }
