@@ -1557,10 +1557,7 @@
             </div>
           </div>
           <div class="stats-row kpi-grid">
-            <div
-              class="stat"
-              style="cursor: default"
-            >
+            <div class="stat" style="cursor: default">
               <div class="num" id="sysMasterVer">-</div>
               <div class="label">Master Version</div>
             </div>
@@ -2396,7 +2393,9 @@
       <div id="pageUsers" class="panel-page hidden">
         <div class="card">
           <h2>&#10133; Create User</h2>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px">
+          <div
+            style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px"
+          >
             <input
               id="newUserName"
               class="search-box"
@@ -2419,7 +2418,14 @@
               <option value="admin">Admin</option>
             </select>
           </div>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+          <div
+            style="
+              display: flex;
+              gap: 8px;
+              flex-wrap: wrap;
+              align-items: center;
+            "
+          >
             <input
               id="newUserEmpId"
               class="search-box"
@@ -2653,29 +2659,24 @@
             const msg = JSON.parse(evt.data);
             console.log("[WS] Event:", msg.type, msg);
             if (msg.type === "items_updated") {
-              // Refresh item counts, version, and item list on all admin panels
+              // Only refresh what is currently visible
               loadStats();
-              loadPushStats();
               if (currentPage === "master" && pageLoaded.master) {
                 loadItems(currentItemsPage);
+                loadPushStats();
               }
               if (currentPage === "dashboard" && pageLoaded.dashboard) {
                 loadDashboardPanels(true);
-                refreshSystemStatus();
               }
             }
             if (msg.type === "transactions_updated") {
-              // Refresh transaction list and worker status on all admin panels
               loadStats();
               if (currentPage === "workers" && pageLoaded.workers) {
                 refreshWorkersPage(true);
-              }
-              if (currentPage === "processed" && pageLoaded.processed) {
+              } else if (currentPage === "processed" && pageLoaded.processed) {
                 loadProcessedTransactions(true);
-              }
-              if (currentPage === "dashboard" && pageLoaded.dashboard) {
+              } else if (currentPage === "dashboard" && pageLoaded.dashboard) {
                 loadDashboardPanels(true);
-                refreshSystemStatus();
               }
             }
           } catch {}
@@ -3057,6 +3058,8 @@
         });
 
         if (page === "dashboard") {
+          // loadStats + loadDashboardPanels fire in parallel; stats covers header counts,
+          // dashboard panels only need worker-status (fast single call now)
           await Promise.allSettled([loadStats(), loadDashboardPanels()]);
           pageLoaded.dashboard = true;
         }
@@ -3704,17 +3707,16 @@
       }
 
       // ─── System Status ─────────────────────────────────────────────────────────
+      // Called only when System Status card is visible (on-demand, not on every dashboard load)
       async function refreshSystemStatus() {
         try {
-          const [healthRes, versionRes, statsRes, workersRes] =
-            await Promise.allSettled([
-              fetch(API.replace("/api", "") + "/api/health", {
-                signal: AbortSignal.timeout(5000),
-              }).then((r) => r.json()),
-              apiFetch("/items/version"),
-              apiFetch("/transactions/stats"),
-              apiFetch("/sync/worker-status"),
-            ]);
+          // Use already-fetched data where possible; only extra call is /items/version
+          const [versionRes, statsRes, workersRes] = await Promise.allSettled([
+            apiFetch("/items/version"),
+            apiFetch("/transactions/stats"),
+            apiFetch("/sync/worker-status"),
+          ]);
+          // health dot is handled by checkHealth() which already ran
           const sysApi = document.getElementById("sysApiStatus");
           const sysMaster = document.getElementById("sysMasterVer");
           const sysItems = document.getElementById("sysTotalItems");
@@ -3722,12 +3724,6 @@
           const sysProc = document.getElementById("sysProcessed");
           const sysWork = document.getElementById("sysWorkers");
           const sysTs = document.getElementById("sysRefreshTs");
-          if (sysApi)
-            sysApi.textContent =
-              healthRes.status === "fulfilled" ? "✅ Online" : "❌ Down";
-          if (sysApi)
-            sysApi.style.color =
-              healthRes.status === "fulfilled" ? "#2e7d32" : "#e53935";
           if (sysMaster)
             sysMaster.textContent =
               versionRes.status === "fulfilled"
@@ -3772,11 +3768,8 @@
               '<div class="loading">Loading performance data...</div>';
         }
         try {
-          const [workersRes, statsRes, versionRes] = await Promise.all([
-            apiFetch("/sync/worker-status"),
-            apiFetch("/transactions/stats"),
-            apiFetch("/items/version"),
-          ]);
+          // worker-status already contains everything we need — skip extra stats/version calls
+          const workersRes = await apiFetch("/sync/worker-status");
           const workers = workersRes.workers || [];
           if (workerBox) {
             workerBox.innerHTML = renderWorkerStatusMarkup(workers, true);
@@ -3794,7 +3787,6 @@
         }
         showDailyMessage();
         checkHealth();
-        refreshSystemStatus();
       }
 
       // ─── File Upload ─────────────────────────────────────────────────────────────
@@ -3932,15 +3924,20 @@
                   ? Math.round((status.processed / status.total) * 100)
                   : 0;
               const elapsed = ((Date.now() - uploadStart) / 1000).toFixed(0);
-              const phase = status.phase === "indexing" ? "Building indexes..." : 
-                            status.phase === "merging" ? "Merging..." : "Inserting...";
+              const phase =
+                status.phase === "indexing"
+                  ? "Building indexes..."
+                  : status.phase === "merging"
+                    ? "Merging..."
+                    : "Inserting...";
               btn.textContent = phase + " " + pct + "% (" + elapsed + "s)";
             }
             if (status.status === "done") {
               const totalSec = ((Date.now() - uploadStart) / 1000).toFixed(1);
               resultDiv.innerHTML =
                 '<div class="alert alert-success">&#10004; Uploaded in ' +
-                totalSec + 's! ' +
+                totalSec +
+                "s! " +
                 status.totalItems +
                 " items on server. (Inserted: " +
                 status.inserted +
@@ -5129,7 +5126,9 @@
       let _allUsersCache = []; // cached for search filtering
 
       function filterUsers() {
-        const q = (document.getElementById("userSearchBox").value || "").trim().toLowerCase();
+        const q = (document.getElementById("userSearchBox").value || "")
+          .trim()
+          .toLowerCase();
         if (!_allUsersCache.length) return;
         renderUsersToDOM(
           q
@@ -5164,281 +5163,296 @@
 
       function renderUsersToDOM(users) {
         const container = document.getElementById("usersContainer");
-          const iAmSuperAdmin = adminRole === "superadmin";
-          const superadmins = users.filter((u) => u.role === "superadmin");
-          const admins = users.filter((u) => u.role === "admin");
-          const workers = users.filter((u) => u.role === "worker");
+        const iAmSuperAdmin = adminRole === "superadmin";
+        const superadmins = users.filter((u) => u.role === "superadmin");
+        const admins = users.filter((u) => u.role === "admin");
+        const workers = users.filter((u) => u.role === "worker");
 
-          function renderUserCard(u) {
-            const initials = u.username.substring(0, 2).toUpperCase();
-            const isSuperAdmin = u.role === "superadmin";
-            const isAdmin = u.role === "admin";
-            const isBlocked = !!u.isBlocked;
-            const dateStr = u.createdAt
-              ? new Date(u.createdAt).toLocaleDateString()
-              : "";
-            let cardClass = "user-card";
-            let cardStyle = "";
-            let avClass = "worker-av";
-            let avStyle = "";
-            let badgeStyle = "";
-            if (isBlocked) {
+        function renderUserCard(u) {
+          const initials = u.username.substring(0, 2).toUpperCase();
+          const isSuperAdmin = u.role === "superadmin";
+          const isAdmin = u.role === "admin";
+          const isBlocked = !!u.isBlocked;
+          const dateStr = u.createdAt
+            ? new Date(u.createdAt).toLocaleDateString()
+            : "";
+          let cardClass = "user-card";
+          let cardStyle = "";
+          let avClass = "worker-av";
+          let avStyle = "";
+          let badgeStyle = "";
+          if (isBlocked) {
+            cardStyle = ' style="border: 2px solid #e53935; opacity: 0.75;"';
+          }
+          if (isSuperAdmin) {
+            cardStyle = ' style="border: 2px solid #FFD700;"';
+            avClass = "admin-av";
+            avStyle = ' style="background:#FFD700;color:#333;"';
+            badgeStyle = ' style="background:#FFD700;color:#333;"';
+          } else if (isAdmin) {
+            cardClass = "user-card admin-card";
+            avClass = "admin-av-blue";
+            if (isBlocked)
               cardStyle = ' style="border: 2px solid #e53935; opacity: 0.75;"';
-            }
-            if (isSuperAdmin) {
-              cardStyle = ' style="border: 2px solid #FFD700;"';
-              avClass = "admin-av";
-              avStyle = ' style="background:#FFD700;color:#333;"';
-              badgeStyle = ' style="background:#FFD700;color:#333;"';
-            } else if (isAdmin) {
-              cardClass = "user-card admin-card";
-              avClass = "admin-av-blue";
-              if (isBlocked) cardStyle = ' style="border: 2px solid #e53935; opacity: 0.75;"';
-            }
-            let h = '<div class="' + cardClass + '"' + cardStyle + ">";
-            h += '<div class="user-card-header">';
+          }
+          let h = '<div class="' + cardClass + '"' + cardStyle + ">";
+          h += '<div class="user-card-header">';
+          h +=
+            '<div class="user-avatar ' +
+            avClass +
+            '"' +
+            avStyle +
+            ">" +
+            esc(initials) +
+            "</div>";
+          h += '<div class="user-info">';
+          h +=
+            '<div class="name">' +
+            esc(u.username) +
+            ' <span class="role-badge ' +
+            u.role +
+            '"' +
+            badgeStyle +
+            ">" +
+            (isSuperAdmin ? "SUPER ADMIN" : u.role.toUpperCase()) +
+            "</span>";
+          if (isBlocked) {
             h +=
-              '<div class="user-avatar ' +
-              avClass +
-              '"' +
-              avStyle +
-              ">" +
-              esc(initials) +
-              "</div>";
-            h += '<div class="user-info">';
+              ' <span style="background:#e53935;color:#fff;font-size:10px;padding:3px 8px;border-radius:12px;font-weight:700;letter-spacing:0.5px">&#128683; BLOCKED</span>';
+          }
+          h += "</div>";
+          h += '<div class="meta">Joined ' + dateStr + "</div>";
+          h += "</div></div>";
+          h += '<div class="user-card-actions">';
+          if (isSuperAdmin && !iAmSuperAdmin) {
             h +=
-              '<div class="name">' +
+              '<span style="color:#999;font-size:12px;">Protected account</span>';
+          } else if (isAdmin && !iAmSuperAdmin) {
+            h +=
+              '<span style="color:#999;font-size:12px;">Admin — managed by Super Admin</span>';
+          } else {
+            h +=
+              '<button class="btn-sm btn-pin-reset" data-user="' +
               esc(u.username) +
-              ' <span class="role-badge ' +
-              u.role +
-              '"' +
-              badgeStyle +
-              ">" +
-              (isSuperAdmin ? "SUPER ADMIN" : u.role.toUpperCase()) +
-              "</span>";
-            if (isBlocked) {
-              h += ' <span style="background:#e53935;color:#fff;font-size:10px;padding:3px 8px;border-radius:12px;font-weight:700;letter-spacing:0.5px">&#128683; BLOCKED</span>';
-            }
-            h += "</div>";
-            h += '<div class="meta">Joined ' + dateStr + "</div>";
-            h += "</div></div>";
-            h += '<div class="user-card-actions">';
-            if (isSuperAdmin && !iAmSuperAdmin) {
+              '" style="background:#e8f5e9;color:#2e7d32">&#128273; Reset PIN</button>';
+            if (!isSuperAdmin) {
               h +=
-                '<span style="color:#999;font-size:12px;">Protected account</span>';
-            } else if (isAdmin && !iAmSuperAdmin) {
-              h +=
-                '<span style="color:#999;font-size:12px;">Admin — managed by Super Admin</span>';
-            } else {
-              h +=
-                '<button class="btn-sm btn-pin-reset" data-user="' +
+                '<button class="btn-sm btn-archive" data-user="' +
                 esc(u.username) +
-                '" style="background:#e8f5e9;color:#2e7d32">&#128273; Reset PIN</button>';
-              if (!isSuperAdmin) {
+                '" style="background:#fff3e0;color:#e65100">&#128451; Archive Data</button>';
+              // Block / Unblock button
+              if (isBlocked) {
                 h +=
-                  '<button class="btn-sm btn-archive" data-user="' +
+                  '<button class="btn-sm btn-toggle-block" data-user="' +
                   esc(u.username) +
-                  '" style="background:#fff3e0;color:#e65100">&#128451; Archive Data</button>';
-                // Block / Unblock button
-                if (isBlocked) {
-                  h +=
-                    '<button class="btn-sm btn-toggle-block" data-user="' +
-                    esc(u.username) +
-                    '" data-action="unblock" style="background:#e8f5e9;color:#2e7d32">&#9989; Unblock</button>';
-                } else {
-                  h +=
-                    '<button class="btn-sm btn-toggle-block" data-user="' +
-                    esc(u.username) +
-                    '" data-action="block" style="background:#ffebee;color:#c62828">&#128683; Block</button>';
-                }
-              }
-              if (!isSuperAdmin && !isAdmin) {
+                  '" data-action="unblock" style="background:#e8f5e9;color:#2e7d32">&#9989; Unblock</button>';
+              } else {
                 h +=
-                  '<button class="btn-sm btn-del-user" data-user="' +
+                  '<button class="btn-sm btn-toggle-block" data-user="' +
                   esc(u.username) +
-                  '" style="background:#fce4ec;color:#c62828">&#128100; Delete User</button>';
-                h +=
-                  '<button class="btn-sm btn-del-all" data-user="' +
-                  esc(u.username) +
-                  '" style="background:#d32f2f;color:#fff">&#128465; Delete User + Data</button>';
-              } else if (isAdmin && iAmSuperAdmin) {
-                h +=
-                  '<button class="btn-sm btn-del-user" data-user="' +
-                  esc(u.username) +
-                  '" style="background:#fce4ec;color:#c62828">&#128100; Delete Admin</button>';
+                  '" data-action="block" style="background:#ffebee;color:#c62828">&#128683; Block</button>';
               }
             }
-            h += "</div>";
-            // Worker info row (only for workers)
             if (!isSuperAdmin && !isAdmin) {
-              h += '<div class="worker-info-row">';
-              h += "<label>&#128196; Emp ID</label>";
               h +=
-                '<input type="text" class="worker-emp-id" data-user="' +
+                '<button class="btn-sm btn-del-user" data-user="' +
                 esc(u.username) +
-                '" placeholder="e.g. EMP-001" value="' +
-                esc(u.employeeId || "") +
-                '" />';
-              h += "<label>&#128241; Device</label>";
+                '" style="background:#fce4ec;color:#c62828">&#128100; Delete User</button>';
               h +=
-                '<input type="text" class="worker-device" data-user="' +
+                '<button class="btn-sm btn-del-all" data-user="' +
                 esc(u.username) +
-                '" placeholder="e.g. Samsung A52" value="' +
-                esc(u.deviceModel || "") +
-                '" />';
+                '" style="background:#d32f2f;color:#fff">&#128465; Delete User + Data</button>';
+            } else if (isAdmin && iAmSuperAdmin) {
               h +=
-                '<button class="btn-save-info" data-user="' +
+                '<button class="btn-sm btn-del-user" data-user="' +
                 esc(u.username) +
-                '">&#10003; Save</button>';
-              h += "</div>";
+                '" style="background:#fce4ec;color:#c62828">&#128100; Delete Admin</button>';
             }
+          }
+          h += "</div>";
+          // Worker info row (only for workers)
+          if (!isSuperAdmin && !isAdmin) {
+            h += '<div class="worker-info-row">';
+            h += "<label>&#128196; Emp ID</label>";
+            h +=
+              '<input type="text" class="worker-emp-id" data-user="' +
+              esc(u.username) +
+              '" placeholder="e.g. EMP-001" value="' +
+              esc(u.employeeId || "") +
+              '" />';
+            h += "<label>&#128241; Device</label>";
+            h +=
+              '<input type="text" class="worker-device" data-user="' +
+              esc(u.username) +
+              '" placeholder="e.g. Samsung A52" value="' +
+              esc(u.deviceModel || "") +
+              '" />';
+            h +=
+              '<button class="btn-save-info" data-user="' +
+              esc(u.username) +
+              '">&#10003; Save</button>';
             h += "</div>";
-            return h;
           }
+          h += "</div>";
+          return h;
+        }
 
-          let html = "";
-          if (!users.length) {
-            html = '<div class="loading">No users match your search.</div>';
-            container.innerHTML = html;
-            return;
-          }
-          // Super Admin section
-          if (superadmins.length) {
-            html += '<div class="user-section">';
-            html +=
-              '<div class="user-section-title superadmin-title">&#128081; Super Admin</div>';
-            superadmins.forEach((u) => {
-              html += renderUserCard(u);
-            });
-            html += "</div>";
-          }
-          // Admins section
-          if (admins.length) {
-            html += '<div class="user-section">';
-            html +=
-              '<div class="user-section-title admin-title">&#128188; Admins (' +
-              admins.length +
-              ")</div>";
-            admins.forEach((u) => {
-              html += renderUserCard(u);
-            });
-            html += "</div>";
-          }
-          // Workers section
-          if (workers.length) {
-            html += '<div class="user-section">';
-            html +=
-              '<div class="user-section-title worker-title">&#128119; Workers (' +
-              workers.length +
-              ")</div>";
-            workers.forEach((u) => {
-              html += renderUserCard(u);
-            });
-            html += "</div>";
-          }
+        let html = "";
+        if (!users.length) {
+          html = '<div class="loading">No users match your search.</div>';
           container.innerHTML = html;
-          // Bind events via addEventListener (more reliable than inline onclick)
-          container.querySelectorAll(".btn-pin-reset").forEach(function (btn) {
-            btn.addEventListener("click", function () {
-              openPinModal(this.dataset.user);
-            });
+          return;
+        }
+        // Super Admin section
+        if (superadmins.length) {
+          html += '<div class="user-section">';
+          html +=
+            '<div class="user-section-title superadmin-title">&#128081; Super Admin</div>';
+          superadmins.forEach((u) => {
+            html += renderUserCard(u);
           });
-          container.querySelectorAll(".btn-archive").forEach(function (btn) {
-            btn.addEventListener("click", function () {
-              deleteUserDataOnly(this.dataset.user);
-            });
+          html += "</div>";
+        }
+        // Admins section
+        if (admins.length) {
+          html += '<div class="user-section">';
+          html +=
+            '<div class="user-section-title admin-title">&#128188; Admins (' +
+            admins.length +
+            ")</div>";
+          admins.forEach((u) => {
+            html += renderUserCard(u);
           });
-          container.querySelectorAll(".btn-del-user").forEach(function (btn) {
-            btn.addEventListener("click", function () {
-              deleteUserOnly(this.dataset.user);
-            });
+          html += "</div>";
+        }
+        // Workers section
+        if (workers.length) {
+          html += '<div class="user-section">';
+          html +=
+            '<div class="user-section-title worker-title">&#128119; Workers (' +
+            workers.length +
+            ")</div>";
+          workers.forEach((u) => {
+            html += renderUserCard(u);
           });
-          container.querySelectorAll(".btn-del-all").forEach(function (btn) {
-            btn.addEventListener("click", function () {
-              deleteUserAndData(this.dataset.user);
-            });
+          html += "</div>";
+        }
+        container.innerHTML = html;
+        // Bind events via addEventListener (more reliable than inline onclick)
+        container.querySelectorAll(".btn-pin-reset").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            openPinModal(this.dataset.user);
           });
-          container.querySelectorAll(".btn-save-info").forEach(function (btn) {
-            btn.addEventListener("click", async function () {
-              const username = this.dataset.user;
-              const card = this.closest(".user-card");
-              if (!card) return;
-              const empInput = card.querySelector(".worker-emp-id");
-              const devInput = card.querySelector(".worker-device");
-              const saveBtn = this;
-              saveBtn.disabled = true;
-              saveBtn.textContent = "Saving…";
-              try {
-                // Use direct fetch to avoid failover switching to production server
-                const res = await fetch(
-                  window.location.origin +
-                    "/api/auth/users/" +
-                    encodeURIComponent(username) +
-                    "/worker-info",
-                  {
-                    method: "PUT",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Authorization: "Bearer " + authToken,
-                    },
-                    body: JSON.stringify({
-                      employeeId: empInput.value.trim(),
-                      deviceModel: devInput.value.trim(),
-                    }),
+        });
+        container.querySelectorAll(".btn-archive").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            deleteUserDataOnly(this.dataset.user);
+          });
+        });
+        container.querySelectorAll(".btn-del-user").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            deleteUserOnly(this.dataset.user);
+          });
+        });
+        container.querySelectorAll(".btn-del-all").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            deleteUserAndData(this.dataset.user);
+          });
+        });
+        container.querySelectorAll(".btn-save-info").forEach(function (btn) {
+          btn.addEventListener("click", async function () {
+            const username = this.dataset.user;
+            const card = this.closest(".user-card");
+            if (!card) return;
+            const empInput = card.querySelector(".worker-emp-id");
+            const devInput = card.querySelector(".worker-device");
+            const saveBtn = this;
+            saveBtn.disabled = true;
+            saveBtn.textContent = "Saving…";
+            try {
+              // Use direct fetch to avoid failover switching to production server
+              const res = await fetch(
+                window.location.origin +
+                  "/api/auth/users/" +
+                  encodeURIComponent(username) +
+                  "/worker-info",
+                {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: "Bearer " + authToken,
                   },
-                );
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Request failed");
-                saveBtn.textContent = "✓ Saved";
-                saveBtn.style.background = "#388e3c";
-                setTimeout(() => {
-                  saveBtn.textContent = "✓ Save";
-                  saveBtn.style.background = "";
-                  saveBtn.disabled = false;
-                }, 1800);
-              } catch (err) {
-                alert("Save failed: " + err.message);
+                  body: JSON.stringify({
+                    employeeId: empInput.value.trim(),
+                    deviceModel: devInput.value.trim(),
+                  }),
+                },
+              );
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || "Request failed");
+              saveBtn.textContent = "✓ Saved";
+              saveBtn.style.background = "#388e3c";
+              setTimeout(() => {
                 saveBtn.textContent = "✓ Save";
                 saveBtn.style.background = "";
                 saveBtn.disabled = false;
-              }
-            });
+              }, 1800);
+            } catch (err) {
+              alert("Save failed: " + err.message);
+              saveBtn.textContent = "✓ Save";
+              saveBtn.style.background = "";
+              saveBtn.disabled = false;
+            }
           });
-          // Block / Unblock event listeners
-          container.querySelectorAll(".btn-toggle-block").forEach(function (btn) {
-            btn.addEventListener("click", async function () {
-              const username = this.dataset.user;
-              const action = this.dataset.action; // "block" or "unblock"
-              const label = action === "block" ? "Block" : "Unblock";
-              if (!confirm(label + " user '" + username + "'? " + (action === "block" ? "They will NOT be able to login anywhere." : "They will regain access to login."))) return;
-              const toggleBtn = this;
-              toggleBtn.disabled = true;
-              toggleBtn.textContent = action === "block" ? "Blocking…" : "Unblocking…";
-              try {
-                const res = await fetch(
-                  window.location.origin +
-                    "/api/auth/users/" +
-                    encodeURIComponent(username) +
-                    "/block",
-                  {
-                    method: "PUT",
-                    headers: {
-                      "Content-Type": "application/json",
-                      Authorization: "Bearer " + authToken,
-                    },
-                    body: JSON.stringify({ blocked: action === "block" }),
+        });
+        // Block / Unblock event listeners
+        container.querySelectorAll(".btn-toggle-block").forEach(function (btn) {
+          btn.addEventListener("click", async function () {
+            const username = this.dataset.user;
+            const action = this.dataset.action; // "block" or "unblock"
+            const label = action === "block" ? "Block" : "Unblock";
+            if (
+              !confirm(
+                label +
+                  " user '" +
+                  username +
+                  "'? " +
+                  (action === "block"
+                    ? "They will NOT be able to login anywhere."
+                    : "They will regain access to login."),
+              )
+            )
+              return;
+            const toggleBtn = this;
+            toggleBtn.disabled = true;
+            toggleBtn.textContent =
+              action === "block" ? "Blocking…" : "Unblocking…";
+            try {
+              const res = await fetch(
+                window.location.origin +
+                  "/api/auth/users/" +
+                  encodeURIComponent(username) +
+                  "/block",
+                {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: "Bearer " + authToken,
                   },
-                );
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Request failed");
-                await loadUsers();
-              } catch (err) {
-                alert(label + " failed: " + err.message);
-                toggleBtn.disabled = false;
-                toggleBtn.textContent = (action === "block" ? "🚫 Block" : "✅ Unblock");
-              }
-            });
+                  body: JSON.stringify({ blocked: action === "block" }),
+                },
+              );
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || "Request failed");
+              await loadUsers();
+            } catch (err) {
+              alert(label + " failed: " + err.message);
+              toggleBtn.disabled = false;
+              toggleBtn.textContent =
+                action === "block" ? "🚫 Block" : "✅ Unblock";
+            }
           });
+        });
       }
 
       function openPinModal(username) {
@@ -5531,7 +5545,9 @@
         const pin = document.getElementById("newUserPin").value.trim();
         const role = document.getElementById("newUserRole").value;
         const employeeId = document.getElementById("newUserEmpId").value.trim();
-        const deviceModel = document.getElementById("newUserDevice").value.trim();
+        const deviceModel = document
+          .getElementById("newUserDevice")
+          .value.trim();
         const result = document.getElementById("userCreateResult");
         result.innerHTML = "";
         if (!username || !pin) {
@@ -5547,7 +5563,13 @@
         try {
           const data = await apiFetch("/auth/register", {
             method: "POST",
-            body: JSON.stringify({ username, pin, role, employeeId, deviceModel }),
+            body: JSON.stringify({
+              username,
+              pin,
+              role,
+              employeeId,
+              deviceModel,
+            }),
           });
           result.innerHTML =
             '<div class="alert alert-success">User created: ' +

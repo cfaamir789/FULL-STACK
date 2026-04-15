@@ -565,43 +565,53 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
 
 router.get("/stats", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
-    const [pendingTx, totalAll, totalProcessed, totalArchived] =
-      await Promise.all([
-        Transaction.find(PENDING_QUERY),
-        Transaction.countDocuments({}),
-        Transaction.countDocuments({ syncStatus: "processed" }),
-        Transaction.countDocuments({ syncStatus: "archived" }),
-      ]);
+    // Single aggregation pass over the collection — no full document loads
+    const [statusCounts, workerAgg] = await Promise.all([
+      Transaction.aggregate([
+        {
+          $group: {
+            _id: { $ifNull: ["$syncStatus", "pending"] },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      Transaction.aggregate([
+        { $match: PENDING_QUERY },
+        {
+          $group: {
+            _id: { $ifNull: ["$Worker_Name", "unknown"] },
+            count: { $sum: 1 },
+            lastTransaction: { $max: "$Timestamp" },
+          },
+        },
+        { $sort: { count: -1 } },
+      ]),
+    ]);
 
-    const workerMap = {};
-    for (const tx of pendingTx) {
-      const worker = tx.Worker_Name || "unknown";
-      if (!workerMap[worker]) {
-        workerMap[worker] = {
-          worker,
-          count: 0,
-          lastTransaction: null,
-        };
-      }
-      workerMap[worker].count += 1;
-      const timestamp = tx.Timestamp ? new Date(tx.Timestamp) : null;
-      if (
-        timestamp &&
-        (!workerMap[worker].lastTransaction ||
-          timestamp > new Date(workerMap[worker].lastTransaction))
-      ) {
-        workerMap[worker].lastTransaction = timestamp.toISOString();
-      }
+    const counts = { pending: 0, processed: 0, archived: 0, total: 0 };
+    for (const row of statusCounts) {
+      const key = ["processed", "archived"].includes(row._id)
+        ? row._id
+        : "pending";
+      counts[key] += row.count;
+      counts.total += row.count;
     }
 
-    const workers = Object.values(workerMap).sort((a, b) => b.count - a.count);
+    const workers = workerAgg.map((w) => ({
+      worker: w._id,
+      count: w.count,
+      lastTransaction: w.lastTransaction
+        ? new Date(w.lastTransaction).toISOString()
+        : null,
+    }));
+
     res.json({
       success: true,
-      total: pendingTx.length,
-      totalPending: pendingTx.length,
-      totalProcessed,
-      totalArchived,
-      totalAll,
+      total: counts.pending,
+      totalPending: counts.pending,
+      totalProcessed: counts.processed,
+      totalArchived: counts.archived,
+      totalAll: counts.total,
       workers,
     });
   } catch (err) {

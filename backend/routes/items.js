@@ -311,7 +311,12 @@ router.get("/", async (req, res) => {
 
     if (paginated) {
       const [items, total] = await Promise.all([
-        Item.find(query).sort({ Item_Name: 1 }).skip(skip).limit(limit).lean(),
+        Item.find(query)
+          .select("ItemCode Barcode Item_Name UOM")
+          .sort({ Item_Name: 1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
         Item.countDocuments(query),
       ]);
       return res.json({
@@ -324,7 +329,10 @@ router.get("/", async (req, res) => {
       });
     }
 
-    const items = await Item.find(query).sort({ Item_Name: 1 }).lean();
+    const items = await Item.find(query)
+      .select("ItemCode Barcode Item_Name UOM")
+      .sort({ Item_Name: 1 })
+      .lean();
     res.json({ success: true, count: items.length, items });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
