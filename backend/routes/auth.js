@@ -189,6 +189,51 @@ router.post("/recover-superadmin", requireDB, async (req, res) => {
   }
 });
 
+// ─── POST /api/auth/impersonate/:username ────────────────────────────────────
+// Superadmin only — issues a 15-min emergency token for any admin/worker without their PIN
+router.post(
+  "/impersonate/:username",
+  requireDB,
+  requireAuth,
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const targetUsername = req.params.username.toUpperCase();
+      const target = await User.findOne({ username: targetUsername });
+
+      if (!target)
+        return res.status(404).json({ success: false, error: "User not found." });
+      if (target.role === "superadmin")
+        return res.status(403).json({ success: false, error: "Cannot impersonate a superadmin account." });
+
+      audit(
+        req.user.username,
+        req.user.role,
+        "impersonate_admin",
+        targetUsername,
+        `Superadmin ${req.user.username} opened emergency session as ${targetUsername}`,
+        "superadmin_panel",
+      );
+
+      // Short-lived token — expires in 15 minutes
+      const token = jwt.sign(
+        {
+          userId: target._id,
+          username: target.username,
+          role: target.role,
+          impersonatedBy: req.user.username,
+        },
+        JWT_SECRET,
+        { expiresIn: "15m" },
+      );
+
+      res.json({ success: true, token, expiresIn: 900, targetUsername });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
+
 // ─── POST /api/auth/register ─────────────────────────────────────────────────
 // Admin-only: create a new worker/admin account (only superadmin can create admins)
 router.post(
