@@ -4,6 +4,7 @@ const itemSchema = new mongoose.Schema({
   ItemCode: String,
   Barcode: { type: String, unique: true, required: true },
   Item_Name: String,
+  UOM: { type: String, default: "PCS" },
 });
 
 itemSchema.index({ Item_Name: 1 });

@@ -9,6 +9,7 @@ const transactionSchema = new mongoose.Schema({
   Frombin: String,
   Tobin: String,
   Qty: Number,
+  UOM: String,
   Timestamp: Date,
   Notes: String,
   deviceId: String,

@@ -10,6 +10,8 @@ const userSchema = new mongoose.Schema({
   },
   recoveryKeys: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now },
+  employeeId: { type: String, default: "" },
+  deviceModel: { type: String, default: "" },
 });
 
 module.exports = mongoose.model("User", userSchema);

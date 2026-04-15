@@ -5,11 +5,17 @@ const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const AuditLog = require("../models/AuditLog");
 const {
   requireAuth,
   requireAdmin,
   requireSuperAdmin,
 } = require("../middleware/authMiddleware");
+
+// Helper: fire-and-forget audit log (never blocks the request)
+function audit(actor, actorRole, action, target, detail, source = "admin_panel") {
+  AuditLog.create({ actor, actorRole, action, target: target || "", detail: detail || "", source }).catch(() => {});
+}
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "warehouse_inv_super_secret_key_2026";
@@ -186,21 +192,17 @@ router.post(
       }
       // Only superadmin can create admin accounts
       if (role === "admin" && req.user.role !== "superadmin") {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            error: "Only Super Admin can create admin accounts.",
-          });
+        return res.status(403).json({
+          success: false,
+          error: "Only Super Admin can create admin accounts.",
+        });
       }
       // Nobody can create another superadmin
       if (role === "superadmin") {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            error: "Cannot create another Super Admin.",
-          });
+        return res.status(403).json({
+          success: false,
+          error: "Cannot create another Super Admin.",
+        });
       }
       if (!["admin", "worker"].includes(role)) {
         return res
@@ -214,6 +216,7 @@ router.post(
         role,
         createdAt: new Date(),
       });
+      audit(req.user.username, req.user.role, "create_user", user.username, `Role: ${role}`);
       res
         .status(201)
         .json({ success: true, username: user.username, role: user.role });
@@ -249,6 +252,8 @@ router.get("/users", requireDB, requireAuth, requireAdmin, async (req, res) => {
       username: u.username,
       role: u.role,
       createdAt: u.createdAt,
+      employeeId: u.employeeId || "",
+      deviceModel: u.deviceModel || "",
     }));
     res.json({ success: true, users: safe });
   } catch (err) {
@@ -280,23 +285,20 @@ router.delete(
           .json({ success: false, error: "User not found." });
       }
       if (target.role === "superadmin") {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            error: "Super Admin account cannot be deleted.",
-          });
+        return res.status(403).json({
+          success: false,
+          error: "Super Admin account cannot be deleted.",
+        });
       }
       // Only superadmin can delete admin accounts
       if (target.role === "admin" && req.user.role !== "superadmin") {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            error: "Only Super Admin can delete admin accounts.",
-          });
+        return res.status(403).json({
+          success: false,
+          error: "Only Super Admin can delete admin accounts.",
+        });
       }
       await User.deleteOne({ username });
+      audit(req.user.username, req.user.role, "delete_user", username, `Deleted role: ${target.role}`);
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
@@ -328,12 +330,10 @@ router.post(
       }
       // Only superadmin can reset their own PIN or another superadmin's PIN
       if (user.role === "superadmin" && req.user.role !== "superadmin") {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            error: "Only Super Admin can reset Super Admin's PIN.",
-          });
+        return res.status(403).json({
+          success: false,
+          error: "Only Super Admin can reset Super Admin's PIN.",
+        });
       }
       // Regular admins cannot reset other admin PINs
       if (
@@ -341,16 +341,15 @@ router.post(
         req.user.role !== "superadmin" &&
         username !== req.user.username
       ) {
-        return res
-          .status(403)
-          .json({
-            success: false,
-            error: "Only Super Admin can reset other admins' PINs.",
-          });
+        return res.status(403).json({
+          success: false,
+          error: "Only Super Admin can reset other admins' PINs.",
+        });
       }
       const hash = await bcrypt.hash(String(pin), 10);
       user.pin_hash = hash;
       await user.save();
+      audit(req.user.username, req.user.role, "reset_pin", username, `Reset PIN for ${username}`);
       res.json({ success: true, username: user.username });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
@@ -358,6 +357,53 @@ router.post(
   },
 );
 
+// ─── PUT /api/auth/users/:username/worker-info ──────────────────────────────
+// Save employeeId and deviceModel for a worker (admin only)
+router.put(
+  "/users/:username/worker-info",
+  requireDB,
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const username = req.params.username.toUpperCase();
+      const { employeeId, deviceModel } = req.body;
+      const user = await User.findOne({ username });
+      if (!user) {
+        return res.status(404).json({ success: false, error: "User not found." });
+      }
+      if (user.role !== "worker") {
+        return res.status(400).json({ success: false, error: "Only worker accounts support this field." });
+      }
+      if (employeeId !== undefined) user.employeeId = String(employeeId).trim();
+      if (deviceModel !== undefined) user.deviceModel = String(deviceModel).trim();
+      await user.save();
+      res.json({ success: true, employeeId: user.employeeId, deviceModel: user.deviceModel });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
+// ─── GET /api/auth/audit-logs ─────────────────────────────────────────────────────────
+// Superadmin only: fetch audit logs
+router.get("/audit-logs", requireDB, requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 500, 2000);
+    const skip = parseInt(req.query.skip) || 0;
+    const actor = req.query.actor || "";
+    const action = req.query.action || "";
+    const filter = {};
+    if (actor) filter.actor = actor.toUpperCase();
+    if (action) filter.action = action;
+    const [logs, total] = await Promise.all([
+      AuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      AuditLog.countDocuments(filter),
+    ]);
+    res.json({ success: true, logs, total });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 // ─── GET /api/auth/check-setup ──────────────────────────────────────────────
 // Frontend calls this to decide whether to show the Setup screen or Login screen
 router.get("/check-setup", requireDB, async (req, res) => {

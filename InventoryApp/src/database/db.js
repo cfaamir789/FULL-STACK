@@ -98,7 +98,8 @@ export const initDB = async () => {
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
       item_code TEXT NOT NULL,
       barcode   TEXT UNIQUE NOT NULL,
-      item_name TEXT NOT NULL
+      item_name TEXT NOT NULL,
+      uom       TEXT NOT NULL DEFAULT 'PCS'
     );
 
     CREATE INDEX IF NOT EXISTS idx_items_item_code ON items(item_code);
@@ -111,6 +112,7 @@ export const initDB = async () => {
       frombin      TEXT NOT NULL,
       tobin        TEXT NOT NULL,
       qty          INTEGER NOT NULL,
+      uom          TEXT NOT NULL DEFAULT 'PCS',
       timestamp    TEXT NOT NULL,
       synced       INTEGER NOT NULL DEFAULT 0,
       worker_name  TEXT NOT NULL DEFAULT 'unknown',
@@ -130,6 +132,20 @@ export const initDB = async () => {
   } catch (_) {
     // Column already exists — safe to ignore
   }
+
+  // Migration: add uom column to items if it doesn't exist yet
+  try {
+    await db.execAsync(
+      `ALTER TABLE items ADD COLUMN uom TEXT NOT NULL DEFAULT 'PCS'`,
+    );
+  } catch (_) {}
+
+  // Migration: add uom column to transactions if it doesn't exist yet
+  try {
+    await db.execAsync(
+      `ALTER TABLE transactions ADD COLUMN uom TEXT NOT NULL DEFAULT 'PCS'`,
+    );
+  } catch (_) {}
 
   // Migration 3: add worker_name column to tag which worker did each transaction
   try {
@@ -308,6 +324,7 @@ export const insertTransaction = async ({
   frombin,
   tobin,
   qty,
+  uom = "PCS",
   worker_name = "unknown",
   notes = "",
 }) => {
@@ -321,6 +338,7 @@ export const insertTransaction = async ({
        frombin,
        tobin,
        qty,
+       uom,
        timestamp,
        synced,
        worker_name,
@@ -328,7 +346,7 @@ export const insertTransaction = async ({
        client_tx_id,
        updated_at
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
     [
       item_barcode,
       item_code,
@@ -336,6 +354,7 @@ export const insertTransaction = async ({
       frombin,
       tobin,
       qty,
+      uom,
       timestamp,
       worker_name,
       notes,

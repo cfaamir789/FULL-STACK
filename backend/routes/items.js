@@ -11,6 +11,13 @@ const {
   requireAdmin,
   requireSuperAdmin,
 } = require("../middleware/authMiddleware");
+const AuditLog = require("../models/AuditLog");
+
+function audit(actor, actorRole, action, target, detail, source) {
+  AuditLog.create({ actor, actorRole, action, target, detail, source }).catch(
+    () => {},
+  );
+}
 
 // Fail fast if MongoDB is not connected
 function requireDB(req, res, next) {
@@ -77,6 +84,7 @@ function parseCsvItems(csvText) {
       Item_Name: String(
         hasOldFormat ? r["Item Description"] : r.Item_Name,
       ).trim(),
+      UOM: "PCS",
     }));
 
   const dedup = new Map();
@@ -131,6 +139,7 @@ async function applyCsvItems(items, mode, onProgress, req) {
               ItemCode: item.ItemCode,
               Barcode: item.Barcode,
               Item_Name: item.Item_Name,
+              UOM: item.UOM || "PCS",
             },
           },
           upsert: true,
@@ -187,7 +196,7 @@ router.get("/bulk", async (req, res) => {
   try {
     const items = await Item.find(
       {},
-      { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1 },
+      { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1, UOM: 1 },
     )
       .sort({ Item_Name: 1 })
       .lean();
@@ -284,7 +293,7 @@ router.post("/", async (req, res) => {
     }
     const item = await Item.findOneAndUpdate(
       { Barcode },
-      { $set: { ItemCode, Barcode, Item_Name } },
+      { $set: { ItemCode, Barcode, Item_Name, UOM: "PCS" } },
       { upsert: true, new: true },
     );
     await bumpItemsVersion(req);
@@ -335,6 +344,14 @@ router.delete("/all", requireAuth, requireSuperAdmin, async (req, res) => {
     const count = await Item.countDocuments({});
     await Item.deleteMany({});
     await bumpItemsVersion(req);
+    audit(
+      req.user?.username || "unknown",
+      req.user?.role || "superadmin",
+      "delete_all_items",
+      "item master",
+      `Deleted ${count} items from master list`,
+      "superadmin-panel",
+    );
     res.json({ success: true, deleted: count });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

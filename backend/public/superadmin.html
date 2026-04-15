@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Super Admin Console</title>
+    <!-- SheetJS for XLSX export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <style>
       * {
         box-sizing: border-box;
@@ -664,6 +666,7 @@
         <button onclick="switchPage('users')">Users</button>
         <button onclick="switchPage('reports')">Reports</button>
         <button onclick="switchPage('data')">Data Management</button>
+        <button onclick="switchPage('logs')">&#128196; Activity Logs</button>
       </div>
 
       <!-- PAGE: Overview -->
@@ -764,7 +767,41 @@
         </div>
       </div>
 
-      <!-- PAGE: Data Management -->
+      <!-- PAGE: Logs -->
+      <div id="pageLogs" class="hidden">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <h2>&#128196; Admin Activity Logs</h2>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <select id="logsActorFilter" style="background:#0f1923;color:#e0e6ed;border:1px solid #2a3a4a;border-radius:6px;padding:6px 10px;font-size:13px;" onchange="loadAuditLogs()">
+                <option value="">All Admins</option>
+              </select>
+              <select id="logsActionFilter" style="background:#0f1923;color:#e0e6ed;border:1px solid #2a3a4a;border-radius:6px;padding:6px 10px;font-size:13px;" onchange="loadAuditLogs()">
+                <option value="">All Actions</option>
+                <option value="create_user">Create User</option>
+                <option value="delete_user">Delete User</option>
+                <option value="reset_pin">Reset PIN</option>
+                <option value="clear_worker_phone">Clear Worker Phone</option>
+                <option value="delete_all_items">Delete All Items</option>
+                <option value="delete_all_transactions">Delete All Transactions</option>
+                <option value="remove_user_from_app">Remove from App</option>
+                <option value="remove_backup">Remove Backup</option>
+                <option value="archive_user_data">Archive User Data</option>
+                <option value="other">Other</option>
+              </select>
+              <button class="btn btn-outline btn-sm" onclick="loadAuditLogs()">&#8635; Refresh</button>
+              <button class="btn btn-success btn-sm" onclick="exportLogsXLSX()">&#9783; XLSX</button>
+            </div>
+          </div>
+          <p style="color:#5a6a7a;font-size:13px;margin-top:8px;">Track all admin actions: user creation, deletion, PIN resets, phone clears, data wipes, and more.</p>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div id="logsTableContainer" style="overflow-x:auto;">
+            <div style="padding:24px;color:#5a6a7a;text-align:center;">Loading logs...</div>
+          </div>
+          <div id="logsPagination" style="display:flex;gap:8px;padding:14px 20px;align-items:center;border-top:1px solid #2a3a4a;flex-wrap:wrap;"></div>
+        </div>
+      </div>
       <div id="pageData" class="hidden">
         <div class="card">
           <h2>&#128451; Data Management</h2>
@@ -1184,7 +1221,7 @@
       // ─── Tab switching ─────────────────────────────────────────────────
       function switchPage(page) {
         currentPage = page;
-        ["Overview", "Users", "Reports", "Data"].forEach((p) => {
+        ["Overview", "Users", "Reports", "Data", "Logs"].forEach((p) => {
           document.getElementById("page" + p).classList.add("hidden");
         });
         document
@@ -1193,7 +1230,7 @@
         document
           .querySelectorAll("#tabBar button")
           .forEach((b) => b.classList.remove("active"));
-        const idx = { overview: 0, users: 1, reports: 2, data: 3 }[page];
+        const idx = { overview: 0, users: 1, reports: 2, data: 3, logs: 4 }[page];
         document
           .querySelectorAll("#tabBar button")
           [idx].classList.add("active");
@@ -1201,6 +1238,7 @@
         if (page === "overview") loadOverview();
         if (page === "users") loadUsers();
         if (page === "reports") loadReports();
+        if (page === "logs") loadAuditLogs();
       }
 
       // ─── Overview ──────────────────────────────────────────────────────
@@ -1731,6 +1769,172 @@
         const d = document.createElement("div");
         d.textContent = str;
         return d.innerHTML;
+      }
+
+      // ─── Audit Logs ────────────────────────────────────────────────────
+      let auditLogsData = [];
+      let auditLogsPage = 1;
+      const AUDIT_LOGS_PER_PAGE = 50;
+
+      async function loadAuditLogs() {
+        const container = document.getElementById("logsTableContainer");
+        const pagination = document.getElementById("logsPagination");
+        if (!container) return;
+        container.innerHTML = '<div style="padding:24px;color:#5a6a7a;text-align:center;">Loading...</div>';
+        if (pagination) pagination.innerHTML = "";
+
+        const actor = document.getElementById("logsActorFilter")?.value || "";
+        const action = document.getElementById("logsActionFilter")?.value || "";
+
+        try {
+          let url = "/auth/audit-logs?limit=500";
+          if (actor) url += "&actor=" + encodeURIComponent(actor);
+          if (action) url += "&action=" + encodeURIComponent(action);
+          const data = await apiFetch(url);
+          auditLogsData = data.logs || [];
+
+          // Populate actor filter options (only on first load or when action changes)
+          const actorSel = document.getElementById("logsActorFilter");
+          const currentActorVal = actorSel?.value;
+          if (actorSel) {
+            const actors = [...new Set(auditLogsData.map((l) => l.actor).filter(Boolean))].sort();
+            actorSel.innerHTML = '<option value="">All Admins</option>' +
+              actors.map((a) => `<option value="${esc(a)}"${a === currentActorVal ? " selected" : ""}>${esc(a)}</option>`).join("");
+          }
+
+          auditLogsPage = 1;
+          renderAuditLogsTable();
+        } catch (err) {
+          container.innerHTML = `<div style="padding:24px;" class="alert alert-error">${esc(err.message)}</div>`;
+        }
+      }
+
+      function renderAuditLogsTable() {
+        const container = document.getElementById("logsTableContainer");
+        const pagination = document.getElementById("logsPagination");
+        if (!container) return;
+
+        const totalPages = Math.max(1, Math.ceil(auditLogsData.length / AUDIT_LOGS_PER_PAGE));
+        if (auditLogsPage > totalPages) auditLogsPage = totalPages;
+        const start = (auditLogsPage - 1) * AUDIT_LOGS_PER_PAGE;
+        const pageData = auditLogsData.slice(start, start + AUDIT_LOGS_PER_PAGE);
+
+        const ACTION_LABELS = {
+          create_user: "Create User",
+          delete_user: "Delete User",
+          reset_pin: "Reset PIN",
+          clear_worker_phone: "Clear Worker Phone",
+          delete_all_items: "Delete All Items",
+          delete_all_transactions: "Delete All Transactions",
+          remove_user_from_app: "Remove from App",
+          remove_backup: "Remove Backup",
+          archive_user_data: "Archive User Data",
+          other: "Other",
+        };
+        const ACTION_COLORS = {
+          create_user: "#4caf50",
+          delete_user: "#ef5350",
+          reset_pin: "#ff9800",
+          clear_worker_phone: "#26c6da",
+          delete_all_items: "#e91e63",
+          delete_all_transactions: "#e91e63",
+          remove_user_from_app: "#ff7043",
+          remove_backup: "#ab47bc",
+          archive_user_data: "#78909c",
+          other: "#7a8a9a",
+        };
+
+        if (!pageData.length) {
+          container.innerHTML = '<div style="padding:24px;color:#5a6a7a;text-align:center;">No activity logs found.</div>';
+          if (pagination) pagination.innerHTML = "";
+          return;
+        }
+
+        let html = `<table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Actor</th>
+              <th>Role</th>
+              <th>Action</th>
+              <th>Target</th>
+              <th>Detail</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>`;
+        pageData.forEach((log) => {
+          const dt = log.createdAt ? new Date(log.createdAt).toLocaleString() : "--";
+          const actionLabel = ACTION_LABELS[log.action] || log.action || "--";
+          const actionColor = ACTION_COLORS[log.action] || "#7a8a9a";
+          html += `<tr>
+            <td style="white-space:nowrap;font-size:12px;color:#7a8a9a;">${esc(dt)}</td>
+            <td style="font-weight:600;color:#e0e6ed;">${esc(log.actor || "--")}</td>
+            <td><span class="role-badge ${esc(log.actorRole || "admin")}">${esc(log.actorRole || "--")}</span></td>
+            <td><span style="background:rgba(${hexToRgb(actionColor)},0.15);color:${esc(actionColor)};padding:3px 9px;border-radius:12px;font-size:12px;font-weight:600;">${esc(actionLabel)}</span></td>
+            <td style="color:#b0bec5;">${esc(log.target || "--")}</td>
+            <td style="color:#7a8a9a;font-size:12px;max-width:280px;word-break:break-word;">${esc(log.detail || "--")}</td>
+            <td style="color:#5a6a7a;font-size:11px;">${esc(log.source || "--")}</td>
+          </tr>`;
+        });
+        html += "</tbody></table>";
+        container.innerHTML = html;
+
+        // Pagination
+        if (pagination) {
+          let pHtml = `<span style="color:#5a6a7a;font-size:13px;margin-right:8px;">Showing ${start + 1}–${Math.min(start + AUDIT_LOGS_PER_PAGE, auditLogsData.length)} of ${auditLogsData.length}</span>`;
+          if (totalPages > 1) {
+            if (auditLogsPage > 1) {
+              pHtml += `<button class="btn btn-outline btn-sm" onclick="setAuditLogsPage(${auditLogsPage - 1})">&#8249; Prev</button>`;
+            }
+            const from = Math.max(1, auditLogsPage - 2);
+            const to = Math.min(totalPages, auditLogsPage + 2);
+            for (let p = from; p <= to; p++) {
+              pHtml += `<button class="btn ${p === auditLogsPage ? "btn-primary" : "btn-outline"} btn-sm" onclick="setAuditLogsPage(${p})">${p}</button>`;
+            }
+            if (auditLogsPage < totalPages) {
+              pHtml += `<button class="btn btn-outline btn-sm" onclick="setAuditLogsPage(${auditLogsPage + 1})">Next &#8250;</button>`;
+            }
+          }
+          pagination.innerHTML = pHtml;
+        }
+      }
+
+      function setAuditLogsPage(p) {
+        auditLogsPage = p;
+        renderAuditLogsTable();
+      }
+
+      function hexToRgb(hex) {
+        const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return r ? `${parseInt(r[1], 16)},${parseInt(r[2], 16)},${parseInt(r[3], 16)}` : "122,138,154";
+      }
+
+      function exportLogsXLSX() {
+        if (!auditLogsData.length) {
+          alert("No logs to export.");
+          return;
+        }
+        const headers = ["Time", "Actor", "Role", "Action", "Target", "Detail", "Source"];
+        const rows = auditLogsData.map((log) => [
+          log.createdAt ? new Date(log.createdAt).toLocaleString() : "",
+          log.actor || "",
+          log.actorRole || "",
+          log.action || "",
+          log.target || "",
+          log.detail || "",
+          log.source || "",
+        ]);
+        const aoa = [headers, ...rows];
+        if (typeof XLSX === "undefined") {
+          alert("XLSX library not loaded. Please refresh the page.");
+          return;
+        }
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Activity Logs");
+        const date = new Date().toISOString().split("T")[0];
+        XLSX.writeFile(wb, `activity_logs_${date}.xlsx`);
       }
     </script>
   </body>

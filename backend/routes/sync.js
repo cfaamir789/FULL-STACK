@@ -11,6 +11,13 @@ const {
   requireAdmin,
   requireSuperAdmin,
 } = require("../middleware/authMiddleware");
+const AuditLog = require("../models/AuditLog");
+
+function audit(actor, actorRole, action, target, detail, source) {
+  AuditLog.create({ actor, actorRole, action, target, detail, source }).catch(
+    () => {},
+  );
+}
 
 // Fail fast if MongoDB is not connected
 function requireDB(req, res, next) {
@@ -111,6 +118,7 @@ const applyIncomingTransaction = (target, incoming) => {
   target.Frombin = incoming.Frombin;
   target.Tobin = incoming.Tobin;
   target.Qty = incoming.Qty;
+  target.UOM = incoming.UOM || "PCS";
   target.Timestamp = incoming.Timestamp;
   target.Notes = incoming.Notes;
   target.deviceId = incoming.deviceId;
@@ -217,6 +225,7 @@ router.post("/", requireDB, requireAuth, async (req, res) => {
       Frombin: String(tx.Frombin || "").trim(),
       Tobin: String(tx.Tobin || "").trim(),
       Qty: Number(tx.Qty),
+      UOM: String(tx.UOM || tx.uom || "PCS").trim(),
       Timestamp: toDate(tx.Timestamp),
       Notes: String(tx.Notes || "").trim(),
       deviceId: String(tx.deviceId || workerName || "unknown").trim(),
@@ -338,10 +347,7 @@ router.get("/", requireDB, requireAuth, requireAdmin, async (req, res) => {
     const sort = buildStatusSort(status);
 
     const [transactions, total] = await Promise.all([
-      Transaction.find(query)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit),
+      Transaction.find(query).sort(sort).skip(skip).limit(limit),
       Transaction.countDocuments(query),
     ]);
 
@@ -618,6 +624,16 @@ router.post(
           .json({ success: false, error: "workers must be an array or 'all'" });
       }
 
+      const workerLabel =
+        workers === "all" ? "all workers" : workers.join(", ");
+      audit(
+        req.user?.username || "unknown",
+        req.user?.role || "admin",
+        "clear_worker_phone",
+        workerLabel,
+        `Cleared phone data for: ${workerLabel}`,
+        "admin-panel",
+      );
       res.json({
         success: true,
         updated,
@@ -676,9 +692,7 @@ router.get(
         ...buildStatusQuery(status || "all"),
       };
       const sort = buildStatusSort(status || "all");
-      const transactions = await Transaction.find(query)
-        .sort(sort)
-        .lean();
+      const transactions = await Transaction.find(query).sort(sort).lean();
 
       if (json === "1") {
         return res.json(transactions);
@@ -727,6 +741,14 @@ router.delete("/all", requireAuth, requireSuperAdmin, async (req, res) => {
   try {
     const count = await Transaction.countDocuments({});
     await Transaction.deleteMany({});
+    audit(
+      req.user?.username || "unknown",
+      req.user?.role || "superadmin",
+      "delete_all_transactions",
+      "all transactions",
+      `Deleted ${count} transaction(s)`,
+      "superadmin-panel",
+    );
     res.json({ success: true, deleted: count });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -744,6 +766,14 @@ router.delete(
         Transaction.deleteMany({}),
         WorkerSync.deleteMany({}),
       ]);
+      audit(
+        req.user?.username || "unknown",
+        req.user?.role || "superadmin",
+        "delete_all_transactions",
+        "all data",
+        `Reset all data: ${txResult.deletedCount} transactions, ${wsResult.deletedCount} worker syncs deleted`,
+        "superadmin-panel",
+      );
       res.json({
         success: true,
         deletedTransactions: txResult.deletedCount,
