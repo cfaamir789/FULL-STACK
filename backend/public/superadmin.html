@@ -2016,8 +2016,10 @@
         try {
           const data = await apiFetch(`/auth/impersonate/${encodeURIComponent(username)}`, { method: "POST" });
           if (!data.success) { alert("Error: " + (data.error || "Unknown")); return; }
-          // Same-origin localStorage is shared — set token so the admin tab picks it up
-          localStorage.setItem("token", data.token);
+          // Same-origin localStorage is shared — admin.html reads "adminToken"
+          localStorage.setItem("adminToken", data.token);
+          localStorage.setItem("adminUsername", data.targetUsername);
+          localStorage.setItem("adminRole", "admin");
           window.open("/admin", "_blank");
           alert(`Emergency session opened for ${username}.\nExpires in 15 minutes.\nAction has been logged in Audit Logs.`);
         } catch (err) {
