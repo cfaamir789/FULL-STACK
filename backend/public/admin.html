@@ -1547,6 +1547,13 @@
           <div class="stats-row kpi-grid">
             <div
               class="stat"
+              style="cursor: default"
+            >
+              <div class="num" id="sysMasterVer">-</div>
+              <div class="label">Master Version</div>
+            </div>
+            <div
+              class="stat"
               role="button"
               tabindex="0"
               title="Open Item Master"
@@ -1646,34 +1653,6 @@
               </div>
             </div>
           </div>
-          <!-- System Status row merged into Overview -->
-          <div class="sys-grid" id="sysGrid" style="margin-top:16px; background:rgba(255,255,255,0.10); border-radius:14px; padding:12px 16px;">
-            <div class="sys-item" style="color:#fff">
-              <div class="sys-label" style="color:rgba(255,255,255,0.7)">API Status</div>
-              <div class="sys-val" id="sysApiStatus" style="color:#fff">--</div>
-            </div>
-            <div class="sys-item" style="color:#fff">
-              <div class="sys-label" style="color:rgba(255,255,255,0.7)">Master Version</div>
-              <div class="sys-val" id="sysMasterVer" style="color:#fff">--</div>
-            </div>
-            <div class="sys-item" style="color:#fff">
-              <div class="sys-label" style="color:rgba(255,255,255,0.7)">Total Items</div>
-              <div class="sys-val" id="sysTotalItems" style="color:#fff">--</div>
-            </div>
-            <div class="sys-item" style="color:#fff">
-              <div class="sys-label" style="color:rgba(255,255,255,0.7)">Pending Queue</div>
-              <div class="sys-val" id="sysPending" style="color:#fff">--</div>
-            </div>
-            <div class="sys-item" style="color:#fff">
-              <div class="sys-label" style="color:rgba(255,255,255,0.7)">Processed</div>
-              <div class="sys-val" id="sysProcessed" style="color:#fff">--</div>
-            </div>
-            <div class="sys-item" style="color:#fff">
-              <div class="sys-label" style="color:rgba(255,255,255,0.7)">Active Workers</div>
-              <div class="sys-val" id="sysWorkers" style="color:#fff">--</div>
-            </div>
-          </div>
-          <div class="refresh-ts" id="sysRefreshTs" style="color:rgba(255,255,255,0.6); margin-top:8px; font-size:12px;">Last checked: --</div>
           <div class="daily-msg" id="dailyMsgBox">
             <span class="msg-icon">&#127808;</span>
             <span id="dailyMsgText">Loading today's thought...</span>
