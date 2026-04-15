@@ -2414,7 +2414,7 @@
       <div id="pageUsers" class="panel-page hidden">
         <div class="card">
           <h2>&#10133; Create User</h2>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px">
             <input
               id="newUserName"
               class="search-box"
@@ -2436,9 +2436,23 @@
               <option value="worker">Worker</option>
               <option value="admin">Admin</option>
             </select>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center">
+            <input
+              id="newUserEmpId"
+              class="search-box"
+              style="margin: 0; flex: 1; min-width: 140px"
+              placeholder="Employee ID (e.g. EMP-001)"
+            />
+            <input
+              id="newUserDevice"
+              class="search-box"
+              style="margin: 0; flex: 1; min-width: 160px"
+              placeholder="Device Model (e.g. Samsung A52)"
+            />
             <button
               class="btn btn-primary"
-              style="max-width: 220px"
+              style="max-width: 220px; flex: 0 0 auto"
               onclick="createUser()"
             >
               Create User
@@ -2452,6 +2466,12 @@
           <p style="color: #888; margin-bottom: 14px; font-size: 13px">
             Manage users, reset PINs, and control access.
           </p>
+          <input
+            id="userSearchBox"
+            class="search-box"
+            placeholder="&#128269; Search by name, employee ID, or device..."
+            oninput="filterUsers()"
+          />
           <div id="usersContainer"><div class="loading">Loading...</div></div>
         </div>
 
@@ -5118,6 +5138,23 @@
 
       // ─── Users ────────────────────────────────────────────────────────────────────
       let pinResetTargetUser = "";
+      let _allUsersCache = []; // cached for search filtering
+
+      function filterUsers() {
+        const q = (document.getElementById("userSearchBox").value || "").trim().toLowerCase();
+        if (!_allUsersCache.length) return;
+        renderUsersToDOM(
+          q
+            ? _allUsersCache.filter(function (u) {
+                return (
+                  u.username.toLowerCase().includes(q) ||
+                  (u.employeeId || "").toLowerCase().includes(q) ||
+                  (u.deviceModel || "").toLowerCase().includes(q)
+                );
+              })
+            : _allUsersCache,
+        );
+      }
 
       async function loadUsers() {
         const container = document.getElementById("usersContainer");
@@ -5125,10 +5162,20 @@
         try {
           const data = await apiFetch("/auth/users");
           const users = data.users || [];
+          _allUsersCache = users;
           if (users.length === 0) {
             container.innerHTML = '<div class="loading">No users found.</div>';
             return;
           }
+          renderUsersToDOM(users);
+        } catch (err) {
+          container.innerHTML =
+            '<div class="alert alert-error">' + err.message + "</div>";
+        }
+      }
+
+      function renderUsersToDOM(users) {
+        const container = document.getElementById("usersContainer");
           const iAmSuperAdmin = adminRole === "superadmin";
           const superadmins = users.filter((u) => u.role === "superadmin");
           const admins = users.filter((u) => u.role === "admin");
@@ -5138,6 +5185,7 @@
             const initials = u.username.substring(0, 2).toUpperCase();
             const isSuperAdmin = u.role === "superadmin";
             const isAdmin = u.role === "admin";
+            const isBlocked = !!u.isBlocked;
             const dateStr = u.createdAt
               ? new Date(u.createdAt).toLocaleDateString()
               : "";
@@ -5146,6 +5194,9 @@
             let avClass = "worker-av";
             let avStyle = "";
             let badgeStyle = "";
+            if (isBlocked) {
+              cardStyle = ' style="border: 2px solid #e53935; opacity: 0.75;"';
+            }
             if (isSuperAdmin) {
               cardStyle = ' style="border: 2px solid #FFD700;"';
               avClass = "admin-av";
@@ -5154,6 +5205,7 @@
             } else if (isAdmin) {
               cardClass = "user-card admin-card";
               avClass = "admin-av-blue";
+              if (isBlocked) cardStyle = ' style="border: 2px solid #e53935; opacity: 0.75;"';
             }
             let h = '<div class="' + cardClass + '"' + cardStyle + ">";
             h += '<div class="user-card-header">';
@@ -5175,7 +5227,11 @@
               badgeStyle +
               ">" +
               (isSuperAdmin ? "SUPER ADMIN" : u.role.toUpperCase()) +
-              "</span></div>";
+              "</span>";
+            if (isBlocked) {
+              h += ' <span style="background:#e53935;color:#fff;font-size:10px;padding:3px 8px;border-radius:12px;font-weight:700;letter-spacing:0.5px">&#128683; BLOCKED</span>';
+            }
+            h += "</div>";
             h += '<div class="meta">Joined ' + dateStr + "</div>";
             h += "</div></div>";
             h += '<div class="user-card-actions">';
@@ -5195,6 +5251,18 @@
                   '<button class="btn-sm btn-archive" data-user="' +
                   esc(u.username) +
                   '" style="background:#fff3e0;color:#e65100">&#128451; Archive Data</button>';
+                // Block / Unblock button
+                if (isBlocked) {
+                  h +=
+                    '<button class="btn-sm btn-toggle-block" data-user="' +
+                    esc(u.username) +
+                    '" data-action="unblock" style="background:#e8f5e9;color:#2e7d32">&#9989; Unblock</button>';
+                } else {
+                  h +=
+                    '<button class="btn-sm btn-toggle-block" data-user="' +
+                    esc(u.username) +
+                    '" data-action="block" style="background:#ffebee;color:#c62828">&#128683; Block</button>';
+                }
               }
               if (!isSuperAdmin && !isAdmin) {
                 h +=
@@ -5241,6 +5309,11 @@
           }
 
           let html = "";
+          if (!users.length) {
+            html = '<div class="loading">No users match your search.</div>';
+            container.innerHTML = html;
+            return;
+          }
           // Super Admin section
           if (superadmins.length) {
             html += '<div class="user-section">';
@@ -5343,10 +5416,41 @@
               }
             });
           });
-        } catch (err) {
-          container.innerHTML =
-            '<div class="alert alert-error">' + err.message + "</div>";
-        }
+          // Block / Unblock event listeners
+          container.querySelectorAll(".btn-toggle-block").forEach(function (btn) {
+            btn.addEventListener("click", async function () {
+              const username = this.dataset.user;
+              const action = this.dataset.action; // "block" or "unblock"
+              const label = action === "block" ? "Block" : "Unblock";
+              if (!confirm(label + " user '" + username + "'? " + (action === "block" ? "They will NOT be able to login anywhere." : "They will regain access to login."))) return;
+              const toggleBtn = this;
+              toggleBtn.disabled = true;
+              toggleBtn.textContent = action === "block" ? "Blocking…" : "Unblocking…";
+              try {
+                const res = await fetch(
+                  window.location.origin +
+                    "/api/auth/users/" +
+                    encodeURIComponent(username) +
+                    "/block",
+                  {
+                    method: "PUT",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: "Bearer " + authToken,
+                    },
+                    body: JSON.stringify({ blocked: action === "block" }),
+                  },
+                );
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Request failed");
+                await loadUsers();
+              } catch (err) {
+                alert(label + " failed: " + err.message);
+                toggleBtn.disabled = false;
+                toggleBtn.textContent = (action === "block" ? "🚫 Block" : "✅ Unblock");
+              }
+            });
+          });
       }
 
       function openPinModal(username) {
@@ -5438,6 +5542,8 @@
         const username = document.getElementById("newUserName").value.trim();
         const pin = document.getElementById("newUserPin").value.trim();
         const role = document.getElementById("newUserRole").value;
+        const employeeId = document.getElementById("newUserEmpId").value.trim();
+        const deviceModel = document.getElementById("newUserDevice").value.trim();
         const result = document.getElementById("userCreateResult");
         result.innerHTML = "";
         if (!username || !pin) {
@@ -5453,7 +5559,7 @@
         try {
           const data = await apiFetch("/auth/register", {
             method: "POST",
-            body: JSON.stringify({ username, pin, role }),
+            body: JSON.stringify({ username, pin, role, employeeId, deviceModel }),
           });
           result.innerHTML =
             '<div class="alert alert-success">User created: ' +
@@ -5463,6 +5569,8 @@
             ")</div>";
           document.getElementById("newUserName").value = "";
           document.getElementById("newUserPin").value = "";
+          document.getElementById("newUserEmpId").value = "";
+          document.getElementById("newUserDevice").value = "";
           await Promise.allSettled([loadUsers(), loadStats()]);
         } catch (err) {
           result.innerHTML =

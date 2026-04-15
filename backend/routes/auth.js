@@ -110,6 +110,11 @@ router.post("/login", requireDB, async (req, res) => {
         .status(401)
         .json({ success: false, error: "Invalid username or PIN." });
     }
+    if (user.isBlocked) {
+      return res
+        .status(403)
+        .json({ success: false, error: "Your account has been blocked. Please contact your administrator." });
+    }
     const match = await bcrypt.compare(String(pin), user.pin_hash);
     if (!match) {
       return res
@@ -223,11 +228,14 @@ router.post(
           .status(400)
           .json({ success: false, error: "role must be admin or worker." });
       }
+      const { employeeId = "", deviceModel = "" } = req.body;
       const hash = await bcrypt.hash(String(pin), 10);
       const user = await User.create({
         username: username.trim().toUpperCase(),
         pin_hash: hash,
         role,
+        employeeId: String(employeeId).trim(),
+        deviceModel: String(deviceModel).trim(),
         createdAt: new Date(),
       });
       audit(
@@ -235,7 +243,7 @@ router.post(
         req.user.role,
         "create_user",
         user.username,
-        `Role: ${role}`,
+        `Role: ${role}, EmpID: ${employeeId}, Device: ${deviceModel}`,
       );
       res
         .status(201)
@@ -274,6 +282,7 @@ router.get("/users", requireDB, requireAuth, requireAdmin, async (req, res) => {
       createdAt: u.createdAt,
       employeeId: u.employeeId || "",
       deviceModel: u.deviceModel || "",
+      isBlocked: !!u.isBlocked,
     }));
     res.json({ success: true, users: safe });
   } catch (err) {
@@ -428,6 +437,65 @@ router.put(
     }
   },
 );
+
+// ─── PUT /api/auth/users/:username/block ────────────────────────────────────
+// Block or unblock a user account (admin only, superadmin protected)
+router.put(
+  "/users/:username/block",
+  requireDB,
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const username = req.params.username.toUpperCase();
+      const { blocked } = req.body; // true = block, false = unblock
+      if (typeof blocked !== "boolean") {
+        return res
+          .status(400)
+          .json({ success: false, error: "blocked must be true or false." });
+      }
+      const user = await User.findOne({ username });
+      if (!user) {
+        return res
+          .status(404)
+          .json({ success: false, error: "User not found." });
+      }
+      // Cannot block superadmin
+      if (user.role === "superadmin") {
+        return res.status(403).json({
+          success: false,
+          error: "Super Admin account cannot be blocked.",
+        });
+      }
+      // Only superadmin can block/unblock admin accounts
+      if (user.role === "admin" && req.user.role !== "superadmin") {
+        return res.status(403).json({
+          success: false,
+          error: "Only Super Admin can block/unblock admin accounts.",
+        });
+      }
+      // Cannot block yourself
+      if (username === req.user.username) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Cannot block your own account." });
+      }
+      user.isBlocked = blocked;
+      await user.save();
+      audit(
+        req.user.username,
+        req.user.role,
+        blocked ? "block_user" : "unblock_user",
+        username,
+        `${blocked ? "Blocked" : "Unblocked"} user ${username}`,
+      );
+      res.json({ success: true, username: user.username, isBlocked: user.isBlocked });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
+
 // ─── GET /api/auth/audit-logs ─────────────────────────────────────────────────────────
 // Superadmin only: fetch audit logs
 router.get(
