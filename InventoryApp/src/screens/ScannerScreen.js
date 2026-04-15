@@ -245,6 +245,10 @@ export default function ScannerScreen({ role = "worker" }) {
       Alert.alert("Missing Item", "Please scan or search for an item first.");
       return;
     }
+    if (!foundItem) {
+      Alert.alert("Unknown Item", "This barcode is not in the item master. Please sync items first.");
+      return;
+    }
     if (!frombin.trim() || !tobin.trim()) {
       Alert.alert("Missing Bins", "From Bin and To Bin are required.");
       return;
