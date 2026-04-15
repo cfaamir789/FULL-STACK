@@ -105,6 +105,25 @@ function setUploadJob(jobId, patch) {
   uploadJobs.set(jobId, { ...prev, ...patch, updatedAt: Date.now() });
 }
 
+// ─── Merge Diff Reports ───────────────────────────────────────────────────────
+// Stores per-item categorization from the last merge so admin can download CSVs.
+// Kept for 2 hours then auto-cleaned.
+const mergeReports = new Map();
+
+function storeMergeReport(mergeId, report) {
+  mergeReports.set(mergeId, { ...report, createdAt: Date.now() });
+  // Auto-clean after 2 hours
+  setTimeout(() => mergeReports.delete(mergeId), 2 * 60 * 60 * 1000);
+}
+
+// Clean stale reports older than 2 hours on startup too
+setInterval(() => {
+  const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+  for (const [id, r] of mergeReports) {
+    if (r.createdAt < cutoff) mergeReports.delete(id);
+  }
+}, 30 * 60 * 1000);
+
 function parseCsvItems(csvText) {
   const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
 
@@ -240,7 +259,7 @@ async function replaceItemsAtomically(items, onProgress) {
   }
 }
 
-async function applyCsvItems(items, mode, onProgress, req) {
+async function applyCsvItems(items, mode, onProgress, req, mergeId) {
   const rawCol = Item.collection; // raw MongoDB driver — skips Mongoose overhead
   const total = items.length;
 
@@ -253,13 +272,57 @@ async function applyCsvItems(items, mode, onProgress, req) {
     return result;
   }
 
-  // ── Merge mode — upsert with raw bulkWrite, large chunks ──
+  // ── Merge mode — pre-fetch existing, compare, upsert, build diff report ──
+
+  // Step 1: Load all existing items into memory for O(1) lookup.
+  // For 1.6M items with 4 fields this is ~100-200 MB — acceptable for an admin op.
+  onProgress?.({ processed: 0, total, inserted: 0, modified: 0, phase: "scanning" });
+  const existingCursor = rawCol.find(
+    {},
+    { projection: { Barcode: 1, ItemCode: 1, Item_Name: 1, UOM: 1, _id: 0 } },
+  );
+  const existingMap = new Map(); // Barcode → { ItemCode, Item_Name, UOM }
+  for await (const doc of existingCursor) {
+    existingMap.set(doc.Barcode, {
+      ItemCode: doc.ItemCode || "",
+      Item_Name: doc.Item_Name || "",
+      UOM: doc.UOM || "PCS",
+    });
+  }
+
+  // Step 2: Categorize every CSV item — new / updated / unchanged
+  const newItems = [];
+  const updatedItems = [];
+  const unchangedItems = [];
+
+  for (const item of items) {
+    const ex = existingMap.get(item.Barcode);
+    if (!ex) {
+      newItems.push(item);
+    } else {
+      const uom = item.UOM || "PCS";
+      if (
+        ex.ItemCode !== (item.ItemCode || "") ||
+        ex.Item_Name !== (item.Item_Name || "") ||
+        ex.UOM !== uom
+      ) {
+        updatedItems.push(item);
+      } else {
+        unchangedItems.push(item);
+      }
+    }
+  }
+  existingMap.clear(); // free memory immediately after categorization
+
+  // Step 3: Only write items that are new or actually changed
+  const itemsToWrite = [...newItems, ...updatedItems];
   let inserted = 0;
   let modified = 0;
   let processed = 0;
   const CHUNK = 5000;
-  const chunks = chunkArray(items, CHUNK);
+  const chunks = chunkArray(itemsToWrite, CHUNK);
   const mergeTime = new Date();
+
   for (const chunk of chunks) {
     const ops = chunk.map((item) => ({
       updateOne: {
@@ -283,9 +346,26 @@ async function applyCsvItems(items, mode, onProgress, req) {
     onProgress?.({ processed, total, inserted, modified, phase: "merging" });
   }
 
+  // Step 4: Store diff report in memory so admin can download CSVs by status
+  if (mergeId) {
+    storeMergeReport(mergeId, {
+      new: newItems,
+      updated: updatedItems,
+      unchanged: unchangedItems,
+    });
+  }
+
   const totalItems = await Item.countDocuments({});
   await bumpItemsVersion(req, totalItems);
-  return { inserted, modified, totalItems, processed: total, total };
+  return {
+    inserted,
+    modified,
+    unchanged: unchangedItems.length,
+    totalItems,
+    processed: total,
+    total,
+    mergeId: mergeId || null,
+  };
 }
 
 // ─── Item Version Tracking ──────────────────────────────────────────────────
@@ -648,6 +728,7 @@ router.post(
       const mode = req.query.mode === "merge" ? "merge" : "replace";
       const csvText = req.file.buffer.toString("utf8");
       const jobId = randomUUID();
+      const mergeId = mode === "merge" ? randomUUID() : null;
 
       setUploadJob(jobId, {
         status: "queued",
@@ -656,8 +737,10 @@ router.post(
         total: 0,
         inserted: 0,
         modified: 0,
+        unchanged: 0,
         error: null,
         totalItems: 0,
+        mergeId,
       });
 
       setImmediate(async () => {
@@ -679,6 +762,7 @@ router.post(
               });
             },
             req,
+            mergeId,
           );
 
           setUploadJob(jobId, {
@@ -713,6 +797,57 @@ router.get(
         .json({ success: false, error: "Upload job not found" });
     }
     return res.json({ success: true, ...job });
+  },
+);
+
+// GET /api/items/merge-report/:mergeId — download diff CSV for a merge operation
+// ?status=new|updated|unchanged|all  (default: all)
+router.get(
+  "/merge-report/:mergeId",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    const report = mergeReports.get(req.params.mergeId);
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        error: "Report not found or has expired (reports are kept for 2 hours)",
+      });
+    }
+
+    const status = req.query.status || "all";
+    let rows;
+    if (status === "new") rows = report.new;
+    else if (status === "updated") rows = report.updated;
+    else if (status === "unchanged") rows = report.unchanged;
+    else rows = [
+      ...report.new.map((r) => ({ ...r, Status: "New" })),
+      ...report.updated.map((r) => ({ ...r, Status: "Updated" })),
+      ...report.unchanged.map((r) => ({ ...r, Status: "Unchanged" })),
+    ];
+
+    // Add Status column for single-status downloads too
+    if (status !== "all") {
+      const label = status.charAt(0).toUpperCase() + status.slice(1);
+      rows = rows.map((r) => ({ ...r, Status: label }));
+    }
+
+    const header = "Status,ItemCode,Barcode,Item_Name,UOM\n";
+    const body = rows
+      .map((r) => {
+        const s = r.Status || "";
+        const ic = (r.ItemCode || "").replace(/"/g, '""');
+        const bc = (r.Barcode || "").replace(/"/g, '""');
+        const nm = (r.Item_Name || "").replace(/"/g, '""');
+        const uom = (r.UOM || "PCS").replace(/"/g, '""');
+        return `"${s}","${ic}","${bc}","${nm}","${uom}"`;
+      })
+      .join("\n");
+
+    const filename = `merge-${status}-${req.params.mergeId.slice(0, 8)}.csv`;
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(header + body);
   },
 );
 

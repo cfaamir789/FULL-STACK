@@ -3956,21 +3956,34 @@
                   ? "Building indexes..."
                   : status.phase === "merging"
                     ? "Merging..."
-                    : "Inserting...";
+                    : status.phase === "scanning"
+                      ? "Scanning existing items..."
+                      : "Inserting...";
               btn.textContent = phase + " " + pct + "% (" + elapsed + "s)";
             }
             if (status.status === "done") {
               const totalSec = ((Date.now() - uploadStart) / 1000).toFixed(1);
-              resultDiv.innerHTML =
-                '<div class="alert alert-success">&#10004; Uploaded in ' +
-                totalSec +
-                "s! " +
-                status.totalItems +
-                " items on server. (Inserted: " +
-                status.inserted +
-                ", Updated: " +
-                status.modified +
-                ")</div>";
+              const isMerge = status.mergeId != null;
+              let html = '<div class="alert alert-success">&#10004; Uploaded in ' +
+                totalSec + "s! " + status.totalItems + " items on server.";
+              if (isMerge) {
+                html += "<br><strong>New: " + (status.inserted || 0) +
+                  " &nbsp;|&nbsp; Updated: " + (status.modified || 0) +
+                  " &nbsp;|&nbsp; Unchanged: " + (status.unchanged || 0) + "</strong>";
+                html += '</div>';
+                // Diff report download buttons
+                const base = API + "/items/merge-report/" + encodeURIComponent(status.mergeId);
+                const tok = authToken ? "?_t=" + encodeURIComponent(authToken) : "";
+                html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">';
+                html += '<button onclick="downloadMergeReport(\'' + status.mergeId + '\',\'new\')" style="padding:7px 14px;background:#16a34a;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;">&#11015; New Items (' + (status.inserted || 0) + ')</button>';
+                html += '<button onclick="downloadMergeReport(\'' + status.mergeId + '\',\'updated\')" style="padding:7px 14px;background:#d97706;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;">&#11015; Updated Items (' + (status.modified || 0) + ')</button>';
+                html += '<button onclick="downloadMergeReport(\'' + status.mergeId + '\',\'unchanged\')" style="padding:7px 14px;background:#6b7280;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;">&#11015; Unchanged (' + (status.unchanged || 0) + ')</button>';
+                html += '<button onclick="downloadMergeReport(\'' + status.mergeId + '\',\'all\')" style="padding:7px 14px;background:#1d4ed8;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;">&#11015; Full Report (All)</button>';
+                html += '</div><div style="margin-top:6px;font-size:12px;color:#6b7280;">Reports available for 2 hours.</div>';
+              } else {
+                html += " (Inserted: " + status.inserted + ", Updated: " + status.modified + ")</div>";
+              }
+              resultDiv.innerHTML = html;
               loadStats();
               loadItems(1);
               selectedFile = null;
@@ -3988,6 +4001,33 @@
         } finally {
           btn.disabled = false;
           btn.textContent = "\u{1F680} Upload & Push to Server";
+        }
+      }
+
+      async function downloadMergeReport(mergeId, status) {
+        try {
+          const headers = {};
+          if (authToken) headers["Authorization"] = "Bearer " + authToken;
+          const res = await fetch(
+            API + "/items/merge-report/" + encodeURIComponent(mergeId) + "?status=" + status,
+            { headers },
+          );
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: "Download failed" }));
+            alert(err.error || "Download failed");
+            return;
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "merge-" + status + "-" + mergeId.slice(0, 8) + ".csv";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          alert("Download error: " + e.message);
         }
       }
 
