@@ -49,7 +49,13 @@ function broadcast(eventType, data = {}) {
 app.set("broadcast", broadcast);
 
 // Middleware
-app.use(compression());
+// Skip compression for routes that send a pre-gzipped buffer (res.locals.noCompress)
+app.use(compression({
+  filter: (req, res) => {
+    if (res.locals.noCompress) return false;
+    return compression.filter(req, res);
+  },
+}));
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 
@@ -216,6 +222,15 @@ connectDB()
       }
     } catch (migErr) {
       console.error("Migration error (non-fatal):", migErr.message);
+    }
+
+    // Warm the bulk-download cache on startup so the first phone request is instant
+    try {
+      const { _warmBulkCache } = require("./routes/items");
+      await _warmBulkCache();
+      console.log("[items-cache] warm-up complete");
+    } catch (e) {
+      console.warn("[items-cache] warm-up failed (non-fatal):", e.message);
     }
   })
   .catch((err) => {

@@ -4,6 +4,9 @@ const mongoose = require("mongoose");
 const multer = require("multer");
 const Papa = require("papaparse");
 const { randomUUID } = require("crypto");
+const zlib = require("zlib");
+const { promisify } = require("util");
+const gzip = promisify(zlib.gzip);
 const Item = require("../models/Item");
 const Meta = require("../models/Meta");
 const {
@@ -12,6 +15,52 @@ const {
   requireSuperAdmin,
 } = require("../middleware/authMiddleware");
 const AuditLog = require("../models/AuditLog");
+
+// ─── Bulk Download Cache ──────────────────────────────────────────────────────
+// Pre-gzipped buffer built once per item-version. Serves 70-80 phones from RAM.
+// All concurrent cold-start requests coalesce on the single build promise.
+let _bulkCache = { version: null, gzBuf: null, etag: null };
+let _buildPromise = null;
+
+async function _buildBulkCache() {
+  const [items, version] = await Promise.all([
+    Item.find({}, { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1, UOM: 1 })
+      .sort({ Item_Name: 1 })
+      .lean(),
+    getItemsVersion(),
+  ]);
+  const payload = JSON.stringify({ success: true, version, total: items.length, items });
+  const gzBuf = await gzip(Buffer.from(payload, "utf8"), { level: 6 });
+  _bulkCache = { version, gzBuf, etag: `"v${version}"` };
+  console.log(`[items-cache] built v${version} — ${items.length} items, ${(gzBuf.length / 1024).toFixed(0)} KB gzipped`);
+  return _bulkCache;
+}
+
+// Public: returns cache, building it if needed. Concurrent callers share one build.
+async function getBulkCache() {
+  const currentVersion = await getItemsVersion();
+  if (_bulkCache.version === currentVersion && _bulkCache.gzBuf) return _bulkCache;
+  if (!_buildPromise) {
+    _buildPromise = _buildBulkCache().finally(() => { _buildPromise = null; });
+  }
+  return _buildPromise;
+}
+
+// Call this whenever items change (invalidates cache immediately)
+function invalidateBulkCache() {
+  _bulkCache = { version: null, gzBuf: null, etag: null };
+  _buildPromise = null;
+}
+
+// Warm the cache after server start (so first phone gets fast response too)
+async function warmBulkCache() {
+  try {
+    await getBulkCache();
+  } catch (e) {
+    console.warn("[items-cache] warm failed:", e.message);
+  }
+}
+module.exports._warmBulkCache = warmBulkCache;
 
 function audit(actor, actorRole, action, target, detail, source) {
   AuditLog.create({ actor, actorRole, action, target, detail, source }).catch(
@@ -40,6 +89,14 @@ function chunkArray(arr, size) {
   }
   return out;
 }
+
+const REPLACE_INSERT_CHUNK = 40000;
+const REPLACE_INSERT_PARALLEL = 4;
+const ITEM_INDEX_DEFS = [
+  { key: { Barcode: 1 }, name: "Barcode_1", unique: true, background: true },
+  { key: { Item_Name: 1 }, name: "Item_Name_1", background: true },
+  { key: { ItemCode: 1 }, name: "ItemCode_1", background: true },
+];
 
 const uploadJobs = new Map();
 
@@ -70,26 +127,24 @@ function parseCsvItems(csvText) {
     );
   }
 
-  const rawItems = parsed.data
-    .filter((r) =>
-      hasOldFormat
-        ? r["Barcode No."] && r["Item Description"]
-        : r.Barcode && r.Item_Name,
-    )
-    .map((r) => ({
-      ItemCode: hasOldFormat
-        ? r["Item No."] || r["Barcode No."]
-        : r.ItemCode || r.Barcode,
-      Barcode: String(hasOldFormat ? r["Barcode No."] : r.Barcode).trim(),
-      Item_Name: String(
-        hasOldFormat ? r["Item Description"] : r.Item_Name,
-      ).trim(),
-      UOM: "PCS",
-    }));
-
   const dedup = new Map();
-  for (const item of rawItems) {
-    dedup.set(item.Barcode, item);
+  for (const row of parsed.data) {
+    const rawBarcode = hasOldFormat ? row["Barcode No."] : row.Barcode;
+    const rawName = hasOldFormat ? row["Item Description"] : row.Item_Name;
+    if (!rawBarcode || !rawName) continue;
+
+    const barcode = String(rawBarcode).trim();
+    const itemName = String(rawName).trim();
+    if (!barcode || !itemName) continue;
+
+    dedup.set(barcode, {
+      ItemCode: String(
+        hasOldFormat ? row["Item No."] || rawBarcode : row.ItemCode || rawBarcode,
+      ).trim(),
+      Barcode: barcode,
+      Item_Name: itemName,
+      UOM: "PCS",
+    });
   }
   const items = Array.from(dedup.values());
 
@@ -99,64 +154,74 @@ function parseCsvItems(csvText) {
   return items;
 }
 
-async function applyCsvItems(items, mode, onProgress, req) {
-  const rawCol = Item.collection; // raw MongoDB driver — skips Mongoose overhead
+async function dropCollectionIfExists(collection) {
+  try {
+    await collection.drop();
+  } catch (e) {
+    if (e.codeName !== "NamespaceNotFound") throw e;
+  }
+}
+
+async function createItemIndexes(collection) {
+  await collection.createIndexes(ITEM_INDEX_DEFS);
+}
+
+async function bulkInsertReplaceItems(items, collection, onProgress) {
   const total = items.length;
+  let inserted = 0;
+  let processed = 0;
+  const chunks = chunkArray(items, REPLACE_INSERT_CHUNK);
 
-  if (mode === "replace") {
-    // ── Phase 1: Drop entire collection (data + indexes) — instant ──
-    try {
-      await rawCol.drop();
-    } catch (e) {
-      if (e.codeName !== "NamespaceNotFound") throw e;
-    }
+  onProgress?.({
+    processed: 0,
+    total,
+    inserted: 0,
+    modified: 0,
+    phase: "inserting",
+  });
 
-    // ── Phase 2: Insert ALL items WITHOUT any indexes ──
-    // No unique constraint = no index lookups per doc = 10x faster
+  for (let i = 0; i < chunks.length; i += REPLACE_INSERT_PARALLEL) {
+    const batch = chunks.slice(i, i + REPLACE_INSERT_PARALLEL);
+    const results = await Promise.all(
+      batch.map((chunk) =>
+        collection
+          .insertMany(chunk, {
+            ordered: false,
+            writeConcern: { w: 1, j: false },
+            bypassDocumentValidation: true,
+          })
+          .then((r) => r.insertedCount)
+          .catch(
+            (err) =>
+              err.result?.nInserted ??
+              chunk.length - (err.writeErrors?.length || 0),
+          ),
+      ),
+    );
+    for (const count of results) inserted += count;
+    processed += batch.reduce((sum, chunk) => sum + chunk.length, 0);
     onProgress?.({
-      processed: 0,
+      processed,
       total,
-      inserted: 0,
+      inserted,
       modified: 0,
       phase: "inserting",
     });
+  }
 
-    let inserted = 0;
-    let processed = 0;
+  return { inserted, processed, total };
+}
 
-    // Large chunks + parallel batches for max throughput
-    const CHUNK = 50000;
-    const chunks = chunkArray(items, CHUNK);
-    const PARALLEL = 3; // fire 3 chunks at once
-    for (let i = 0; i < chunks.length; i += PARALLEL) {
-      const batch = chunks.slice(i, i + PARALLEL);
-      const results = await Promise.all(
-        batch.map((chunk) =>
-          rawCol
-            .insertMany(chunk, {
-              ordered: false,
-              writeConcern: { w: 1, j: false },
-            })
-            .then((r) => r.insertedCount)
-            .catch(
-              (err) =>
-                err.result?.nInserted ??
-                chunk.length - (err.writeErrors?.length || 0),
-            ),
-        ),
-      );
-      for (const count of results) inserted += count;
-      processed += batch.reduce((s, c) => s + c.length, 0);
-      onProgress?.({
-        processed,
-        total,
-        inserted,
-        modified: 0,
-        phase: "inserting",
-      });
-    }
+async function replaceItemsAtomically(items, onProgress) {
+  const db = mongoose.connection.db;
+  const liveName = Item.collection.collectionName;
+  const tempName = `${liveName}_upload_${Date.now()}_${randomUUID().slice(0, 8)}`;
+  const tempCol = db.collection(tempName);
+  const total = items.length;
 
-    // ── Phase 3: Build indexes AFTER all data is loaded (bulk build is 10x faster) ──
+  try {
+    await dropCollectionIfExists(tempCol);
+    const { inserted } = await bulkInsertReplaceItems(items, tempCol, onProgress);
     onProgress?.({
       processed: total,
       total,
@@ -164,48 +229,58 @@ async function applyCsvItems(items, mode, onProgress, req) {
       modified: 0,
       phase: "indexing",
     });
-    await Promise.all([
-      rawCol.createIndex({ Barcode: 1 }, { unique: true, background: true }),
-      rawCol.createIndex({ Item_Name: 1 }, { background: true }),
-      rawCol.createIndex({ ItemCode: 1 }, { background: true }),
-    ]);
-
-    await bumpItemsVersion(req);
-    const totalItems = await Item.countDocuments({});
-    return { inserted, modified: 0, totalItems, processed: total, total };
-  } else {
-    // ── Merge mode — upsert with raw bulkWrite, large chunks ──
-    let inserted = 0;
-    let modified = 0;
-    let processed = 0;
-    const CHUNK = 5000;
-    const chunks = chunkArray(items, CHUNK);
-    for (const chunk of chunks) {
-      const ops = chunk.map((item) => ({
-        updateOne: {
-          filter: { Barcode: item.Barcode },
-          update: {
-            $set: {
-              ItemCode: item.ItemCode,
-              Barcode: item.Barcode,
-              Item_Name: item.Item_Name,
-              UOM: item.UOM || "PCS",
-            },
-          },
-          upsert: true,
-        },
-      }));
-      const result = await rawCol.bulkWrite(ops, { ordered: false });
-      inserted += result.upsertedCount || 0;
-      modified += result.modifiedCount || 0;
-      processed += chunk.length;
-      onProgress?.({ processed, total, inserted, modified, phase: "merging" });
-    }
-
-    await bumpItemsVersion(req);
-    const totalItems = await Item.countDocuments({});
-    return { inserted, modified, totalItems, processed: total, total };
+    await createItemIndexes(tempCol);
+    await tempCol.rename(liveName, { dropTarget: true });
+    return { inserted, modified: 0, totalItems: total, processed: total, total };
+  } catch (err) {
+    try {
+      await dropCollectionIfExists(tempCol);
+    } catch (_) {}
+    throw err;
   }
+}
+
+async function applyCsvItems(items, mode, onProgress, req) {
+  const rawCol = Item.collection; // raw MongoDB driver — skips Mongoose overhead
+  const total = items.length;
+
+  if (mode === "replace") {
+    const result = await replaceItemsAtomically(items, onProgress);
+    await bumpItemsVersion(req, result.totalItems);
+    return result;
+  }
+
+  // ── Merge mode — upsert with raw bulkWrite, large chunks ──
+  let inserted = 0;
+  let modified = 0;
+  let processed = 0;
+  const CHUNK = 5000;
+  const chunks = chunkArray(items, CHUNK);
+  for (const chunk of chunks) {
+    const ops = chunk.map((item) => ({
+      updateOne: {
+        filter: { Barcode: item.Barcode },
+        update: {
+          $set: {
+            ItemCode: item.ItemCode,
+            Barcode: item.Barcode,
+            Item_Name: item.Item_Name,
+            UOM: item.UOM || "PCS",
+          },
+        },
+        upsert: true,
+      },
+    }));
+    const result = await rawCol.bulkWrite(ops, { ordered: false });
+    inserted += result.upsertedCount || 0;
+    modified += result.modifiedCount || 0;
+    processed += chunk.length;
+    onProgress?.({ processed, total, inserted, modified, phase: "merging" });
+  }
+
+  const totalItems = await Item.countDocuments({});
+  await bumpItemsVersion(req, totalItems);
+  return { inserted, modified, totalItems, processed: total, total };
 }
 
 // ─── Item Version Tracking ──────────────────────────────────────────────────
@@ -216,18 +291,24 @@ async function getItemsVersion() {
   return doc ? doc.version : 0;
 }
 
-async function bumpItemsVersion(req) {
+async function bumpItemsVersion(req, totalItemsHint) {
   const doc = await Meta.findOneAndUpdate(
     { key: "itemsVersion" },
     { $inc: { version: 1 } },
     { upsert: true, new: true },
   );
+  invalidateBulkCache(); // drop stale cache immediately
   // Broadcast to all connected admin dashboards
   const broadcast = req?.app?.get("broadcast");
   if (broadcast) {
-    const count = await Item.countDocuments({});
+    const count =
+      typeof totalItemsHint === "number"
+        ? totalItemsHint
+        : await Item.countDocuments({});
     broadcast("items_updated", { version: doc.version, totalItems: count });
   }
+  // Rebuild cache in background so next phone request is instant
+  getBulkCache().catch(() => {});
   return doc.version;
 }
 
@@ -240,23 +321,28 @@ router.get("/version", async (req, res) => {
   res.json({ success: true, version, totalItems: count });
 });
 
-// GET /api/items/bulk — download ALL items in a single compressed JSON response
-// Used by phones for atomic item master download (replaces paginated pull)
+// GET /api/items/bulk — ultra-fast cached bulk download for phones
+// First request after a version change builds the cache (~2s), all others serve from RAM (<50ms).
+// Phones sending If-None-Match with current ETag get 304 instantly (skip the download entirely).
 router.get("/bulk", async (req, res) => {
   try {
-    const items = await Item.find(
-      {},
-      { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1, UOM: 1 },
-    )
-      .sort({ Item_Name: 1 })
-      .lean();
-    const version = await getItemsVersion();
-    res.json({
-      success: true,
-      version,
-      total: items.length,
-      items,
+    const cache = await getBulkCache();
+
+    // 304 Not Modified — phone already has this version, skip the download
+    if (req.headers["if-none-match"] === cache.etag) {
+      return res.status(304).end();
+    }
+
+    // Disable express compression middleware — we serve a pre-gzipped buffer
+    res.locals.noCompress = true;
+    res.set({
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Encoding": "gzip",
+      "ETag": cache.etag,
+      "Cache-Control": "no-cache",
+      "Content-Length": cache.gzBuf.length,
     });
+    return res.end(cache.gzBuf);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -428,40 +514,8 @@ router.post("/replace", requireAuth, requireAdmin, async (req, res) => {
         .status(400)
         .json({ success: false, error: "items array is required" });
     }
-    const rawCol = Item.collection;
-    try {
-      await rawCol.drop();
-    } catch (e) {
-      if (e.codeName !== "NamespaceNotFound") throw e;
-    }
-    // Insert without indexes, then build indexes after
-    let inserted = 0;
-    const CHUNK = 50000;
-    const chunks = chunkArray(items, CHUNK);
-    const PARALLEL = 3;
-    for (let i = 0; i < chunks.length; i += PARALLEL) {
-      const batch = chunks.slice(i, i + PARALLEL);
-      const results = await Promise.all(
-        batch.map((c) =>
-          rawCol
-            .insertMany(c, { ordered: false, writeConcern: { w: 1, j: false } })
-            .then((r) => r.insertedCount)
-            .catch(
-              (err) =>
-                err.result?.nInserted ??
-                c.length - (err.writeErrors?.length || 0),
-            ),
-        ),
-      );
-      for (const count of results) inserted += count;
-    }
-    await Promise.all([
-      rawCol.createIndex({ Barcode: 1 }, { unique: true, background: true }),
-      rawCol.createIndex({ Item_Name: 1 }, { background: true }),
-      rawCol.createIndex({ ItemCode: 1 }, { background: true }),
-    ]);
-    await bumpItemsVersion(req);
-    res.json({ success: true, inserted });
+    const result = await applyCsvItems(items, "replace", null, req);
+    res.json({ success: true, inserted: result.inserted, totalItems: result.totalItems });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -485,133 +539,15 @@ router.post(
           .json({ success: false, error: "No file uploaded" });
       }
       const csvText = req.file.buffer.toString("utf8");
-      const parsed = Papa.parse(csvText, {
-        header: true,
-        skipEmptyLines: true,
+      const mode = req.query.mode === "merge" ? "merge" : "replace";
+      const items = parseCsvItems(csvText);
+      const result = await applyCsvItems(items, mode, null, req);
+      res.json({
+        success: true,
+        inserted: result.inserted,
+        modified: result.modified,
+        totalItems: result.totalItems,
       });
-
-      if (parsed.errors.length > 0 && parsed.data.length === 0) {
-        return res.status(400).json({
-          success: false,
-          error: "CSV parsing failed: " + parsed.errors[0].message,
-        });
-      }
-
-      const firstRow = parsed.data[0];
-      if (!firstRow) {
-        return res.status(400).json({ success: false, error: "CSV is empty" });
-      }
-
-      const hasNewFormat = "Barcode" in firstRow && "Item_Name" in firstRow;
-      const hasOldFormat =
-        "Barcode No." in firstRow && "Item Description" in firstRow;
-
-      if (!hasNewFormat && !hasOldFormat) {
-        return res.status(400).json({
-          success: false,
-          error:
-            "CSV must have headers: ItemCode, Barcode, Item_Name (or Item No., Barcode No., Item Description)",
-          foundHeaders: Object.keys(firstRow),
-        });
-      }
-
-      const rawItems = parsed.data
-        .filter((r) =>
-          hasOldFormat
-            ? r["Barcode No."] && r["Item Description"]
-            : r.Barcode && r.Item_Name,
-        )
-        .map((r) => ({
-          ItemCode: hasOldFormat
-            ? r["Item No."] || r["Barcode No."]
-            : r.ItemCode || r.Barcode,
-          Barcode: String(hasOldFormat ? r["Barcode No."] : r.Barcode).trim(),
-          Item_Name: String(
-            hasOldFormat ? r["Item Description"] : r.Item_Name,
-          ).trim(),
-        }));
-
-      // Keep only the latest row per barcode to avoid duplicate writes.
-      const dedup = new Map();
-      for (const item of rawItems) {
-        dedup.set(item.Barcode, item);
-      }
-      const items = Array.from(dedup.values());
-
-      if (items.length === 0) {
-        return res
-          .status(400)
-          .json({ success: false, error: "No valid rows found in CSV" });
-      }
-
-      const mode = req.query.mode || "replace"; // 'replace' or 'merge'
-      const rawCol = Item.collection;
-
-      let inserted = 0;
-      let modified = 0;
-
-      if (mode === "replace") {
-        try {
-          await rawCol.drop();
-        } catch (e) {
-          if (e.codeName !== "NamespaceNotFound") throw e;
-        }
-        // Insert without indexes, then build indexes after
-        const CHUNK = 50000;
-        const chunks = chunkArray(items, CHUNK);
-        const PARALLEL = 3;
-        for (let i = 0; i < chunks.length; i += PARALLEL) {
-          const batch = chunks.slice(i, i + PARALLEL);
-          const results = await Promise.all(
-            batch.map((c) =>
-              rawCol
-                .insertMany(c, {
-                  ordered: false,
-                  writeConcern: { w: 1, j: false },
-                })
-                .then((r) => r.insertedCount)
-                .catch(
-                  (err) =>
-                    err.result?.nInserted ??
-                    c.length - (err.writeErrors?.length || 0),
-                ),
-            ),
-          );
-          for (const count of results) inserted += count;
-        }
-        await Promise.all([
-          rawCol.createIndex(
-            { Barcode: 1 },
-            { unique: true, background: true },
-          ),
-          rawCol.createIndex({ Item_Name: 1 }, { background: true }),
-          rawCol.createIndex({ ItemCode: 1 }, { background: true }),
-        ]);
-      } else {
-        const chunks = chunkArray(items, 5000);
-        for (const chunk of chunks) {
-          const ops = chunk.map((item) => ({
-            updateOne: {
-              filter: { Barcode: item.Barcode },
-              update: {
-                $set: {
-                  ItemCode: item.ItemCode,
-                  Barcode: item.Barcode,
-                  Item_Name: item.Item_Name,
-                },
-              },
-              upsert: true,
-            },
-          }));
-          const result = await rawCol.bulkWrite(ops, { ordered: false });
-          inserted += result.upsertedCount || 0;
-          modified += result.modifiedCount || 0;
-        }
-      }
-
-      const totalItems = await Item.countDocuments({});
-      await bumpItemsVersion(req);
-      res.json({ success: true, inserted, modified, totalItems });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }
