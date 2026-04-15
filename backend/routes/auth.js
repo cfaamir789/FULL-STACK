@@ -13,8 +13,22 @@ const {
 } = require("../middleware/authMiddleware");
 
 // Helper: fire-and-forget audit log (never blocks the request)
-function audit(actor, actorRole, action, target, detail, source = "admin_panel") {
-  AuditLog.create({ actor, actorRole, action, target: target || "", detail: detail || "", source }).catch(() => {});
+function audit(
+  actor,
+  actorRole,
+  action,
+  target,
+  detail,
+  source = "admin_panel",
+) {
+  AuditLog.create({
+    actor,
+    actorRole,
+    action,
+    target: target || "",
+    detail: detail || "",
+    source,
+  }).catch(() => {});
 }
 
 const JWT_SECRET =
@@ -216,7 +230,13 @@ router.post(
         role,
         createdAt: new Date(),
       });
-      audit(req.user.username, req.user.role, "create_user", user.username, `Role: ${role}`);
+      audit(
+        req.user.username,
+        req.user.role,
+        "create_user",
+        user.username,
+        `Role: ${role}`,
+      );
       res
         .status(201)
         .json({ success: true, username: user.username, role: user.role });
@@ -298,7 +318,13 @@ router.delete(
         });
       }
       await User.deleteOne({ username });
-      audit(req.user.username, req.user.role, "delete_user", username, `Deleted role: ${target.role}`);
+      audit(
+        req.user.username,
+        req.user.role,
+        "delete_user",
+        username,
+        `Deleted role: ${target.role}`,
+      );
       res.json({ success: true });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
@@ -349,7 +375,13 @@ router.post(
       const hash = await bcrypt.hash(String(pin), 10);
       user.pin_hash = hash;
       await user.save();
-      audit(req.user.username, req.user.role, "reset_pin", username, `Reset PIN for ${username}`);
+      audit(
+        req.user.username,
+        req.user.role,
+        "reset_pin",
+        username,
+        `Reset PIN for ${username}`,
+      );
       res.json({ success: true, username: user.username });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
@@ -370,15 +402,27 @@ router.put(
       const { employeeId, deviceModel } = req.body;
       const user = await User.findOne({ username });
       if (!user) {
-        return res.status(404).json({ success: false, error: "User not found." });
+        return res
+          .status(404)
+          .json({ success: false, error: "User not found." });
       }
       if (user.role !== "worker") {
-        return res.status(400).json({ success: false, error: "Only worker accounts support this field." });
+        return res
+          .status(400)
+          .json({
+            success: false,
+            error: "Only worker accounts support this field.",
+          });
       }
       if (employeeId !== undefined) user.employeeId = String(employeeId).trim();
-      if (deviceModel !== undefined) user.deviceModel = String(deviceModel).trim();
+      if (deviceModel !== undefined)
+        user.deviceModel = String(deviceModel).trim();
       await user.save();
-      res.json({ success: true, employeeId: user.employeeId, deviceModel: user.deviceModel });
+      res.json({
+        success: true,
+        employeeId: user.employeeId,
+        deviceModel: user.deviceModel,
+      });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -386,24 +430,34 @@ router.put(
 );
 // ─── GET /api/auth/audit-logs ─────────────────────────────────────────────────────────
 // Superadmin only: fetch audit logs
-router.get("/audit-logs", requireDB, requireAuth, requireSuperAdmin, async (req, res) => {
-  try {
-    const limit = Math.min(parseInt(req.query.limit) || 500, 2000);
-    const skip = parseInt(req.query.skip) || 0;
-    const actor = req.query.actor || "";
-    const action = req.query.action || "";
-    const filter = {};
-    if (actor) filter.actor = actor.toUpperCase();
-    if (action) filter.action = action;
-    const [logs, total] = await Promise.all([
-      AuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      AuditLog.countDocuments(filter),
-    ]);
-    res.json({ success: true, logs, total });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+router.get(
+  "/audit-logs",
+  requireDB,
+  requireAuth,
+  requireSuperAdmin,
+  async (req, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit) || 500, 2000);
+      const skip = parseInt(req.query.skip) || 0;
+      const actor = req.query.actor || "";
+      const action = req.query.action || "";
+      const filter = {};
+      if (actor) filter.actor = actor.toUpperCase();
+      if (action) filter.action = action;
+      const [logs, total] = await Promise.all([
+        AuditLog.find(filter)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        AuditLog.countDocuments(filter),
+      ]);
+      res.json({ success: true, logs, total });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
 // ─── GET /api/auth/check-setup ──────────────────────────────────────────────
 // Frontend calls this to decide whether to show the Setup screen or Login screen
 router.get("/check-setup", requireDB, async (req, res) => {

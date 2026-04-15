@@ -439,7 +439,7 @@
       }
       .worker-info-row input:focus {
         border-color: #2e7d32;
-        box-shadow: 0 0 0 2px rgba(46,125,50,0.12);
+        box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.12);
       }
       .btn-save-info {
         padding: 5px 14px;
@@ -452,8 +452,13 @@
         color: #fff;
         transition: background 0.2s;
       }
-      .btn-save-info:hover { background: #1b5e20; }
-      .btn-save-info:disabled { background: #aaa; cursor: default; }
+      .btn-save-info:hover {
+        background: #1b5e20;
+      }
+      .btn-save-info:disabled {
+        background: #aaa;
+        cursor: default;
+      }
       /* PIN reset modal */
       .pin-overlay {
         display: none;
@@ -679,9 +684,15 @@
         color: #2e7d32;
         border-color: #a5d6a7;
       }
-      .copy-icon-btn .check-icon { display: none; }
-      .copy-icon-btn.copied .check-icon { display: inline; }
-      .copy-icon-btn.copied .copy-svg { display: none; }
+      .copy-icon-btn .check-icon {
+        display: none;
+      }
+      .copy-icon-btn.copied .check-icon {
+        display: inline;
+      }
+      .copy-icon-btn.copied .copy-svg {
+        display: none;
+      }
       /* CSV button */
       .tb-btn-csv {
         background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
@@ -1534,17 +1545,65 @@
             </div>
           </div>
           <div class="stats-row kpi-grid">
-            <div class="stat">
+            <div
+              class="stat"
+              role="button"
+              tabindex="0"
+              title="Open Item Master"
+              onclick="switchPage('master')"
+              onkeydown="
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  switchPage('master');
+                }
+              "
+              style="cursor: pointer"
+            >
               <div class="num" id="statItems">-</div>
               <div class="label">Total Items</div>
+              <div style="margin-top: 8px; font-size: 11px; opacity: 0.8">
+                View master
+              </div>
             </div>
-            <div class="stat">
+            <div
+              class="stat"
+              role="button"
+              tabindex="0"
+              title="Open Users page"
+              onclick="switchPage('users')"
+              onkeydown="
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  switchPage('users');
+                }
+              "
+              style="cursor: pointer"
+            >
               <div class="num" id="statUsers">-</div>
               <div class="label">Users</div>
+              <div style="margin-top: 8px; font-size: 11px; opacity: 0.8">
+                View users
+              </div>
             </div>
-            <div class="stat">
+            <div
+              class="stat"
+              role="button"
+              tabindex="0"
+              title="Open Pending Queue"
+              onclick="openQueuePage('pending')"
+              onkeydown="
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  openQueuePage('pending');
+                }
+              "
+              style="cursor: pointer"
+            >
               <div class="num" id="statTx">-</div>
               <div class="label">Pending Queue</div>
+              <div style="margin-top: 8px; font-size: 11px; opacity: 0.8">
+                View queue
+              </div>
             </div>
             <div
               class="stat"
@@ -1566,9 +1625,25 @@
                 View details
               </div>
             </div>
-            <div class="stat">
+            <div
+              class="stat"
+              role="button"
+              tabindex="0"
+              title="Open Archived transactions"
+              onclick="openQueuePage('archived')"
+              onkeydown="
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  openQueuePage('archived');
+                }
+              "
+              style="cursor: pointer"
+            >
               <div class="num" id="statArchived">-</div>
               <div class="label">Archived</div>
+              <div style="margin-top: 8px; font-size: 11px; opacity: 0.8">
+                View archived
+              </div>
             </div>
           </div>
           <div class="daily-msg" id="dailyMsgBox">
@@ -1748,13 +1823,56 @@
           <div class="tx-header">
             <h2>&#128269; Processed Audit Trail</h2>
             <div class="tx-actions">
-              <button class="copy-icon-btn tb-btn-copy-nostatus" id="copyProcessedAuditBtn" onclick="copyProcessedAuditTrail()" title="Copy processed audit trail to clipboard (no status column)">
-                <svg class="copy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <button
+                class="copy-icon-btn tb-btn-copy-nostatus"
+                id="copyProcessedAuditBtn"
+                onclick="copyProcessedAuditTrail()"
+                title="Copy processed audit trail to clipboard (no status column)"
+              >
+                <svg
+                  class="copy-svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path
+                    d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                  ></path>
+                </svg>
+                <svg
+                  class="check-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
                 <span class="copy-label">&#128203; Copy Audit</span>
               </button>
-              <button class="copy-icon-btn tb-btn-xlsx" onclick="exportProcessedAuditXLSX()" title="Export processed audit trail as Excel XLSX">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <button
+                class="copy-icon-btn tb-btn-xlsx"
+                onclick="exportProcessedAuditXLSX()"
+                title="Export processed audit trail as Excel XLSX"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
                 &#9783; XLSX Audit
               </button>
             </div>
@@ -2036,31 +2154,129 @@
           <div class="tx-header">
             <h2>&#128196; ERP Queue (Shared Server Data)</h2>
             <div class="tx-actions">
-              <button class="copy-icon-btn" id="copyAllBtn" onclick="copyTransactionsToClipboard()" title="Copy visible rows to clipboard">
-                <svg class="copy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <button
+                class="copy-icon-btn"
+                id="copyAllBtn"
+                onclick="copyTransactionsToClipboard()"
+                title="Copy visible rows to clipboard"
+              >
+                <svg
+                  class="copy-svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path
+                    d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                  ></path>
+                </svg>
+                <svg
+                  class="check-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
                 <span class="copy-label">&#128203; Copy</span>
               </button>
-              <button class="copy-icon-btn tb-btn-copy-nostatus" id="copyBulkNoStatusBtn" onclick="copyTransactionsNoStatus()" title="Copy all visible rows WITHOUT the Status column">
-                <svg class="copy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <button
+                class="copy-icon-btn tb-btn-copy-nostatus"
+                id="copyBulkNoStatusBtn"
+                onclick="copyTransactionsNoStatus()"
+                title="Copy all visible rows WITHOUT the Status column"
+              >
+                <svg
+                  class="copy-svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path
+                    d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                  ></path>
+                </svg>
+                <svg
+                  class="check-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
                 <span class="copy-label">&#128203; Copy Bulk</span>
               </button>
-              <button class="copy-icon-btn tb-btn-csv" onclick="downloadTransactionsCSV('csv')" title="Download visible columns as CSV">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <button
+                class="copy-icon-btn tb-btn-csv"
+                onclick="downloadTransactionsCSV('csv')"
+                title="Download visible columns as CSV"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
                 &#128196; CSV
               </button>
-              <button class="copy-icon-btn tb-btn-xlsx" onclick="downloadTransactionsCSV('xlsx')" title="Download visible columns as Excel XLSX">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <button
+                class="copy-icon-btn tb-btn-xlsx"
+                onclick="downloadTransactionsCSV('xlsx')"
+                title="Download visible columns as Excel XLSX"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
                 &#9783; XLSX
               </button>
-              <button class="copy-icon-btn tx-danger-btn" onclick="markWorkerProcessed()" title="Mark all pending transactions for the selected worker as processed">
+              <button
+                class="copy-icon-btn tx-danger-btn"
+                onclick="markWorkerProcessed()"
+                title="Mark all pending transactions for the selected worker as processed"
+              >
                 &#10003; Mark Worker Done
               </button>
-              <button class="copy-icon-btn tb-btn-mark-filter" onclick="markFilteredProcessed()" title="Mark only the currently filtered transactions as processed">
+              <button
+                class="copy-icon-btn tb-btn-mark-filter"
+                onclick="markFilteredProcessed()"
+                title="Mark only the currently filtered transactions as processed"
+              >
                 &#10003; Mark Filtered Done
               </button>
-              <button class="copy-icon-btn tb-btn-reopen" onclick="reopenFilteredTransactions()" title="Move processed transactions back into the active queue">
+              <button
+                class="copy-icon-btn tb-btn-reopen"
+                onclick="reopenFilteredTransactions()"
+                title="Move processed transactions back into the active queue"
+              >
                 &#8635; Reopen Filtered
               </button>
             </div>
@@ -2786,6 +3002,16 @@
         filterProcessedTransactions();
       }
 
+      async function openQueuePage(status) {
+        await switchPage("workers");
+        const statusFilter = document.getElementById("txStatusFilter");
+        if (statusFilter) {
+          statusFilter.value = status;
+          await loadTransactions();
+        }
+        scrollToBlock("workersQueueBlock");
+      }
+
       async function refreshWorkersPage(silent = false) {
         await Promise.allSettled([
           loadWorkerStatus(silent),
@@ -3092,24 +3318,23 @@
           { key: "erpBatch", label: "ERP Batch" },
           { key: "Notes", label: "Notes" },
         ];
-        let text = AUDIT_COLS.map((c) => c.label).join("\t") + "\n";
-        txs.forEach((tx) => {
-          text +=
-            AUDIT_COLS.map((c) => {
-              if (c.key === "processedAt") {
-                return tx.processedAt ? new Date(tx.processedAt).toLocaleString() : "";
-              }
-              if (c.key === "employeeId") {
-                const info = workerInfoMap[(tx.Worker_Name || "").toUpperCase()] || {};
-                return info.employeeId || "";
-              }
-              const v = tx[c.key];
-              return v !== undefined && v !== null ? String(v) : "";
-            }).join("\t") + "\n";
+        const getCellVal = (tx, key) => {
+          if (key === "processedAt")
+            return tx.processedAt
+              ? new Date(tx.processedAt).toLocaleString()
+              : "";
+          if (key === "employeeId") {
+            const info =
+              workerInfoMap[(tx.Worker_Name || "").toUpperCase()] || {};
+            return info.employeeId || "";
+          }
+          const v = tx[key];
+          return v !== undefined && v !== null ? String(v) : "";
+        };
+        copyRichToClip(AUDIT_COLS, txs, getCellVal).then(() => {
+          const btn = document.getElementById("copyProcessedAuditBtn");
+          if (btn) flashCopyBtn(btn);
         });
-        copyToClip(text);
-        const btn = document.getElementById("copyProcessedAuditBtn");
-        if (btn) flashCopyBtn(btn);
       }
 
       function exportProcessedAuditXLSX() {
@@ -3138,10 +3363,13 @@
         const rows = txs.map((tx) =>
           AUDIT_COLS.map((c) => {
             if (c.key === "processedAt") {
-              return tx.processedAt ? new Date(tx.processedAt).toLocaleString() : "";
+              return tx.processedAt
+                ? new Date(tx.processedAt).toLocaleString()
+                : "";
             }
             if (c.key === "employeeId") {
-              const info = workerInfoMap[(tx.Worker_Name || "").toUpperCase()] || {};
+              const info =
+                workerInfoMap[(tx.Worker_Name || "").toUpperCase()] || {};
               return info.employeeId || "";
             }
             const v = tx[c.key];
@@ -3158,7 +3386,10 @@
         const d = new Date();
         const dd = String(d.getDate()).padStart(2, "0");
         const mm = String(d.getMonth() + 1).padStart(2, "0");
-        XLSX.writeFile(wb, `processed_audit_${dd}-${mm}-${d.getFullYear()}.xlsx`);
+        XLSX.writeFile(
+          wb,
+          `processed_audit_${dd}-${mm}-${d.getFullYear()}.xlsx`,
+        );
       }
 
       function renderProcessedTable() {
@@ -3865,23 +4096,23 @@
 
       // ─── Column Config ────────────────────────────────────────────────────────────
       const DEFAULT_TX_COLS = [
-        { key: "Item_Barcode",  label: "Barcode",      vis: true  },
-        { key: "Item_Code",    label: "Item Code",     vis: true  },
-        { key: "Item_Name",    label: "Item Name",     vis: true  },
-        { key: "Frombin",      label: "From Bin",      vis: true  },
-        { key: "Tobin",        label: "To Bin",        vis: true  },
-        { key: "Qty",          label: "Qty",           vis: true  },
-        { key: "UOM",          label: "UOM",           vis: true  },
-        { key: "employeeId",   label: "Employee ID",   vis: true  },
-        { key: "deviceModel",  label: "Device Model",  vis: true  },
-        { key: "Timestamp",    label: "Date/Time",     vis: true  },
-        { key: "Worker_Name",  label: "Worker",        vis: true  },
-        { key: "syncStatus",   label: "Status",        vis: true  },
-        { key: "Notes",        label: "Notes",         vis: false },
-        { key: "processedBy",  label: "Processed By",  vis: false },
-        { key: "processedAt",  label: "Processed At",  vis: false },
-        { key: "erpDocument",  label: "ERP Document",  vis: false },
-        { key: "erpBatch",     label: "ERP Batch",     vis: false },
+        { key: "Item_Barcode", label: "Barcode", vis: true },
+        { key: "Item_Code", label: "Item Code", vis: true },
+        { key: "Item_Name", label: "Item Name", vis: true },
+        { key: "Frombin", label: "From Bin", vis: true },
+        { key: "Tobin", label: "To Bin", vis: true },
+        { key: "Qty", label: "Qty", vis: true },
+        { key: "UOM", label: "UOM", vis: true },
+        { key: "employeeId", label: "Employee ID", vis: true },
+        { key: "deviceModel", label: "Device Model", vis: true },
+        { key: "Timestamp", label: "Date/Time", vis: true },
+        { key: "Worker_Name", label: "Worker", vis: true },
+        { key: "syncStatus", label: "Status", vis: true },
+        { key: "Notes", label: "Notes", vis: false },
+        { key: "processedBy", label: "Processed By", vis: false },
+        { key: "processedAt", label: "Processed At", vis: false },
+        { key: "erpDocument", label: "ERP Document", vis: false },
+        { key: "erpBatch", label: "ERP Batch", vis: false },
       ];
 
       let txCols = (() => {
@@ -3890,7 +4121,9 @@
           if (saved) {
             const parsed = JSON.parse(saved);
             // Version check: reset if missing new columns (employeeId / deviceModel)
-            const hasNewCols = parsed.some(c => c.key === "employeeId" || c.key === "deviceModel");
+            const hasNewCols = parsed.some(
+              (c) => c.key === "employeeId" || c.key === "deviceModel",
+            );
             if (hasNewCols) return parsed;
           }
         } catch {}
@@ -4350,14 +4583,15 @@
         }
         if (key === "Qty")
           return "<td>" + (tx.Qty !== undefined ? tx.Qty : "") + "</td>";
-        if (key === "UOM")
-          return "<td>" + esc(tx.UOM || "") + "</td>";
+        if (key === "UOM") return "<td>" + esc(tx.UOM || "") + "</td>";
         if (key === "employeeId") {
-          const info = workerInfoMap[(tx.Worker_Name || "").toUpperCase()] || {};
+          const info =
+            workerInfoMap[(tx.Worker_Name || "").toUpperCase()] || {};
           return "<td>" + esc(info.employeeId || "") + "</td>";
         }
         if (key === "deviceModel") {
-          const info = workerInfoMap[(tx.Worker_Name || "").toUpperCase()] || {};
+          const info =
+            workerInfoMap[(tx.Worker_Name || "").toUpperCase()] || {};
           return "<td>" + esc(info.deviceModel || "") + "</td>";
         }
         return "<td>" + esc(tx[key] || "") + "</td>";
@@ -4418,7 +4652,8 @@
           visibleCols.forEach((c) => {
             html += "<th>" + esc(c.label) + "</th>";
           });
-          html += "<th>Copy</th><th>Action</th></tr></thead><tbody>";
+          html +=
+            "<th>Copy</th><th>Action</th><th>Delete</th></tr></thead><tbody>";
           slice.forEach((tx, i) => {
             const idx = start + i;
             const txId = String(tx._id || "");
@@ -4449,6 +4684,10 @@
               ', this)" title="Update this row status">' +
               actionLabel +
               "</button></td>";
+            html +=
+              '<td><button class="copy-icon-btn" style="color:#c62828;border-color:#ef9a9a" onclick="deleteSingleTx(\'' +
+              txId.replace(/'/g, "") +
+              '\', this)" title="Delete this transaction permanently">&#128465; Delete</button></td>';
             html += "</tr>";
           });
           html += "</tbody></table></div></div>";
@@ -4486,16 +4725,56 @@
         render();
       }
 
+      async function deleteSingleTx(txId, btnEl) {
+        if (!txId) return;
+        const tx = filteredTransactions.find((t) => String(t._id) === txId);
+        const label = tx
+          ? (tx.Item_Code || "") +
+            " | " +
+            (tx.Item_Name || "") +
+            " | Qty: " +
+            (tx.Qty || "")
+          : txId;
+        if (
+          !confirm(
+            "Permanently delete this transaction?\n\n" +
+              label +
+              "\n\nThis cannot be undone.",
+          )
+        )
+          return;
+        const original = btnEl.textContent;
+        btnEl.disabled = true;
+        btnEl.textContent = "...";
+        try {
+          await apiFetch("/transactions/" + txId, { method: "DELETE" });
+          await refreshWorkersPage();
+        } catch (err) {
+          alert("Delete failed: " + err.message);
+          btnEl.disabled = false;
+          btnEl.textContent = original;
+        }
+      }
+
       function copyRow(idx, btnEl) {
         const tx = filteredTransactions[idx];
         if (!tx) return;
-        const visibleCols = txCols.filter((c) => c.vis && c.key !== "syncStatus");
-        const text = visibleCols
-          .map((c) => String(getExportCellValue(tx, c.key)))
-          .join("\t");
-        copyToClip(text);
-        flashCopyBtn(btnEl);
+        const visibleCols = txCols.filter(
+          (c) => c.vis && c.key !== "syncStatus",
+        );
+        copyRichToClip(visibleCols, [tx], getExportCellValue, false).then(
+          () => {
+            flashCopyBtn(btnEl);
+          },
+        );
       }
+
+      // Keys that must be treated as TEXT in Excel (no scientific notation, preserve leading zeros)
+      const TEXT_AS_STRING_KEYS = new Set([
+        "Item_Barcode",
+        "Item_Code",
+        "employeeId",
+      ]);
 
       function copyToClip(text) {
         // Works on HTTP (non-secure) contexts too
@@ -4509,6 +4788,66 @@
         ta.setSelectionRange(0, ta.value.length);
         document.execCommand("copy");
         document.body.removeChild(ta);
+      }
+
+      // Copies both HTML table (Excel-friendly) + plain text to clipboard
+      async function copyRichToClip(cols, rows, escFn, includeHeader = true) {
+        // Build plain text (tab-separated)
+        const headerLine = cols.map((c) => c.label).join("\t") + "\n";
+        const dataLines =
+          rows
+            .map((row) => cols.map((c) => String(escFn(row, c.key))).join("\t"))
+            .join("\n") + "\n";
+        const plainText = includeHeader ? headerLine + dataLines : dataLines;
+
+        // Build HTML table — text columns get mso-number-format:@ so Excel treats as text
+        const escHtml = (v) =>
+          String(v)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+        let html = '<table xmlns:x="urn:schemas-microsoft-com:office:excel">';
+        if (includeHeader) {
+          html += "<thead><tr>";
+          cols.forEach((c) => {
+            html += "<th>" + escHtml(c.label) + "</th>";
+          });
+          html += "</tr></thead>";
+        }
+        html += "<tbody>";
+        rows.forEach((row) => {
+          html += "<tr>";
+          cols.forEach((c) => {
+            const val = escFn(row, c.key);
+            if (TEXT_AS_STRING_KEYS.has(c.key)) {
+              html +=
+                '<td style="mso-number-format:\\@">' + escHtml(val) + "</td>";
+            } else {
+              html += "<td>" + escHtml(val) + "</td>";
+            }
+          });
+          html += "</tr>";
+        });
+        html += "</tbody></table>";
+
+        try {
+          if (
+            navigator.clipboard &&
+            typeof ClipboardItem !== "undefined" &&
+            navigator.clipboard.write
+          ) {
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                "text/html": new Blob([html], { type: "text/html" }),
+                "text/plain": new Blob([plainText], { type: "text/plain" }),
+              }),
+            ]);
+          } else {
+            copyToClip(plainText);
+          }
+        } catch (e) {
+          copyToClip(plainText);
+        }
       }
 
       function flashCopyBtn(btnEl) {
@@ -4653,15 +4992,9 @@
           return;
         }
         const visibleCols = txCols.filter((c) => c.vis);
-        let text = visibleCols.map((c) => c.label).join("\t") + "\n";
-        txs.forEach((tx) => {
-          text +=
-            visibleCols
-              .map((c) => String(getExportCellValue(tx, c.key)))
-              .join("\t") + "\n";
+        copyRichToClip(visibleCols, txs, getExportCellValue).then(() => {
+          flashCopyBtn(document.getElementById("copyAllBtn"));
         });
-        copyToClip(text);
-        flashCopyBtn(document.getElementById("copyAllBtn"));
       }
 
       function copyTransactionsNoStatus() {
@@ -4670,16 +5003,12 @@
           alert("No transactions to copy.");
           return;
         }
-        const visibleCols = txCols.filter((c) => c.vis && c.key !== "syncStatus");
-        let text = visibleCols.map((c) => c.label).join("\t") + "\n";
-        txs.forEach((tx) => {
-          text +=
-            visibleCols
-              .map((c) => String(getExportCellValue(tx, c.key)))
-              .join("\t") + "\n";
+        const visibleCols = txCols.filter(
+          (c) => c.vis && c.key !== "syncStatus",
+        );
+        copyRichToClip(visibleCols, txs, getExportCellValue).then(() => {
+          flashCopyBtn(document.getElementById("copyBulkNoStatusBtn"));
         });
-        copyToClip(text);
-        flashCopyBtn(document.getElementById("copyBulkNoStatusBtn"));
       }
 
       // ─── Smart export filename ─────────────────────────────────────────────────
@@ -4715,7 +5044,8 @@
           const info = workerInfoMap[(r.Worker_Name || "").toUpperCase()] || {};
           return info.deviceModel || "";
         }
-        if (key === "Qty") return r.Qty !== undefined ? r.Qty : (r.qty !== undefined ? r.qty : "");
+        if (key === "Qty")
+          return r.Qty !== undefined ? r.Qty : r.qty !== undefined ? r.qty : "";
         const v = r[key];
         return v !== undefined && v !== null ? String(v) : "";
       }
@@ -4747,7 +5077,9 @@
             }
             const aoa = [
               headers,
-              ...rows.map((r) => visibleCols.map((c) => getExportCellValue(r, c.key))),
+              ...rows.map((r) =>
+                visibleCols.map((c) => getExportCellValue(r, c.key)),
+              ),
             ];
             if (format === "xlsx" && typeof XLSX !== "undefined") {
               const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -4761,14 +5093,18 @@
                   rowArr
                     .map((v) => {
                       const s = String(v === undefined || v === null ? "" : v);
-                      return s.includes(",") || s.includes('"') || s.includes("\n")
+                      return s.includes(",") ||
+                        s.includes('"') ||
+                        s.includes("\n")
                         ? '"' + s.replace(/"/g, '""') + '"'
                         : s;
                     })
                     .join(","),
                 )
                 .join("\n");
-              const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+              const blob = new Blob(["\uFEFF" + csv], {
+                type: "text/csv;charset=utf-8;",
+              });
               const blobUrl = URL.createObjectURL(blob);
               const a = document.createElement("a");
               a.href = blobUrl;
@@ -4880,12 +5216,25 @@
             // Worker info row (only for workers)
             if (!isSuperAdmin && !isAdmin) {
               h += '<div class="worker-info-row">';
-              h += '<label>&#128196; Emp ID</label>';
-              h += '<input type="text" class="worker-emp-id" data-user="' + esc(u.username) + '" placeholder="e.g. EMP-001" value="' + esc(u.employeeId || "") + '" />';
-              h += '<label>&#128241; Device</label>';
-              h += '<input type="text" class="worker-device" data-user="' + esc(u.username) + '" placeholder="e.g. Samsung A52" value="' + esc(u.deviceModel || "") + '" />';
-              h += '<button class="btn-save-info" data-user="' + esc(u.username) + '">&#10003; Save</button>';
-              h += '</div>';
+              h += "<label>&#128196; Emp ID</label>";
+              h +=
+                '<input type="text" class="worker-emp-id" data-user="' +
+                esc(u.username) +
+                '" placeholder="e.g. EMP-001" value="' +
+                esc(u.employeeId || "") +
+                '" />';
+              h += "<label>&#128241; Device</label>";
+              h +=
+                '<input type="text" class="worker-device" data-user="' +
+                esc(u.username) +
+                '" placeholder="e.g. Samsung A52" value="' +
+                esc(u.deviceModel || "") +
+                '" />';
+              h +=
+                '<button class="btn-save-info" data-user="' +
+                esc(u.username) +
+                '">&#10003; Save</button>';
+              h += "</div>";
             }
             h += "</div>";
             return h;
@@ -4961,18 +5310,21 @@
               try {
                 // Use direct fetch to avoid failover switching to production server
                 const res = await fetch(
-                  window.location.origin + "/api/auth/users/" + encodeURIComponent(username) + "/worker-info",
+                  window.location.origin +
+                    "/api/auth/users/" +
+                    encodeURIComponent(username) +
+                    "/worker-info",
                   {
                     method: "PUT",
                     headers: {
                       "Content-Type": "application/json",
-                      "Authorization": "Bearer " + authToken,
+                      Authorization: "Bearer " + authToken,
                     },
                     body: JSON.stringify({
                       employeeId: empInput.value.trim(),
                       deviceModel: devInput.value.trim(),
                     }),
-                  }
+                  },
                 );
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || "Request failed");
