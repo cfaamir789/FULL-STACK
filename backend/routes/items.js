@@ -113,7 +113,13 @@ async function applyCsvItems(items, mode, onProgress, req) {
 
     // ── Phase 2: Insert ALL items WITHOUT any indexes ──
     // No unique constraint = no index lookups per doc = 10x faster
-    onProgress?.({ processed: 0, total, inserted: 0, modified: 0, phase: "inserting" });
+    onProgress?.({
+      processed: 0,
+      total,
+      inserted: 0,
+      modified: 0,
+      phase: "inserting",
+    });
 
     let inserted = 0;
     let processed = 0;
@@ -127,18 +133,37 @@ async function applyCsvItems(items, mode, onProgress, req) {
       const results = await Promise.all(
         batch.map((chunk) =>
           rawCol
-            .insertMany(chunk, { ordered: false, writeConcern: { w: 1, j: false } })
+            .insertMany(chunk, {
+              ordered: false,
+              writeConcern: { w: 1, j: false },
+            })
             .then((r) => r.insertedCount)
-            .catch((err) => err.result?.nInserted ?? (chunk.length - (err.writeErrors?.length || 0)))
-        )
+            .catch(
+              (err) =>
+                err.result?.nInserted ??
+                chunk.length - (err.writeErrors?.length || 0),
+            ),
+        ),
       );
       for (const count of results) inserted += count;
       processed += batch.reduce((s, c) => s + c.length, 0);
-      onProgress?.({ processed, total, inserted, modified: 0, phase: "inserting" });
+      onProgress?.({
+        processed,
+        total,
+        inserted,
+        modified: 0,
+        phase: "inserting",
+      });
     }
 
     // ── Phase 3: Build indexes AFTER all data is loaded (bulk build is 10x faster) ──
-    onProgress?.({ processed: total, total, inserted, modified: 0, phase: "indexing" });
+    onProgress?.({
+      processed: total,
+      total,
+      inserted,
+      modified: 0,
+      phase: "indexing",
+    });
     await Promise.all([
       rawCol.createIndex({ Barcode: 1 }, { unique: true, background: true }),
       rawCol.createIndex({ Item_Name: 1 }, { background: true }),
@@ -396,7 +421,9 @@ router.post("/replace", requireAuth, requireAdmin, async (req, res) => {
         .json({ success: false, error: "items array is required" });
     }
     const rawCol = Item.collection;
-    try { await rawCol.drop(); } catch (e) {
+    try {
+      await rawCol.drop();
+    } catch (e) {
       if (e.codeName !== "NamespaceNotFound") throw e;
     }
     // Insert without indexes, then build indexes after
@@ -407,9 +434,16 @@ router.post("/replace", requireAuth, requireAdmin, async (req, res) => {
     for (let i = 0; i < chunks.length; i += PARALLEL) {
       const batch = chunks.slice(i, i + PARALLEL);
       const results = await Promise.all(
-        batch.map((c) => rawCol.insertMany(c, { ordered: false, writeConcern: { w: 1, j: false } })
-          .then((r) => r.insertedCount)
-          .catch((err) => err.result?.nInserted ?? (c.length - (err.writeErrors?.length || 0))))
+        batch.map((c) =>
+          rawCol
+            .insertMany(c, { ordered: false, writeConcern: { w: 1, j: false } })
+            .then((r) => r.insertedCount)
+            .catch(
+              (err) =>
+                err.result?.nInserted ??
+                c.length - (err.writeErrors?.length || 0),
+            ),
+        ),
       );
       for (const count of results) inserted += count;
     }
@@ -509,7 +543,9 @@ router.post(
       let modified = 0;
 
       if (mode === "replace") {
-        try { await rawCol.drop(); } catch (e) {
+        try {
+          await rawCol.drop();
+        } catch (e) {
           if (e.codeName !== "NamespaceNotFound") throw e;
         }
         // Insert without indexes, then build indexes after
@@ -519,14 +555,27 @@ router.post(
         for (let i = 0; i < chunks.length; i += PARALLEL) {
           const batch = chunks.slice(i, i + PARALLEL);
           const results = await Promise.all(
-            batch.map((c) => rawCol.insertMany(c, { ordered: false, writeConcern: { w: 1, j: false } })
-              .then((r) => r.insertedCount)
-              .catch((err) => err.result?.nInserted ?? (c.length - (err.writeErrors?.length || 0))))
+            batch.map((c) =>
+              rawCol
+                .insertMany(c, {
+                  ordered: false,
+                  writeConcern: { w: 1, j: false },
+                })
+                .then((r) => r.insertedCount)
+                .catch(
+                  (err) =>
+                    err.result?.nInserted ??
+                    c.length - (err.writeErrors?.length || 0),
+                ),
+            ),
           );
           for (const count of results) inserted += count;
         }
         await Promise.all([
-          rawCol.createIndex({ Barcode: 1 }, { unique: true, background: true }),
+          rawCol.createIndex(
+            { Barcode: 1 },
+            { unique: true, background: true },
+          ),
           rawCol.createIndex({ Item_Name: 1 }, { background: true }),
           rawCol.createIndex({ ItemCode: 1 }, { background: true }),
         ]);
