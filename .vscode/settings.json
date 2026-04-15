@@ -29,5 +29,6 @@
     "javascript": "javascriptreact"
   },
   "workbench.iconTheme": "material-icon-theme",
-  "java.configuration.updateBuildConfiguration": "automatic"
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.compile.nullAnalysis.mode": "automatic"
 }

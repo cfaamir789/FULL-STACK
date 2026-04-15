@@ -18,16 +18,25 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
-import { getDashboardStats, getRecentTransactions } from "../database/db";
-import { getDisplayUrl } from "../services/api";
+import {
+  getDashboardStats,
+  getAllTransactions,
+  getPendingTransactions,
+} from "../database/db";
+import { getDisplayUrl, getServerTransactions } from "../services/api";
 import { attemptSync, setSyncStatusListener } from "../services/syncService";
 import StatsCard from "../components/StatsCard";
 import SyncStatusBanner from "../components/SyncStatusBanner";
 import TransactionRow from "../components/TransactionRow";
 import VoiceMic from "../components/VoiceMic";
 import Colors from "../theme/colors";
+import {
+  isTransactionOwnedByUser,
+  mapServerTransactionToLocalShape,
+  mergeTransactions,
+} from "../utils/transactions";
 
-export default function DashboardScreen() {
+export default function DashboardScreen({ username }) {
   const queryRef = useRef(null);
   const [stats, setStats] = useState({
     totalItems: 0,
@@ -45,13 +54,45 @@ export default function DashboardScreen() {
   const [query, setQuery] = useState("");
 
   const loadData = useCallback(async () => {
-    const [s, r] = await Promise.all([
+    const [localStats, localAll, localPendingAll] = await Promise.all([
       getDashboardStats(),
-      getRecentTransactions(200),
+      getAllTransactions(),
+      getPendingTransactions(),
     ]);
-    setStats(s);
-    setRecent(r);
-  }, []);
+    const localRecent = localAll.filter((tx) =>
+      isTransactionOwnedByUser(tx, username),
+    );
+    const localPending = localPendingAll.filter((tx) =>
+      isTransactionOwnedByUser(tx, username),
+    );
+
+    let nextStats = {
+      totalItems: localStats.totalItems,
+      totalTransactions: localRecent.length,
+      pendingSync: localPending.length,
+    };
+    let nextRecent = localRecent;
+
+    try {
+      const serverRes = await getServerTransactions(1, 200, "all", {
+        mine: true,
+      });
+      const serverRecent = (serverRes.transactions || []).map(
+        mapServerTransactionToLocalShape,
+      );
+      nextStats = {
+        totalItems: localStats.totalItems,
+        totalTransactions: Number(serverRes.total || 0),
+        pendingSync: localPending.length,
+      };
+      nextRecent = mergeTransactions(serverRecent, localPending);
+    } catch (_) {
+      // Server unavailable — keep local fallback so the app still works offline.
+    }
+
+    setStats(nextStats);
+    setRecent(nextRecent);
+  }, [username]);
 
   const filtered = useMemo(
     () =>
@@ -121,7 +162,7 @@ export default function DashboardScreen() {
           />
           <StatsCard
             icon="swap-horizontal"
-            label="Local History"
+            label="History"
             value={stats.totalTransactions}
             color={Colors.success}
           />

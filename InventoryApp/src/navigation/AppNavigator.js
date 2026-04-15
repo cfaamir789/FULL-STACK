@@ -88,7 +88,9 @@ const AdminStackNavigator = ({ username, role }) => (
       name="AdminTransactions"
       options={{ title: "All Transactions" }}
     >
-      {() => <TransactionsScreen username={username} role={role} />}
+      {() => (
+        <TransactionsScreen username={username} role={role} scope="all" />
+      )}
     </AdminStack.Screen>
   </AdminStack.Navigator>
 );
@@ -172,7 +174,6 @@ export default function AppNavigator() {
         >
           <Tab.Screen
             name="Dashboard"
-            component={DashboardScreen}
             options={{
               title: `Dashboard · ${workerName}`,
               headerRight: () => (
@@ -195,7 +196,9 @@ export default function AppNavigator() {
                 </TouchableOpacity>
               ),
             }}
-          />
+          >
+            {() => <DashboardScreen username={workerName} />}
+          </Tab.Screen>
           <Tab.Screen name="Scanner" options={{ headerShown: false }}>
             {() => <ScannerScreen role={role} />}
           </Tab.Screen>
@@ -227,7 +230,13 @@ export default function AppNavigator() {
               ),
             }}
           >
-            {() => <TransactionsScreen username={workerName} role={role} />}
+            {() => (
+              <TransactionsScreen
+                username={workerName}
+                role={role}
+                scope="self"
+              />
+            )}
           </Tab.Screen>
           {isAdminRole(role) && (
             <Tab.Screen

@@ -17,17 +17,26 @@ import { useFocusEffect } from "@react-navigation/native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  getRecentTransactions,
   getAllTransactions,
+  getPendingTransactions,
   updateTransaction,
   deleteTransaction,
 } from "../database/db";
-import { getServerTransactions, checkHealth } from "../services/api";
+import {
+  getServerTransactions,
+  getAllServerTransactions,
+  checkHealth,
+} from "../services/api";
 import TransactionRow from "../components/TransactionRow";
 import VoiceMic from "../components/VoiceMic";
 import CalcInput from "../components/CalcInput";
 import Colors from "../theme/colors";
 import { isAdminRole } from "../utils/roles";
+import {
+  isTransactionOwnedByUser,
+  mapServerTransactionToLocalShape,
+  mergeTransactions,
+} from "../utils/transactions";
 
 const IS_WEB = Platform.OS === "web";
 let backupSvc = null;
@@ -35,9 +44,13 @@ if (!IS_WEB) {
   backupSvc = require("../services/backupService");
 }
 
-export default function TransactionsScreen({ username, role }) {
+export default function TransactionsScreen({
+  username,
+  role,
+  scope = "self",
+}) {
   const queryRef = useRef(null);
-  const canManageAll = isAdminRole(role);
+  const canManageAll = isAdminRole(role) && scope === "all";
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
@@ -205,48 +218,48 @@ export default function TransactionsScreen({ username, role }) {
   const loadTransactions = useCallback(async () => {
     setLoading(true);
     try {
-      // Always load local transactions
-      const localData = await getRecentTransactions(200);
+      const localAll = await getAllTransactions();
+      const localData =
+        scope === "self"
+          ? localAll.filter((tx) => isTransactionOwnedByUser(tx, username))
+          : localAll;
 
-      // If admin, also try fetching from server and merge
-      if (canManageAll) {
+      if (scope === "all" && canManageAll) {
         try {
           await checkHealth();
           const serverRes = await getServerTransactions(1, 500, "pending");
-          const serverTxs = (serverRes.transactions || []).map((tx) => ({
-            id: tx._id,
-            item_barcode: tx.Item_Barcode,
-            item_code: tx.Item_Code,
-            item_name: tx.Item_Name,
-            frombin: tx.Frombin,
-            tobin: tx.Tobin,
-            qty: tx.Qty,
-            worker_name: tx.Worker_Name,
-            notes: tx.Notes || "",
-            timestamp: tx.Timestamp,
-            synced: 1,
-            erp_document: tx.erpDocument || "",
-            erp_batch: tx.erpBatch || "",
-            sync_status: tx.syncStatus || "pending",
-            _source: "server",
-          }));
-
-          serverTxs.sort(
-            (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
+          const serverTxs = (serverRes.transactions || []).map(
+            mapServerTransactionToLocalShape,
           );
-          setTransactions(serverTxs);
+
+          setTransactions(mergeTransactions(serverTxs));
         } catch {
           // Server unreachable, show local fallback only
           setTransactions(localData);
         }
       } else {
-        setTransactions(localData);
+        try {
+          await checkHealth();
+          const [serverRes, localPendingAll] = await Promise.all([
+            getAllServerTransactions({ status: "all", mine: true }),
+            getPendingTransactions(),
+          ]);
+          const localPending = localPendingAll.filter((tx) =>
+            isTransactionOwnedByUser(tx, username),
+          );
+          const serverTxs = (serverRes.transactions || []).map(
+            mapServerTransactionToLocalShape,
+          );
+          setTransactions(mergeTransactions(serverTxs, localPending));
+        } catch {
+          setTransactions(localData);
+        }
       }
     } catch {
       setTransactions([]);
     }
     setLoading(false);
-  }, [canManageAll]);
+  }, [canManageAll, scope, username]);
 
   useFocusEffect(
     useCallback(() => {
