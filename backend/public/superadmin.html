@@ -710,6 +710,31 @@
         </div>
 
         <div class="card">
+          <h2>&#128279; Admin Dashboard Links</h2>
+          <p style="color:#5a6a7a;font-size:12px;margin-bottom:14px">Quick access to admin dashboards — click to open or copy the URL.</p>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:10px;background:#0f1923;border:1px solid #2a3a4a;border-radius:10px;padding:14px 16px;flex-wrap:wrap">
+              <div style="width:10px;height:10px;border-radius:50%;background:#4caf50;box-shadow:0 0 6px rgba(76,175,80,0.5);flex-shrink:0"></div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:700;color:#e0e6ed">fullstck</div>
+                <div style="font-size:12px;color:#5a6a7a;word-break:break-all">https://fullstck.onrender.com/admin/</div>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="copyUrl('https://fullstck.onrender.com/admin/',this)" style="flex-shrink:0">&#128203; Copy</button>
+              <a href="https://fullstck.onrender.com/admin/" target="_blank" class="btn btn-primary btn-sm" style="flex-shrink:0;text-decoration:none">Open &#8599;</a>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;background:#0f1923;border:1px solid #2a3a4a;border-radius:10px;padding:14px 16px;flex-wrap:wrap">
+              <div style="width:10px;height:10px;border-radius:50%;background:#4caf50;box-shadow:0 0 6px rgba(76,175,80,0.5);flex-shrink:0"></div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:700;color:#e0e6ed">inventory-backend-fdex</div>
+                <div style="font-size:12px;color:#5a6a7a;word-break:break-all">https://inventory-backend-fdex.onrender.com/admin/</div>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="copyUrl('https://inventory-backend-fdex.onrender.com/admin/',this)" style="flex-shrink:0">&#128203; Copy</button>
+              <a href="https://inventory-backend-fdex.onrender.com/admin/" target="_blank" class="btn btn-primary btn-sm" style="flex-shrink:0;text-decoration:none">Open &#8599;</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
           <h2>&#9889; Multi-Server Health</h2>
           <p style="color: #5a6a7a; font-size: 12px; margin-bottom: 14px">
             All failover servers are checked in parallel. Green = online &amp;
@@ -2008,6 +2033,17 @@
         return r
           ? `${parseInt(r[1], 16)},${parseInt(r[2], 16)},${parseInt(r[3], 16)}`
           : "122,138,154";
+      }
+
+      // ─── Copy URL ─────────────────────────────────────────────────────
+      function copyUrl(url, btn) {
+        navigator.clipboard.writeText(url).then(() => {
+          const orig = btn.innerHTML;
+          btn.innerHTML = "&#10003; Copied!";
+          btn.style.color = "#4caf50";
+          btn.style.borderColor = "#4caf50";
+          setTimeout(() => { btn.innerHTML = orig; btn.style.color = ""; btn.style.borderColor = ""; }, 2000);
+        }).catch(() => { alert("Copy failed — URL: " + url); });
       }
 
       // ─── Emergency Impersonation ───────────────────────────────────────
