@@ -40,7 +40,19 @@ import {
 } from "../database/db";
 import { attemptSync } from "../services/syncService";
 import CalcInput from "../components/CalcInput";
-import VoiceMic from "../components/VoiceMic";
+// ClearButton — shows ✕ inside the input when there is text, invisible when empty
+const ClearButton = ({ value, onClear, style }) => {
+  if (!value) return null;
+  return (
+    <TouchableOpacity
+      onPress={onClear}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      style={[{ marginRight: 8, padding: 2 }, style]}
+    >
+      <MaterialCommunityIcons name="close-circle" size={18} color="#9e9e9e" />
+    </TouchableOpacity>
+  );
+};
 import Colors from "../theme/colors";
 import { isAdminRole } from "../utils/roles";
 
@@ -358,13 +370,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <VoiceMic
-                onResult={(t) => setBarcode(digitsOnly(t))}
-                mode="numeric"
-                focusTargetRef={barcodeRef}
-                size={18}
-                style={styles.micInside}
-              />
+              <ClearButton value={barcode} onClear={() => setBarcode("")} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -400,13 +406,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <VoiceMic
-                onResult={(t) => setItemCode(digitsOnly(t))}
-                mode="numeric"
-                focusTargetRef={itemCodeRef}
-                size={18}
-                style={styles.micInside}
-              />
+              <ClearButton value={itemCode} onClear={() => setItemCode("")} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -458,13 +458,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <VoiceMic
-                onResult={(t) => setQuickCode(digitsOnly(t))}
-                mode="numeric"
-                focusTargetRef={quickCodeRef}
-                size={18}
-                style={styles.micInside}
-              />
+              <ClearButton value={quickCode} onClear={() => setQuickCode("")} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -534,12 +528,7 @@ export default function ScannerScreen({ role = "worker" }) {
               }}
               blurOnSubmit={false}
             />
-            <VoiceMic
-              onResult={(t) => setItemName(t)}
-              focusTargetRef={itemNameRef}
-              size={18}
-              style={styles.micInside}
-            />
+            <ClearButton value={itemName} onClear={() => setItemName("")} />
           </View>
           <TouchableOpacity
             style={styles.searchBtn}
@@ -641,12 +630,7 @@ export default function ScannerScreen({ role = "worker" }) {
           }}
           blurOnSubmit={false}
         />
-        <VoiceMic
-          onResult={(t) => setFrombin(t)}
-          focusTargetRef={fromBinRef}
-          size={18}
-          style={styles.micInside}
-        />
+        <ClearButton value={frombin} onClear={() => setFrombin("")} />
       </View>
 
       <Text style={styles.label}>To Bin</Text>
@@ -665,12 +649,7 @@ export default function ScannerScreen({ role = "worker" }) {
           }}
           blurOnSubmit={false}
         />
-        <VoiceMic
-          onResult={(t) => setTobin(t)}
-          focusTargetRef={toBinRef}
-          size={18}
-          style={styles.micInside}
-        />
+        <ClearButton value={tobin} onClear={() => setTobin("")} />
       </View>
 
       <Text style={styles.label}>
@@ -709,12 +688,7 @@ export default function ScannerScreen({ role = "worker" }) {
             if (e.nativeEvent.key === "Enter") handleSave();
           }}
         />
-        <VoiceMic
-          onResult={(t) => setNotes(t)}
-          focusTargetRef={notesRef}
-          size={18}
-          style={styles.micInside}
-        />
+        <ClearButton value={notes} onClear={() => setNotes("")} />
       </View>
 
       <TouchableOpacity

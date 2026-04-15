@@ -234,6 +234,8 @@ router.post("/", requireDB, requireAuth, async (req, res) => {
     }
 
     const workerName = req.user.username;
+    const now = new Date();
+
     const docs = transactions.map((tx) => ({
       clientTxId:
         String(
@@ -255,47 +257,60 @@ router.post("/", requireDB, requireAuth, async (req, res) => {
       Worker_Name: workerName,
     }));
 
+    // ── BATCH LOOKUP: one query instead of N individual findOne calls ──────────
+    // Build a map of all known clientTxIds in one round-trip
+    const allClientTxIds = docs.map((d) => d.clientTxId);
+    const existingDocs = await Transaction.find(
+      { clientTxId: { $in: allClientTxIds } },
+    ).lean();
+    const existingMap = new Map(existingDocs.map((e) => [e.clientTxId, e]));
+
     let inserted = 0;
     let updated = 0;
     let unchanged = 0;
     let locked = 0;
+    const toInsert = [];
+    const toUpdate = []; // { id, update }
     const sheetRows = [];
 
     for (const doc of docs) {
-      let existing = await Transaction.findOne({ clientTxId: doc.clientTxId });
+      const existing = existingMap.get(doc.clientTxId);
 
       if (!existing) {
-        existing = await Transaction.findOne({
-          clientTxId: { $exists: false },
+        toInsert.push({
+          clientTxId: doc.clientTxId,
+          clientUpdatedAt: doc.clientUpdatedAt,
           Item_Barcode: doc.Item_Barcode,
+          Item_Code: doc.Item_Code,
+          Item_Name: doc.Item_Name,
+          Frombin: doc.Frombin,
+          Tobin: doc.Tobin,
+          Qty: doc.Qty,
+          UOM: doc.UOM,
           Timestamp: doc.Timestamp,
+          Notes: doc.Notes,
           deviceId: doc.deviceId,
-        });
-      }
-
-      if (!existing) {
-        const created = new Transaction({
-          ...doc,
+          Worker_Name: doc.Worker_Name,
           syncStatus: "pending",
-          lastSyncedAt: new Date(),
-          createdAt: new Date(),
+          lastSyncedAt: now,
+          createdAt: now,
         });
-        await created.save();
         inserted += 1;
-        sheetRows.push(created.toObject());
         continue;
       }
 
       const currentStatus = normalizeStatus(existing.syncStatus, "pending");
       if (currentStatus === "processed" || currentStatus === "archived") {
-        if (!existing.clientTxId) {
-          existing.clientTxId = doc.clientTxId;
-        }
-        if (!existing.clientUpdatedAt) {
-          existing.clientUpdatedAt = doc.clientUpdatedAt;
-        }
-        existing.lastSyncedAt = new Date();
-        await existing.save();
+        toUpdate.push({
+          id: existing._id,
+          update: {
+            $set: {
+              clientTxId: existing.clientTxId || doc.clientTxId,
+              clientUpdatedAt: existing.clientUpdatedAt || doc.clientUpdatedAt,
+              lastSyncedAt: now,
+            },
+          },
+        });
         locked += 1;
         continue;
       }
@@ -307,25 +322,71 @@ router.post("/", requireDB, requireAuth, async (req, res) => {
       const changed = hasMeaningfulChange(existing, doc);
 
       if (changed && incomingIsNewer) {
-        applyIncomingTransaction(existing, doc);
-        existing.syncStatus = "pending";
-        await existing.save();
+        toUpdate.push({
+          id: existing._id,
+          update: {
+            $set: {
+              clientTxId: doc.clientTxId,
+              clientUpdatedAt: doc.clientUpdatedAt,
+              Item_Barcode: doc.Item_Barcode,
+              Item_Code: doc.Item_Code,
+              Item_Name: doc.Item_Name,
+              Frombin: doc.Frombin,
+              Tobin: doc.Tobin,
+              Qty: doc.Qty,
+              UOM: doc.UOM,
+              Timestamp: doc.Timestamp,
+              Notes: doc.Notes,
+              deviceId: doc.deviceId,
+              Worker_Name: doc.Worker_Name,
+              lastSyncedAt: now,
+              syncStatus: "pending",
+            },
+          },
+        });
         updated += 1;
       } else {
-        if (!existing.clientTxId) {
-          existing.clientTxId = doc.clientTxId;
-        }
-        if (!existing.clientUpdatedAt) {
-          existing.clientUpdatedAt = doc.clientUpdatedAt;
-        }
-        existing.lastSyncedAt = new Date();
-        if (!existing.syncStatus) {
-          existing.syncStatus = "pending";
-        }
-        await existing.save();
+        toUpdate.push({
+          id: existing._id,
+          update: {
+            $set: {
+              clientTxId: existing.clientTxId || doc.clientTxId,
+              clientUpdatedAt: existing.clientUpdatedAt || doc.clientUpdatedAt,
+              ...(existing.syncStatus ? {} : { syncStatus: "pending" }),
+              lastSyncedAt: now,
+            },
+          },
+        });
         unchanged += 1;
       }
     }
+
+    // ── BATCH WRITE: 2 round-trips max regardless of transaction count ─────────
+    const writePromises = [];
+
+    if (toInsert.length > 0) {
+      const insertOp = Transaction.insertMany(toInsert, { ordered: false })
+        .then((docs) => {
+          for (const d of docs) sheetRows.push(d.toObject());
+        })
+        .catch((err) => {
+          // On duplicate key errors some docs still inserted — count them
+          const partial = err.result?.nInserted ?? 0;
+          inserted = partial; // adjust count
+        });
+      writePromises.push(insertOp);
+    }
+
+    if (toUpdate.length > 0) {
+      const bulkOps = toUpdate.map(({ id, update }) => ({
+        updateOne: { filter: { _id: id }, update },
+      }));
+      writePromises.push(
+        Transaction.bulkWrite(bulkOps, { ordered: false }),
+      );
+    }
+
+    await Promise.all(writePromises);
 
     await recordWorkerSync(workerName, inserted + updated);
     if (sheetRows.length > 0) {
@@ -357,7 +418,25 @@ router.post("/", requireDB, requireAuth, async (req, res) => {
   }
 });
 
-router.get("/", requireDB, requireAuth, requireAdmin, async (req, res) => {
+// POST /api/sync/verify — phone asks "which of these clientTxIds does the server have?"
+// Used as a fallback: if sync POST timed out, phone calls this to mark already-synced txns.
+router.post("/verify", requireDB, requireAuth, async (req, res) => {
+  try {
+    const { clientTxIds } = req.body;
+    if (!Array.isArray(clientTxIds) || clientTxIds.length === 0) {
+      return res.json({ success: true, found: [] });
+    }
+    const found = await Transaction.find(
+      { clientTxId: { $in: clientTxIds } },
+      { clientTxId: 1, _id: 0 },
+    ).lean();
+    res.json({ success: true, found: found.map((d) => d.clientTxId) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get("/", requireDB, requireAuth, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(
@@ -368,6 +447,17 @@ router.get("/", requireDB, requireAuth, requireAdmin, async (req, res) => {
     const status = req.query.status || "pending";
     const query = buildStatusQuery(status);
     const sort = buildStatusSort(status);
+    const mine = String(req.query.mine || "").trim() === "1";
+    const worker = req.query.worker
+      ? String(req.query.worker).trim().toUpperCase()
+      : "";
+    const isAdmin = req.user.role === "admin" || req.user.role === "superadmin";
+
+    if (mine || !isAdmin) {
+      query.Worker_Name = req.user.username;
+    } else if (worker) {
+      query.Worker_Name = worker;
+    }
 
     const [transactions, total] = await Promise.all([
       Transaction.find(query).sort(sort).skip(skip).limit(limit),

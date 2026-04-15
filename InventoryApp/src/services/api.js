@@ -306,9 +306,27 @@ export const fetchItemsBulk = async () => {
   return res.data; // { version, total, items }
 };
 
-export const syncTransactions = async (transactions) => {
-  const res = await apiClient.post("/sync", { transactions });
+// Download only items created/updated after `since` (ISO string).
+// Pass `lastFullSync` (ISO) so server can detect if a full replace happened.
+// Returns { version, serverTime, requiresFullSync, items, total }
+export const fetchItemsDelta = async (since, lastFullSync) => {
+  const params = new URLSearchParams({ since });
+  if (lastFullSync) params.set("lastFullSync", lastFullSync);
+  const res = await apiClient.get(`/items/delta?${params}`, { timeout: 30000 });
   return res.data;
+};
+
+export const syncTransactions = async (transactions) => {
+  // 60-second timeout: budget phones on slow networks + Render free tier can be slow.
+  // The server saves data before responding, so if 10s fires the phone never gets the ack.
+  const res = await apiClient.post("/sync", { transactions }, { timeout: 60000 });
+  return res.data;
+};
+
+// Ask server which of these clientTxIds it already has (fallback after timeout)
+export const verifySyncedTxIds = async (clientTxIds) => {
+  const res = await apiClient.post("/sync/verify", { clientTxIds }, { timeout: 30000 });
+  return res.data; // { success, found: [clientTxId, ...] }
 };
 
 // Check if server wants us to clear synced data
@@ -339,11 +357,54 @@ export const getServerTransactions = async (
   page = 1,
   limit = 50,
   status = "pending",
+  options = {},
 ) => {
-  const res = await apiClient.get(
-    `/transactions?page=${page}&limit=${limit}&status=${encodeURIComponent(status)}`,
-  );
+  const params = [
+    `page=${encodeURIComponent(String(page))}`,
+    `limit=${encodeURIComponent(String(limit))}`,
+    `status=${encodeURIComponent(String(status || "pending"))}`,
+  ];
+  if (options.mine) {
+    params.push("mine=1");
+  }
+  if (options.worker) {
+    params.push(
+      `worker=${encodeURIComponent(
+        String(options.worker).trim().toUpperCase(),
+      )}`,
+    );
+  }
+  const res = await apiClient.get(`/transactions?${params.join("&")}`);
   return res.data;
+};
+
+export const getAllServerTransactions = async ({
+  status = "all",
+  mine = false,
+  worker = "",
+  pageSize = 200,
+  maxPages = 100,
+} = {}) => {
+  let page = 1;
+  let total = 0;
+  const transactions = [];
+
+  while (page <= maxPages) {
+    const data = await getServerTransactions(page, pageSize, status, {
+      mine,
+      worker,
+    });
+    const batch = data.transactions || [];
+    total = Number(data.total || 0);
+    transactions.push(...batch);
+
+    if (batch.length === 0 || transactions.length >= total) {
+      break;
+    }
+    page += 1;
+  }
+
+  return { success: true, total, transactions };
 };
 
 export const setServerTransactionStatus = async ({

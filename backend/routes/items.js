@@ -246,7 +246,10 @@ async function applyCsvItems(items, mode, onProgress, req) {
 
   if (mode === "replace") {
     const result = await replaceItemsAtomically(items, onProgress);
-    await bumpItemsVersion(req, result.totalItems);
+    await Promise.all([
+      bumpItemsVersion(req, result.totalItems),
+      setLastFullReplace(),
+    ]);
     return result;
   }
 
@@ -256,6 +259,7 @@ async function applyCsvItems(items, mode, onProgress, req) {
   let processed = 0;
   const CHUNK = 5000;
   const chunks = chunkArray(items, CHUNK);
+  const mergeTime = new Date();
   for (const chunk of chunks) {
     const ops = chunk.map((item) => ({
       updateOne: {
@@ -266,6 +270,7 @@ async function applyCsvItems(items, mode, onProgress, req) {
             Barcode: item.Barcode,
             Item_Name: item.Item_Name,
             UOM: item.UOM || "PCS",
+            updatedAt: mergeTime,
           },
         },
         upsert: true,
@@ -289,6 +294,19 @@ async function applyCsvItems(items, mode, onProgress, req) {
 async function getItemsVersion() {
   const doc = await Meta.findOne({ key: "itemsVersion" }).lean();
   return doc ? doc.version : 0;
+}
+
+async function setLastFullReplace() {
+  await Meta.findOneAndUpdate(
+    { key: "lastFullReplace" },
+    { $set: { value: new Date() } },
+    { upsert: true },
+  );
+}
+
+async function getLastFullReplace() {
+  const doc = await Meta.findOne({ key: "lastFullReplace" }).lean();
+  return doc?.value ? new Date(doc.value) : null;
 }
 
 async function bumpItemsVersion(req, totalItemsHint) {
@@ -343,6 +361,63 @@ router.get("/bulk", async (req, res) => {
       "Content-Length": cache.gzBuf.length,
     });
     return res.end(cache.gzBuf);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/items/delta?since=<ISO>&lastFullSync=<ISO>
+// Returns only items created/updated after `since`.
+// If lastFullSync is before the last full-replace, phone must do a full re-download.
+// Small payload (200-1000 items/day) — served directly, no pre-caching needed.
+router.get("/delta", async (req, res) => {
+  try {
+    const sinceRaw = req.query.since;
+    const lastFullSyncRaw = req.query.lastFullSync;
+
+    if (!sinceRaw) {
+      return res.status(400).json({ success: false, error: "since param required" });
+    }
+
+    const since = new Date(sinceRaw);
+    if (isNaN(since.getTime())) {
+      return res.status(400).json({ success: false, error: "invalid since date" });
+    }
+
+    const serverTime = new Date();
+    const [version, lastFullReplace] = await Promise.all([
+      getItemsVersion(),
+      getLastFullReplace(),
+    ]);
+
+    // If admin did a full replace after the phone's last full sync → force full download
+    if (lastFullReplace && lastFullSyncRaw) {
+      const lastFullSync = new Date(lastFullSyncRaw);
+      if (!isNaN(lastFullSync.getTime()) && lastFullReplace > lastFullSync) {
+        return res.json({
+          success: true,
+          version,
+          serverTime: serverTime.toISOString(),
+          requiresFullSync: true,
+          items: [],
+          total: 0,
+        });
+      }
+    }
+
+    const items = await Item.find(
+      { updatedAt: { $gte: since } },
+      { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1, UOM: 1 },
+    ).lean();
+
+    return res.json({
+      success: true,
+      version,
+      serverTime: serverTime.toISOString(),
+      requiresFullSync: false,
+      items,
+      total: items.length,
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -437,7 +512,7 @@ router.post("/", async (req, res) => {
     }
     const item = await Item.findOneAndUpdate(
       { Barcode },
-      { $set: { ItemCode, Barcode, Item_Name, UOM: "PCS" } },
+      { $set: { ItemCode, Barcode, Item_Name, UOM: "PCS", updatedAt: new Date() } },
       { upsert: true, new: true },
     );
     await bumpItemsVersion(req);
@@ -459,6 +534,7 @@ router.post("/import", requireAuth, requireAdmin, async (req, res) => {
     let inserted = 0;
     let modified = 0;
     const rawCol = Item.collection;
+    const importTime = new Date();
     const chunks = chunkArray(items, 3000);
     for (const chunk of chunks) {
       const ops = chunk.map((item) => ({
@@ -469,6 +545,7 @@ router.post("/import", requireAuth, requireAdmin, async (req, res) => {
               ItemCode: item.ItemCode,
               Barcode: item.Barcode,
               Item_Name: item.Item_Name,
+              updatedAt: importTime,
             },
           },
           upsert: true,
@@ -490,7 +567,7 @@ router.delete("/all", requireAuth, requireSuperAdmin, async (req, res) => {
   try {
     const count = await Item.countDocuments({});
     await Item.deleteMany({});
-    await bumpItemsVersion(req);
+    await Promise.all([bumpItemsVersion(req), setLastFullReplace()]);
     audit(
       req.user?.username || "unknown",
       req.user?.role || "superadmin",

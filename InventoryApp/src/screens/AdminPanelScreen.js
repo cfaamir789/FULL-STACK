@@ -32,6 +32,7 @@ import {
 import {
   attemptSync,
   downloadItemMaster,
+  downloadItemDelta,
   checkItemMasterUpdate,
 } from "../services/syncService";
 import Colors from "../theme/colors";
@@ -183,6 +184,46 @@ export default function AdminPanelScreen({ navigation }) {
     } catch (err) {
       setMasterResult({ success: false, error: err.message });
       Alert.alert("Download Failed", err.message);
+    } finally {
+      setMasterDownloading(false);
+      setMasterProgress(null);
+    }
+  };
+
+  const handleSmartSync = async () => {
+    setMasterDownloading(true);
+    setMasterResult(null);
+    setMasterProgress({ phase: "checking", percent: 0 });
+    try {
+      const result = await downloadItemDelta((progress) => {
+        setMasterProgress(progress);
+      });
+      setMasterResult(result);
+      if (result.success) {
+        const local = await getDashboardStats();
+        setLocalStats(local);
+        setMasterStatus((prev) =>
+          prev
+            ? { ...prev, localVersion: result.version, updateAvailable: false }
+            : prev,
+        );
+        if (result.unchanged) {
+          Alert.alert("Already Up to Date", "No new or updated items found.");
+        } else if (result.delta) {
+          Alert.alert(
+            "Smart Sync Done",
+            `Updated ${result.count.toLocaleString()} item(s) — only changes downloaded!`,
+          );
+        } else {
+          Alert.alert(
+            "Full Download Done",
+            `Downloaded ${result.count.toLocaleString()} items (v${result.version}).`,
+          );
+        }
+      }
+    } catch (err) {
+      setMasterResult({ success: false, error: err.message });
+      Alert.alert("Sync Failed", err.message);
     } finally {
       setMasterDownloading(false);
       setMasterProgress(null);
@@ -659,6 +700,25 @@ export default function AdminPanelScreen({ navigation }) {
             </TouchableOpacity>
 
             <TouchableOpacity
+              style={[styles.masterBtn, { backgroundColor: "#1565c0" }]}
+              onPress={handleSmartSync}
+              disabled={masterDownloading || !online}
+            >
+              {masterDownloading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialCommunityIcons
+                  name="sync"
+                  size={18}
+                  color="#fff"
+                />
+              )}
+              <Text style={styles.masterBtnText}>
+                {masterDownloading ? "Syncing..." : "Smart Sync (New/Updated Only)"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.masterBtn, { backgroundColor: "#2e7d32" }]}
               onPress={handleDownloadMaster}
               disabled={masterDownloading || !online}
@@ -673,7 +733,7 @@ export default function AdminPanelScreen({ navigation }) {
                 />
               )}
               <Text style={styles.masterBtnText}>
-                {masterDownloading ? "Downloading..." : "Download from Server"}
+                {masterDownloading ? "Downloading..." : "Full Download (All Items)"}
               </Text>
             </TouchableOpacity>
 

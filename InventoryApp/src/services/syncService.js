@@ -3,7 +3,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   checkHealth,
   syncTransactions,
+  verifySyncedTxIds,
   fetchItemsBulk,
+  fetchItemsDelta,
   fetchItemsVersion,
   getServerTimeISO,
   checkClearCommand,
@@ -13,6 +15,7 @@ import {
   getPendingTransactions,
   markTransactionsSynced,
   clearAndReplaceAllItems,
+  upsertItems,
   clearSyncedTransactions,
 } from "../database/db";
 
@@ -74,11 +77,74 @@ export const downloadItemMaster = async (onProgress) => {
     });
   });
 
-  // 3. Save version ONLY after successful write
-  await AsyncStorage.setItem("itemsVersion", String(serverVersion));
+  // 3. Save version and sync timestamps ONLY after successful write
+  const syncNow = new Date().toISOString();
+  await Promise.all([
+    AsyncStorage.setItem("itemsVersion", String(serverVersion)),
+    AsyncStorage.setItem("lastItemSyncTime", syncNow),
+    AsyncStorage.setItem("lastItemFullSync", syncNow),
+  ]);
 
   onProgress?.({ phase: "done", percent: 100 });
-  return { success: true, count: items.length, version: serverVersion };
+  return { success: true, count: items.length, version: serverVersion, delta: false };
+};
+
+// ─── Smart Delta Sync ─────────────────────────────────────────────────────────
+// Downloads only new/updated items since last sync. Falls back to full download
+// if this is the first sync ever, or if the admin did a full replace.
+//
+// AsyncStorage keys used:
+//   itemsVersion       — version number of last successful download
+//   lastItemSyncTime   — ISO timestamp of last delta or full download
+//   lastItemFullSync   — ISO timestamp of last FULL (bulk) download
+export const downloadItemDelta = async (onProgress) => {
+  const [lastSyncTime, lastFullSync, localVerStr] = await Promise.all([
+    AsyncStorage.getItem("lastItemSyncTime"),
+    AsyncStorage.getItem("lastItemFullSync"),
+    AsyncStorage.getItem("itemsVersion"),
+  ]);
+
+  // First time or no sync time → must do full download
+  if (!lastSyncTime || !localVerStr) {
+    return downloadItemMaster(onProgress);
+  }
+
+  onProgress?.({ phase: "checking", percent: 0 });
+
+  let deltaData;
+  try {
+    deltaData = await fetchItemsDelta(lastSyncTime, lastFullSync);
+  } catch (err) {
+    // Network error on delta → fall back to full download
+    return downloadItemMaster(onProgress);
+  }
+
+  // Server says a full replace happened after our last full sync → full download
+  if (deltaData.requiresFullSync) {
+    return downloadItemMaster(onProgress);
+  }
+
+  const { items, total, version, serverTime } = deltaData;
+
+  // Nothing changed
+  if (total === 0) {
+    onProgress?.({ phase: "done", percent: 100 });
+    return { success: true, count: 0, version, delta: true, unchanged: true };
+  }
+
+  onProgress?.({ phase: "saving", percent: 0 });
+
+  // Upsert only the changed items — existing items stay untouched
+  await upsertItems(items);
+
+  // Save updated sync timestamps and version
+  await Promise.all([
+    AsyncStorage.setItem("itemsVersion", String(version)),
+    AsyncStorage.setItem("lastItemSyncTime", serverTime),
+  ]);
+
+  onProgress?.({ phase: "done", percent: 100 });
+  return { success: true, count: total, version, delta: true };
 };
 
 // Check if a newer item master version is available on server
@@ -172,6 +238,33 @@ export const attemptSync = async () => {
     const ids = pending.map((tx) => tx.id);
     await markTransactionsSynced(ids);
   } catch (err) {
+    // Sync POST timed out or network dropped AFTER server saved the data.
+    // Verify which transactions the server already has and mark those as synced
+    // so they don't get re-sent forever (fixes stuck-pending on slow phones).
+    try {
+      const clientTxIds = pending
+        .map((tx) => tx.client_tx_id)
+        .filter(Boolean);
+      if (clientTxIds.length > 0) {
+        const verifyRes = await verifySyncedTxIds(clientTxIds);
+        if (verifyRes?.found?.length > 0) {
+          const foundSet = new Set(verifyRes.found);
+          const verifiedIds = pending
+            .filter((tx) => tx.client_tx_id && foundSet.has(tx.client_tx_id))
+            .map((tx) => tx.id);
+          if (verifiedIds.length > 0) {
+            await markTransactionsSynced(verifiedIds);
+            synced = verifiedIds.length;
+            // Return partial success so caller knows some were synced
+            const lastSync = await getServerTimeISO();
+            notifyStatus({ online: true, lastSync, pendingCount: pending.length - synced });
+            return { synced, reason: "partial_verified", lastSync };
+          }
+        }
+      }
+    } catch (_) {
+      // verify also failed — truly offline or server down
+    }
     return { synced: 0, reason: "sync_failed", error: err.message };
   }
 
