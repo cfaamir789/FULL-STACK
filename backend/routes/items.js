@@ -101,45 +101,59 @@ function parseCsvItems(csvText) {
 
 async function applyCsvItems(items, mode, onProgress, req) {
   const rawCol = Item.collection; // raw MongoDB driver — skips Mongoose overhead
-
-  if (mode === "replace") {
-    // drop() is instant vs deleteMany which scans every doc
-    try {
-      await rawCol.drop();
-    } catch (e) {
-      // Collection may not exist yet, that's fine
-      if (e.codeName !== "NamespaceNotFound") throw e;
-    }
-    // Recreate indexes after drop
-    await Item.ensureIndexes();
-  }
-
-  let inserted = 0;
-  let modified = 0;
-  let processed = 0;
   const total = items.length;
 
   if (mode === "replace") {
-    // Raw driver insertMany with large chunks — bypasses Mongoose validation
-    const CHUNK = 5000;
-    const chunks = chunkArray(items, CHUNK);
-    for (const chunk of chunks) {
-      try {
-        const result = await rawCol.insertMany(chunk, {
-          ordered: false,
-          writeConcern: { w: 1 },
-        });
-        inserted += result.insertedCount;
-      } catch (err) {
-        // Some dupes may fail; count successes
-        inserted += err.result?.nInserted ?? (chunk.length - (err.writeErrors?.length || 0));
-      }
-      processed += chunk.length;
-      onProgress?.({ processed, total, inserted, modified });
+    // ── Phase 1: Drop entire collection (data + indexes) — instant ──
+    try {
+      await rawCol.drop();
+    } catch (e) {
+      if (e.codeName !== "NamespaceNotFound") throw e;
     }
+
+    // ── Phase 2: Insert ALL items WITHOUT any indexes ──
+    // No unique constraint = no index lookups per doc = 10x faster
+    onProgress?.({ processed: 0, total, inserted: 0, modified: 0, phase: "inserting" });
+
+    let inserted = 0;
+    let processed = 0;
+
+    // Large chunks + parallel batches for max throughput
+    const CHUNK = 50000;
+    const chunks = chunkArray(items, CHUNK);
+    const PARALLEL = 3; // fire 3 chunks at once
+    for (let i = 0; i < chunks.length; i += PARALLEL) {
+      const batch = chunks.slice(i, i + PARALLEL);
+      const results = await Promise.all(
+        batch.map((chunk) =>
+          rawCol
+            .insertMany(chunk, { ordered: false, writeConcern: { w: 1, j: false } })
+            .then((r) => r.insertedCount)
+            .catch((err) => err.result?.nInserted ?? (chunk.length - (err.writeErrors?.length || 0)))
+        )
+      );
+      for (const count of results) inserted += count;
+      processed += batch.reduce((s, c) => s + c.length, 0);
+      onProgress?.({ processed, total, inserted, modified: 0, phase: "inserting" });
+    }
+
+    // ── Phase 3: Build indexes AFTER all data is loaded (bulk build is 10x faster) ──
+    onProgress?.({ processed: total, total, inserted, modified: 0, phase: "indexing" });
+    await Promise.all([
+      rawCol.createIndex({ Barcode: 1 }, { unique: true, background: true }),
+      rawCol.createIndex({ Item_Name: 1 }, { background: true }),
+      rawCol.createIndex({ ItemCode: 1 }, { background: true }),
+    ]);
+
+    await bumpItemsVersion(req);
+    const totalItems = await Item.countDocuments({});
+    return { inserted, modified: 0, totalItems, processed: total, total };
   } else {
-    // Merge mode — upsert with raw bulkWrite
-    const CHUNK = 3000;
+    // ── Merge mode — upsert with raw bulkWrite, large chunks ──
+    let inserted = 0;
+    let modified = 0;
+    let processed = 0;
+    const CHUNK = 5000;
     const chunks = chunkArray(items, CHUNK);
     for (const chunk of chunks) {
       const ops = chunk.map((item) => ({
@@ -160,13 +174,13 @@ async function applyCsvItems(items, mode, onProgress, req) {
       inserted += result.upsertedCount || 0;
       modified += result.modifiedCount || 0;
       processed += chunk.length;
-      onProgress?.({ processed, total, inserted, modified });
+      onProgress?.({ processed, total, inserted, modified, phase: "merging" });
     }
-  }
 
-  await bumpItemsVersion(req);
-  const totalItems = await Item.countDocuments({});
-  return { inserted, modified, totalItems, processed, total };
+    await bumpItemsVersion(req);
+    const totalItems = await Item.countDocuments({});
+    return { inserted, modified, totalItems, processed: total, total };
+  }
 }
 
 // ─── Item Version Tracking ──────────────────────────────────────────────────
@@ -382,22 +396,28 @@ router.post("/replace", requireAuth, requireAdmin, async (req, res) => {
         .json({ success: false, error: "items array is required" });
     }
     const rawCol = Item.collection;
-    try {
-      await rawCol.drop();
-    } catch (e) {
+    try { await rawCol.drop(); } catch (e) {
       if (e.codeName !== "NamespaceNotFound") throw e;
     }
-    await Item.ensureIndexes();
+    // Insert without indexes, then build indexes after
     let inserted = 0;
-    const chunks = chunkArray(items, 5000);
-    for (const chunk of chunks) {
-      try {
-        const result = await rawCol.insertMany(chunk, { ordered: false });
-        inserted += result.insertedCount;
-      } catch (err) {
-        inserted += err.result?.nInserted ?? (chunk.length - (err.writeErrors?.length || 0));
-      }
+    const CHUNK = 50000;
+    const chunks = chunkArray(items, CHUNK);
+    const PARALLEL = 3;
+    for (let i = 0; i < chunks.length; i += PARALLEL) {
+      const batch = chunks.slice(i, i + PARALLEL);
+      const results = await Promise.all(
+        batch.map((c) => rawCol.insertMany(c, { ordered: false, writeConcern: { w: 1, j: false } })
+          .then((r) => r.insertedCount)
+          .catch((err) => err.result?.nInserted ?? (c.length - (err.writeErrors?.length || 0))))
+      );
+      for (const count of results) inserted += count;
     }
+    await Promise.all([
+      rawCol.createIndex({ Barcode: 1 }, { unique: true, background: true }),
+      rawCol.createIndex({ Item_Name: 1 }, { background: true }),
+      rawCol.createIndex({ ItemCode: 1 }, { background: true }),
+    ]);
     await bumpItemsVersion(req);
     res.json({ success: true, inserted });
   } catch (err) {
@@ -485,30 +505,33 @@ router.post(
       const mode = req.query.mode || "replace"; // 'replace' or 'merge'
       const rawCol = Item.collection;
 
-      if (mode === "replace") {
-        try {
-          await rawCol.drop();
-        } catch (e) {
-          if (e.codeName !== "NamespaceNotFound") throw e;
-        }
-        await Item.ensureIndexes();
-      }
-
       let inserted = 0;
       let modified = 0;
 
       if (mode === "replace") {
-        const chunks = chunkArray(items, 5000);
-        for (const chunk of chunks) {
-          try {
-            const result = await rawCol.insertMany(chunk, { ordered: false });
-            inserted += result.insertedCount;
-          } catch (err) {
-            inserted += err.result?.nInserted ?? (chunk.length - (err.writeErrors?.length || 0));
-          }
+        try { await rawCol.drop(); } catch (e) {
+          if (e.codeName !== "NamespaceNotFound") throw e;
         }
+        // Insert without indexes, then build indexes after
+        const CHUNK = 50000;
+        const chunks = chunkArray(items, CHUNK);
+        const PARALLEL = 3;
+        for (let i = 0; i < chunks.length; i += PARALLEL) {
+          const batch = chunks.slice(i, i + PARALLEL);
+          const results = await Promise.all(
+            batch.map((c) => rawCol.insertMany(c, { ordered: false, writeConcern: { w: 1, j: false } })
+              .then((r) => r.insertedCount)
+              .catch((err) => err.result?.nInserted ?? (c.length - (err.writeErrors?.length || 0))))
+          );
+          for (const count of results) inserted += count;
+        }
+        await Promise.all([
+          rawCol.createIndex({ Barcode: 1 }, { unique: true, background: true }),
+          rawCol.createIndex({ Item_Name: 1 }, { background: true }),
+          rawCol.createIndex({ ItemCode: 1 }, { background: true }),
+        ]);
       } else {
-        const chunks = chunkArray(items, 3000);
+        const chunks = chunkArray(items, 5000);
         for (const chunk of chunks) {
           const ops = chunk.map((item) => ({
             updateOne: {

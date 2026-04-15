@@ -3920,7 +3920,9 @@
                   ? Math.round((status.processed / status.total) * 100)
                   : 0;
               const elapsed = ((Date.now() - uploadStart) / 1000).toFixed(0);
-              btn.textContent = "Processing... " + pct + "% (" + elapsed + "s)";
+              const phase = status.phase === "indexing" ? "Building indexes..." : 
+                            status.phase === "merging" ? "Merging..." : "Inserting...";
+              btn.textContent = phase + " " + pct + "% (" + elapsed + "s)";
             }
             if (status.status === "done") {
               const totalSec = ((Date.now() - uploadStart) / 1000).toFixed(1);
