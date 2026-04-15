@@ -1035,12 +1035,24 @@
         border-radius: 14px;
         background: linear-gradient(180deg, #fff, #f9fbfd);
       }
+      .activity-row > div:first-child {
+        min-width: 0;
+        overflow: hidden;
+      }
       .activity-row strong {
+        display: block;
         font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .activity-row span {
+        display: block;
         font-size: 12px;
         color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .activity-pill {
         padding: 6px 10px;
@@ -3227,12 +3239,12 @@
           let page = 1;
           while (true) {
             const data = await apiFetch(
-              "/transactions?page=" + page + "&limit=200&status=processed",
+              "/transactions?page=" + page + "&limit=500&status=processed",
             );
             all = all.concat(data.transactions || []);
             if (all.length >= (data.total || 0)) break;
             page += 1;
-            if (page > 100) break;
+            if (page > 20) break;
           }
           processedTransactions = all;
           populateProcessedFilters();
@@ -4458,13 +4470,13 @@
             const data = await apiFetch(
               "/transactions?page=" +
                 page +
-                "&limit=200&status=" +
+                "&limit=500&status=" +
                 encodeURIComponent(status),
             );
             all = all.concat(data.transactions || []);
             if (all.length >= (data.total || 0)) break;
             page++;
-            if (page > 100) break; // safety
+            if (page > 20) break; // safety
           }
           allTransactions = all;
           // Populate worker filter dropdown (keep current selection)

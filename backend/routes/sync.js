@@ -160,13 +160,36 @@ router.get(
   requireAdmin,
   async (req, res) => {
     try {
-      const docs = await WorkerSync.find().sort({ lastSync: -1 }).lean();
       const todayStr = getTodayStr();
+      // IST day boundaries (UTC offsets: IST = UTC+5:30)
+      const todayStart = new Date(todayStr + "T00:00:00+05:30");
+      const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+      // Fetch WorkerSync docs and live today-counts from Transaction in parallel
+      const [docs, todayAgg] = await Promise.all([
+        WorkerSync.find().sort({ lastSync: -1 }).lean(),
+        Transaction.aggregate([
+          { $match: { lastSyncedAt: { $gte: todayStart, $lt: todayEnd } } },
+          { $group: { _id: "$Worker_Name", count: { $sum: 1 } } },
+        ]),
+      ]);
+
+      // Build a quick lookup: workerName -> live count for today
+      const liveTodayMap = {};
+      for (const row of todayAgg) {
+        if (row._id) liveTodayMap[row._id] = row.count;
+      }
+
       const workers = docs.map((doc) => ({
         worker: doc.worker,
         lastSync: doc.lastSync,
-        // If lastResetDate is not today, show 0 (stale counter from previous day)
-        totalToday: doc.lastResetDate === todayStr ? doc.totalToday || 0 : 0,
+        // Prefer live Transaction count; fall back to cached counter
+        totalToday:
+          liveTodayMap[doc.worker] !== undefined
+            ? liveTodayMap[doc.worker]
+            : doc.lastResetDate === todayStr
+              ? doc.totalToday || 0
+              : 0,
         minutesAgo: Math.round(
           (Date.now() - new Date(doc.lastSync).getTime()) / 60000,
         ),
@@ -338,7 +361,7 @@ router.get("/", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(
-      100,
+      500,
       Math.max(1, parseInt(req.query.limit, 10) || 50),
     );
     const skip = (page - 1) * limit;
