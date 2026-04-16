@@ -10,7 +10,14 @@ export default React.memo(function StatsCard({ icon, label, value, color }) {
       <View style={[styles.iconWrap, { backgroundColor: iconColor + "20" }]}>
         <MaterialCommunityIcons name={icon} size={24} color={iconColor} />
       </View>
-      <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{value}</Text>
+      <Text
+        style={styles.value}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.5}
+      >
+        {value}
+      </Text>
       <Text style={styles.label}>{label}</Text>
     </View>
   );

@@ -2042,12 +2042,15 @@
         <div class="worker-top-grid">
           <div class="card status-card" id="workersStatusBlock">
             <div class="panel-head">
-              <div class="head-copy">
-                <h2>&#128225; Worker Sync Status</h2>
-                <p>
-                  Refresh now updates both worker sync status and the ERP queue
-                  below.
-                </p>
+              <div class="head-copy" style="display:flex;align-items:center;gap:8px">
+                <button onclick="toggleWorkerStatus()" id="workerStatusToggleBtn" title="Show/hide worker list" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:18px;color:#2e7d32;line-height:1;flex-shrink:0">&#9654;</button>
+                <div>
+                  <h2 style="margin:0">&#128225; Worker Sync Status</h2>
+                  <p style="margin:4px 0 0">
+                    Refresh now updates both worker sync status and the ERP queue
+                    below.
+                  </p>
+                </div>
               </div>
               <button
                 class="btn btn-primary"
@@ -2057,7 +2060,7 @@
                 &#128260; Refresh Status + Queue
               </button>
             </div>
-            <div id="workerStatusContainer">
+            <div id="workerStatusContainer" style="display:none">
               <div class="loading">Loading...</div>
             </div>
           </div>
@@ -2129,7 +2132,69 @@
           </div>
         </div>
 
+        <!-- ─── ERP Workflow Guidelines ──────────────────────────────────────── -->
+        <div class="card" id="erpGuidelinesBlock" style="border-left:4px solid #2e7d32;background:linear-gradient(135deg,#f1f8e9,#e8f5e9)">
+          <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleErpGuide()">
+            <h2 style="margin:0;color:#2e7d32">&#128218; ERP Queue — How to Process</h2>
+            <span id="erpGuideToggleIcon" style="font-size:18px;color:#2e7d32;font-weight:700">&#9660;</span>
+          </div>
+          <div id="erpGuideBody" style="margin-top:14px">
+            <div style="display:flex;flex-wrap:wrap;gap:12px">
+              <div style="flex:1;min-width:200px;background:#fff;border-radius:10px;padding:14px 16px;border:1.5px solid #a5d6a7;display:flex;gap:12px;align-items:flex-start">
+                <div style="background:#2e7d32;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">1</div>
+                <div>
+                  <div style="font-weight:700;color:#1b5e20;margin-bottom:4px">&#128190; Take Backup</div>
+                  <div style="font-size:13px;color:#555">Go to <strong>Backup &amp; Restore</strong> and take a full backup of the current queue. Do this <em>before</em> marking anything done.</div>
+                </div>
+              </div>
+              <div style="flex:1;min-width:200px;background:#fff;border-radius:10px;padding:14px 16px;border:1.5px solid #a5d6a7;display:flex;gap:12px;align-items:flex-start">
+                <div style="background:#2e7d32;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">2</div>
+                <div>
+                  <div style="font-weight:700;color:#1b5e20;margin-bottom:4px">&#11015;&#65039; Download Backup</div>
+                  <div style="font-size:13px;color:#555">Download the backup file to your computer. Keep it safe — this is your safety net if anything goes wrong.</div>
+                </div>
+              </div>
+              <div style="flex:1;min-width:200px;background:#fff;border-radius:10px;padding:14px 16px;border:1.5px solid #a5d6a7;display:flex;gap:12px;align-items:flex-start">
+                <div style="background:#2e7d32;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">3</div>
+                <div>
+                  <div style="font-weight:700;color:#1b5e20;margin-bottom:4px">&#10003; Select Workers &amp; Mark Done</div>
+                  <div style="font-size:13px;color:#555">Filter by one or more workers below. Review the rows, then use <strong>Mark Worker Done</strong> or <strong>Mark Filtered Done</strong> to move them to history.</div>
+                </div>
+              </div>
+              <div style="flex:1;min-width:200px;background:#fff;border-radius:10px;padding:14px 16px;border:1.5px solid #ffcc80;display:flex;gap:12px;align-items:flex-start">
+                <div style="background:#e65100;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">4</div>
+                <div>
+                  <div style="font-weight:700;color:#bf360c;margin-bottom:4px">&#128247; Clear Phone</div>
+                  <div style="font-size:13px;color:#555">Once marked done, the worker can <strong>clear their phone queue</strong> on next sync. Workers will see 0 pending after their app syncs.</div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:12px;padding:10px 14px;background:#fffde7;border-radius:8px;border:1px solid #fff176;font-size:13px;color:#5d4037">
+              &#9888;&#65039; <strong>Important:</strong> Always take &amp; download the backup first (Steps 1–2) before marking rows as done. The <em>Date</em> column copies without time — use it when pasting into ERP.
+            </div>
+          </div>
+        </div>
+
         <div class="card table-card" id="workersQueueBlock">
+          <!-- ─── Inline EOD Export (top of queue) ─────────────────────────── -->
+          <div style="border-bottom:1px solid #e8f5e9;margin-bottom:14px;padding-bottom:14px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span style="font-size:17px">&#128228;</span>
+              <strong style="color:#1b5e20;font-size:15px">Worker End-of-Day Export</strong>
+              <button onclick="toggleEodInline()" id="eodInlineToggleBtn" title="Show/hide export controls" style="background:none;border:none;cursor:pointer;font-size:15px;color:#2e7d32;padding:2px 4px;line-height:1">&#9654;</button>
+            </div>
+            <div id="eodInlineBody" style="display:none">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+                <select id="eodWorkerSelectQueue" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-width:180px">
+                  <option value="">-- Select Worker --</option>
+                </select>
+                <button class="btn-sm btn-export" onclick="downloadWorkerEODQueue('csv')" title="Download CSV and mark as done">&#8659; CSV + Mark Done</button>
+                <button class="btn-sm" style="background:#217346;color:#fff;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer" onclick="downloadWorkerEODQueue('xlsx')" title="Download XLSX and mark as done">&#8659; XLSX + Mark Done</button>
+                <button class="btn-sm btn-copy" onclick="markWorkerDoneOnlyQueue()" title="Mark done without downloading">&#10003; Mark Done Only</button>
+              </div>
+              <div id="eodResultQueue" style="margin-top:6px"></div>
+            </div>
+          </div>
           <div class="tx-header">
             <h2>&#128196; ERP Queue (Shared Server Data)</h2>
             <div class="tx-actions">
@@ -2265,15 +2330,29 @@
             for audit and are never re-synced as new work.
           </p>
           <div class="tx-filters">
-            <select id="txWorkerFilter" onchange="filterTransactions()">
-              <option value="">All Workers</option>
-            </select>
+            <!-- Multi-worker dropdown -->
+            <div style="position:relative;display:inline-block" id="txWorkerMultiWrap">
+              <button id="txWorkerMultiBtn" onclick="toggleWorkerDropdown()" style="min-width:160px;max-width:220px;border:1px solid #ccc;border-radius:6px;padding:7px 12px;background:#fff;cursor:pointer;text-align:left;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:space-between;gap:6px">
+                <span id="txWorkerMultiLabel">All Workers</span>
+                <span>&#9660;</span>
+              </button>
+              <div id="txWorkerMultiPanel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:200px;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:999;padding:8px 0;max-height:260px;overflow-y:auto">
+                <label style="display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;font-weight:600;border-bottom:1px solid #eee">
+                  <input type="checkbox" id="txWorkerAll" checked onchange="onWorkerAllToggle()"> All Workers
+                </label>
+                <div id="txWorkerCheckList"></div>
+              </div>
+            </div>
+            <!-- hidden legacy select kept for compatibility -->
+            <select id="txWorkerFilter" style="display:none"></select>
             <select id="txStatusFilter" onchange="loadTransactions()">
               <option value="pending">Pending Queue</option>
               <option value="processed">Processed History</option>
               <option value="archived">Archived</option>
               <option value="all">All Statuses</option>
             </select>
+            <input type="date" id="txDateFrom" title="From date" onchange="filterTransactions()" style="border:1px solid #ccc;border-radius:6px;padding:7px 10px;font-size:14px">
+            <input type="date" id="txDateTo" title="To date" onchange="filterTransactions()" style="border:1px solid #ccc;border-radius:6px;padding:7px 10px;font-size:14px">
             <input
               type="text"
               id="txSearch"
@@ -3087,11 +3166,12 @@
 
       // ─── Stats ───────────────────────────────────────────────────────────────────
       async function loadStats() {
-        // Fire all 3 stats requests in parallel for speed
-        const [itemsRes, usersRes, statsRes] = await Promise.allSettled([
+        // Fire all 4 stats requests in parallel for speed
+        const [itemsRes, usersRes, statsRes, versionRes] = await Promise.allSettled([
           apiFetch("/items/count"),
           apiFetch("/auth/users"),
           apiFetch("/transactions/stats"),
+          apiFetch("/items/version"),
         ]);
         document.getElementById("statItems").textContent =
           itemsRes.status === "fulfilled" ? itemsRes.value.count || 0 : "?";
@@ -3113,6 +3193,12 @@
         const archivedEl = document.getElementById("statArchived");
         if (processedEl) processedEl.textContent = processed;
         if (archivedEl) archivedEl.textContent = archived;
+        const sysMasterVer = document.getElementById("sysMasterVer");
+        if (sysMasterVer)
+          sysMasterVer.textContent =
+            versionRes.status === "fulfilled"
+              ? "v" + (versionRes.value.version ?? "-")
+              : "?";
       }
 
       let processedTransactions = [];
@@ -4177,7 +4263,8 @@
         { key: "UOM", label: "UOM", vis: true },
         { key: "employeeId", label: "Employee ID", vis: true },
         { key: "deviceModel", label: "Device Model", vis: true },
-        { key: "Timestamp", label: "Date/Time", vis: true },
+        { key: "Timestamp_date", label: "Date", vis: true },
+        { key: "Timestamp_time", label: "Time", vis: true },
         { key: "Worker_Name", label: "Worker", vis: true },
         { key: "syncStatus", label: "Status", vis: true },
         { key: "Notes", label: "Notes", vis: false },
@@ -4207,6 +4294,33 @@
       }
 
       let colConfigOpen = false;
+      function toggleErpGuide() {
+        const body = document.getElementById("erpGuideBody");
+        const icon = document.getElementById("erpGuideToggleIcon");
+        if (!body) return;
+        const open = body.style.display !== "none";
+        body.style.display = open ? "none" : "block";
+        if (icon) icon.textContent = open ? "▶" : "▼";
+      }
+
+      function toggleWorkerStatus() {
+        const container = document.getElementById("workerStatusContainer");
+        const btn = document.getElementById("workerStatusToggleBtn");
+        if (!container) return;
+        const isHidden = container.style.display === "none";
+        container.style.display = isHidden ? "block" : "none";
+        if (btn) btn.innerHTML = isHidden ? "&#9660;" : "&#9654;";
+      }
+
+      function toggleEodInline() {
+        const body = document.getElementById("eodInlineBody");
+        const btn = document.getElementById("eodInlineToggleBtn");
+        if (!body) return;
+        const isHidden = body.style.display === "none";
+        body.style.display = isHidden ? "block" : "none";
+        if (btn) btn.innerHTML = isHidden ? "&#9660;" : "&#9654;";
+      }
+
       function toggleColConfig() {
         colConfigOpen = !colConfigOpen;
         const panel = document.getElementById("colConfigPanel");
@@ -4363,47 +4477,53 @@
       }
 
       function populateEodWorkerSelect() {
-        const sel = document.getElementById("eodWorkerSelect");
-        if (!sel) return;
-        const prev = sel.value;
-        const workers = [
-          ...new Set(
-            allTransactions
-              .filter(
-                (tx) =>
-                  String(tx.syncStatus || "pending").toLowerCase() ===
-                  "pending",
-              )
-              .map((t) => t.Worker_Name)
-              .filter(Boolean),
-          ),
-        ].sort();
-        sel.innerHTML =
-          '<option value="">-- Select Worker --</option>' +
-          workers
-            .map(
-              (w) =>
-                '<option value="' +
-                esc(w) +
-                '"' +
-                (w === prev ? " selected" : "") +
-                ">" +
-                esc(w) +
-                " (" +
-                allTransactions.filter(
+        const workerOptions = (() => {
+          const workers = [
+            ...new Set(
+              allTransactions
+                .filter(
                   (tx) =>
-                    tx.Worker_Name === w &&
                     String(tx.syncStatus || "pending").toLowerCase() ===
-                      "pending",
-                ).length +
-                ")</option>",
-            )
-            .join("");
+                    "pending",
+                )
+                .map((t) => t.Worker_Name)
+                .filter(Boolean),
+            ),
+          ].sort();
+          return (
+            '<option value="">-- Select Worker --</option>' +
+            workers
+              .map(
+                (w) =>
+                  '<option value="' +
+                  esc(w) +
+                  '">' +
+                  esc(w) +
+                  " (" +
+                  allTransactions.filter(
+                    (tx) =>
+                      tx.Worker_Name === w &&
+                      String(tx.syncStatus || "pending").toLowerCase() ===
+                        "pending",
+                  ).length +
+                  ")</option>",
+              )
+              .join("")
+          );
+        })();
+        // Populate both selects (main card + inline queue section)
+        ["eodWorkerSelect", "eodWorkerSelectQueue"].forEach((id) => {
+          const sel = document.getElementById(id);
+          if (!sel) return;
+          const prev = sel.value;
+          sel.innerHTML = workerOptions;
+          if (prev) sel.value = prev;
+        });
       }
 
-      async function downloadWorkerEOD(format) {
+      async function downloadWorkerEOD(format, resultId = "eodResult") {
         const worker = document.getElementById("eodWorkerSelect")?.value;
-        const resultDiv = document.getElementById("eodResult");
+        const resultDiv = document.getElementById(resultId);
         if (!worker) {
           resultDiv.innerHTML =
             '<div class="alert alert-error">Select a worker first.</div>';
@@ -4493,9 +4613,9 @@
         }
       }
 
-      async function markWorkerDoneOnly() {
+      async function markWorkerDoneOnly(resultId = "eodResult") {
         const worker = document.getElementById("eodWorkerSelect")?.value;
-        const resultDiv = document.getElementById("eodResult");
+        const resultDiv = document.getElementById(resultId);
         if (!worker) {
           resultDiv.innerHTML =
             '<div class="alert alert-error">Select a worker first.</div>';
@@ -4516,6 +4636,20 @@
           return;
         }
         await bulkSetTransactionStatus(ids, worker, worker, "processed");
+      }
+
+      // ─── Queue-inline EOD wrappers (sync inline select → main, then call main fn) ─
+      function downloadWorkerEODQueue(format) {
+        const qs = document.getElementById("eodWorkerSelectQueue");
+        const ms = document.getElementById("eodWorkerSelect");
+        if (qs && ms) ms.value = qs.value;
+        downloadWorkerEOD(format, "eodResultQueue");
+      }
+      function markWorkerDoneOnlyQueue() {
+        const qs = document.getElementById("eodWorkerSelectQueue");
+        const ms = document.getElementById("eodWorkerSelect");
+        if (qs && ms) ms.value = qs.value;
+        markWorkerDoneOnly("eodResultQueue");
       }
 
       async function loadTransactions(silent = false) {
@@ -4543,34 +4677,29 @@
             if (page > 20) break; // safety
           }
           allTransactions = all;
-          // Populate worker filter dropdown (keep current selection)
+          // Populate multi-worker checkbox list (keep prior selections)
           const workers = [
             ...new Set(all.map((t) => t.Worker_Name).filter(Boolean)),
           ].sort();
-          const sel = document.getElementById("txWorkerFilter");
-          const prevVal = sel.value;
-          sel.innerHTML =
-            '<option value="">All Workers (' +
-            all.length +
-            ")</option>" +
-            workers
+          const prevSelected = getSelectedWorkers();
+          const list = document.getElementById("txWorkerCheckList");
+          if (list) {
+            list.innerHTML = workers
               .map((w) => {
                 const cnt = all.filter((t) => t.Worker_Name === w).length;
-                return (
-                  '<option value="' +
-                  esc(w) +
-                  '"' +
-                  (w === prevVal ? " selected" : "") +
-                  ">" +
-                  esc(w) +
-                  " (" +
-                  cnt +
-                  ")</option>"
-                );
+                const checked = prevSelected.length === 0 || prevSelected.includes(w);
+                return `<label style="display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;border-bottom:1px solid #f5f5f5">
+                  <input type="checkbox" class="txWorkerChk" value="${esc(w)}" ${checked ? "checked" : ""} onchange="onWorkerCheckChange()">
+                  <span>${esc(w)} <span style="color:#888;font-size:12px">(${cnt})</span></span>
+                </label>`;
               })
               .join("");
-          // Default to All Workers on first load
-          if (!prevVal) sel.value = "";
+          }
+          updateWorkerMultiLabel(all.length);
+          // Sync legacy hidden select for compatibility
+          const sel = document.getElementById("txWorkerFilter");
+          sel.innerHTML = '<option value="">All Workers</option>' +
+            workers.map(w => `<option value="${esc(w)}">${esc(w)}</option>`).join("");
           // Apply filters & render
           filterTransactions();
         } catch (err) {
@@ -4580,12 +4709,21 @@
       }
 
       function filterTransactions() {
-        const workerFilter = document.getElementById("txWorkerFilter").value;
+        const selectedWorkers = getSelectedWorkers(); // empty = all
         const search = (
           document.getElementById("txSearch").value || ""
         ).toLowerCase();
+        const dateFrom = document.getElementById("txDateFrom")?.value; // "YYYY-MM-DD"
+        const dateTo = document.getElementById("txDateTo")?.value;
         filteredTransactions = allTransactions.filter((tx) => {
-          if (workerFilter && tx.Worker_Name !== workerFilter) return false;
+          if (selectedWorkers.length > 0 && !selectedWorkers.includes(tx.Worker_Name)) return false;
+          if (dateFrom || dateTo) {
+            const ts = tx.Timestamp ? new Date(tx.Timestamp) : null;
+            if (!ts) return false;
+            const tsDay = ts.toISOString().slice(0, 10);
+            if (dateFrom && tsDay < dateFrom) return false;
+            if (dateTo && tsDay > dateTo) return false;
+          }
           if (search) {
             const hay = [
               tx.Item_Code,
@@ -4606,6 +4744,55 @@
         renderTransactions(filteredTransactions);
         populateEodWorkerSelect();
       }
+
+      // ─── Multi-worker dropdown helpers ────────────────────────────────────────
+      function getSelectedWorkers() {
+        const checks = document.querySelectorAll(".txWorkerChk:checked");
+        return Array.from(checks).map(c => c.value);
+      }
+
+      function updateWorkerMultiLabel(total) {
+        const checks = Array.from(document.querySelectorAll(".txWorkerChk"));
+        const selected = checks.filter(c => c.checked);
+        const lbl = document.getElementById("txWorkerMultiLabel");
+        if (!lbl) return;
+        if (selected.length === 0 || selected.length === checks.length) {
+          lbl.textContent = "All Workers" + (total !== undefined ? " (" + total + ")" : "");
+        } else {
+          lbl.textContent = selected.length === 1
+            ? selected[0].value
+            : selected.length + " Workers";
+        }
+      }
+
+      function toggleWorkerDropdown() {
+        const panel = document.getElementById("txWorkerMultiPanel");
+        if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+      }
+
+      function onWorkerAllToggle() {
+        const allChk = document.getElementById("txWorkerAll");
+        document.querySelectorAll(".txWorkerChk").forEach(c => { c.checked = allChk.checked; });
+        updateWorkerMultiLabel();
+        filterTransactions();
+      }
+
+      function onWorkerCheckChange() {
+        const checks = Array.from(document.querySelectorAll(".txWorkerChk"));
+        const allChk = document.getElementById("txWorkerAll");
+        if (allChk) allChk.checked = checks.every(c => c.checked);
+        updateWorkerMultiLabel();
+        filterTransactions();
+      }
+
+      // Close multi-worker panel when clicking outside
+      document.addEventListener("click", function(e) {
+        const wrap = document.getElementById("txWorkerMultiWrap");
+        if (wrap && !wrap.contains(e.target)) {
+          const panel = document.getElementById("txWorkerMultiPanel");
+          if (panel) panel.style.display = "none";
+        }
+      });
 
       function txStatusBadge(tx) {
         const status = String(tx.syncStatus || "pending").toLowerCase();
@@ -4629,6 +4816,20 @@
       function txCellValue(tx, key) {
         if (key === "syncStatus") {
           return txStatusBadge(tx);
+        }
+        if (key === "Timestamp_date") {
+          return tx.Timestamp
+            ? '<td style="white-space:nowrap">' +
+                esc(new Date(tx.Timestamp).toLocaleDateString()) +
+                "</td>"
+            : "<td></td>";
+        }
+        if (key === "Timestamp_time") {
+          return tx.Timestamp
+            ? '<td style="white-space:nowrap">' +
+                esc(new Date(tx.Timestamp).toLocaleTimeString()) +
+                "</td>"
+            : "<td></td>";
         }
         if (key === "Timestamp") {
           return tx.Timestamp
@@ -5046,15 +5247,20 @@
       }
 
       async function markWorkerProcessed() {
-        const worker = document.getElementById("txWorkerFilter").value;
-        if (!worker) {
-          alert("Select a worker first from the dropdown.");
+        const selectedWorkers = getSelectedWorkers();
+        if (selectedWorkers.length === 0) {
+          alert("Select at least one worker from the dropdown first.");
           return;
         }
+        const workerLabel = selectedWorkers.length === 1 ? selectedWorkers[0] : selectedWorkers.length + " workers";
         const workerIds = allTransactions
-          .filter((tx) => tx.Worker_Name === worker)
+          .filter((tx) => selectedWorkers.includes(tx.Worker_Name))
           .map((tx) => tx._id);
-        await bulkSetTransactionStatus(workerIds, worker, worker, "processed");
+        if (workerIds.length === 0) {
+          alert("No pending transactions found for the selected worker(s).");
+          return;
+        }
+        await bulkSetTransactionStatus(workerIds, selectedWorkers[0], workerLabel, "processed");
       }
 
       function copyTransactionsToClipboard() {
@@ -5104,6 +5310,12 @@
       }
 
       function getExportCellValue(r, key) {
+        if (key === "Timestamp_date") {
+          return r.Timestamp ? new Date(r.Timestamp).toLocaleDateString() : "";
+        }
+        if (key === "Timestamp_time") {
+          return r.Timestamp ? new Date(r.Timestamp).toLocaleTimeString() : "";
+        }
         if (key === "Timestamp" || key === "processedAt") {
           const v = r[key];
           return v ? new Date(v).toLocaleString() : "";
@@ -5123,7 +5335,8 @@
       }
 
       function downloadTransactionsCSV(format = "csv") {
-        const workerFilter = document.getElementById("txWorkerFilter").value;
+        const selectedWorkers = getSelectedWorkers();
+        const workerFilter = selectedWorkers.length === 1 ? selectedWorkers[0] : "";
         const statusFilter =
           document.getElementById("txStatusFilter")?.value || "pending";
         let url = API + "/transactions/export";
