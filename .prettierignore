@@ -1,0 +1,21 @@
+# Dependency directories
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+build/
+web-build/
+.expo/
+
+# Package lock files
+package-lock.json
+yarn.lock
+
+# Generated files
+*.min.js
+*.min.css
+
+# Android/iOS build artifacts
+android/
+ios/
