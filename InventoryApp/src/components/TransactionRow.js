@@ -26,7 +26,7 @@ export default React.memo(function TransactionRow({
             {item.item_code && item.item_code.trim() !== "" ? (
               <Text style={styles.itemCode}>{item.item_code}</Text>
             ) : null}
-            <Text style={styles.itemName} numberOfLines={1}>
+            <Text style={styles.itemName} numberOfLines={2}>
               {item.item_name}
             </Text>
           </View>

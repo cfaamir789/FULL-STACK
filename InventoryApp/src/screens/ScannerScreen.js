@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useCallback } from "react";
+﻿import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -36,6 +36,7 @@ import {
   getItemByItemCode,
   searchItemsByItemCode,
   searchItems,
+  searchItemsByName,
   insertTransaction,
 } from "../database/db";
 import { attemptSync } from "../services/syncService";
@@ -88,10 +89,36 @@ export default function ScannerScreen({ role = "worker" }) {
   const itemCodeRef = useRef(null);
   const quickCodeRef = useRef(null);
   const itemNameRef = useRef(null);
+  const nameSearchTimer = useRef(null);
 
   const digitsOnly = (text) => String(text || "").replace(/\D+/g, "");
 
   const focusFromBin = () => setTimeout(() => fromBinRef.current?.focus(), 120);
+
+  // Live search as user types in Item Name mode
+  useEffect(() => {
+    if (mode !== "itemname") return;
+    if (nameSearchTimer.current) clearTimeout(nameSearchTimer.current);
+    if (!itemName.trim() || itemName.trim().length < 2) {
+      setNameResults([]);
+      return;
+    }
+    nameSearchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      const results = await searchItemsByName(itemName.trim());
+      const seen = new Set();
+      const unique = results.filter((r) => {
+        if (seen.has(r.item_code)) return false;
+        seen.add(r.item_code);
+        return true;
+      });
+      setNameResults(unique);
+      setSearching(false);
+    }, 300);
+    return () => {
+      if (nameSearchTimer.current) clearTimeout(nameSearchTimer.current);
+    };
+  }, [itemName, mode]);
 
   useFocusEffect(
     useCallback(() => {
@@ -245,7 +272,7 @@ export default function ScannerScreen({ role = "worker" }) {
   const handleItemNameSearch = async () => {
     if (!itemName.trim()) return;
     setSearching(true);
-    const results = await searchItems(itemName.trim());
+    const results = await searchItemsByName(itemName.trim());
     const seen = new Set();
     const unique = results.filter((r) => {
       if (seen.has(r.item_code)) return false;
@@ -496,7 +523,11 @@ export default function ScannerScreen({ role = "worker" }) {
             </Text>
           </View>
           {quickCodeResults.length > 0 && (
-            <View style={styles.nameResultsList}>
+            <ScrollView
+              style={styles.nameResultsList}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
               {quickCodeResults.map((r) => (
                 <TouchableOpacity
                   key={r.id || r.barcode}
@@ -504,12 +535,12 @@ export default function ScannerScreen({ role = "worker" }) {
                   onPress={() => handleQuickCodeResultSelect(r)}
                 >
                   <Text style={styles.nameResultCode}>{r.item_code}</Text>
-                  <Text style={styles.nameResultName} numberOfLines={1}>
+                  <Text style={styles.nameResultName}>
                     {r.item_name}
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           )}
           {quickCodeResults.length === 0 &&
             quickCode.trim().length > 0 &&
@@ -556,7 +587,11 @@ export default function ScannerScreen({ role = "worker" }) {
           </TouchableOpacity>
         </View>
         {nameResults.length > 0 && (
-          <View style={styles.nameResultsList}>
+          <ScrollView
+            style={styles.nameResultsList}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
             {nameResults.map((r) => (
               <TouchableOpacity
                 key={r.id || r.barcode}
@@ -564,12 +599,12 @@ export default function ScannerScreen({ role = "worker" }) {
                 onPress={() => handleNameResultSelect(r)}
               >
                 <Text style={styles.nameResultCode}>{r.item_code}</Text>
-                <Text style={styles.nameResultName} numberOfLines={1}>
+                <Text style={styles.nameResultName}>
                   {r.item_name}
                 </Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
         )}
         {nameResults.length === 0 &&
           itemName.trim().length > 0 &&
@@ -1100,7 +1135,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     overflow: "hidden",
     backgroundColor: Colors.card,
-    maxHeight: 200,
+    maxHeight: 260,
   },
   nameResultItem: {
     paddingHorizontal: 14,

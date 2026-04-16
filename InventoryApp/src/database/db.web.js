@@ -265,6 +265,14 @@ export const searchItems = async (query) => {
   return results.sort((a, b) => a.item_name.localeCompare(b.item_name));
 };
 
+export const searchItemsByName = async (query) => {
+  const items = await getItemsCache();
+  const q = query.toLowerCase();
+  return items
+    .filter((i) => i.item_name.toLowerCase().includes(q))
+    .sort((a, b) => a.item_name.localeCompare(b.item_name));
+};
+
 export const getAllItems = async () => {
   const items = await getItemsCache();
   return [...items].sort((a, b) => a.item_name.localeCompare(b.item_name));

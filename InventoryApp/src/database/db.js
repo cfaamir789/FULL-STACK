@@ -309,9 +309,17 @@ export const searchItems = async (query) => {
   );
 };
 
+export const searchItemsByName = async (query, limit = 200) => {
+  const q = `%${query}%`;
+  return await db.getAllAsync(
+    `SELECT * FROM items WHERE item_name LIKE ? ORDER BY item_name ASC LIMIT ?`,
+    [q, limit],
+  );
+};
+
 export const getAllItems = async () => {
   return await db.getAllAsync(
-    "SELECT * FROM items ORDER BY item_name ASC LIMIT 1000",
+    "SELECT * FROM items ORDER BY item_name ASC LIMIT 50000",
   );
 };
 

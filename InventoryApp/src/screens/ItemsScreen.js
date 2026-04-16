@@ -201,7 +201,10 @@ export default function ItemsScreen({ navigation, route }) {
       </View>
 
       <Text style={styles.countText}>
-        {items.length} item{items.length !== 1 ? "s" : ""}
+        {items.length} unique product{items.length !== 1 ? "s" : ""}
+        {allItems.length !== items.length
+          ? ` (${allItems.length.toLocaleString()} total barcodes)`
+          : ""}
         {query.trim() ? ' matching "' + query.trim() + '"' : ""}
       </Text>
 

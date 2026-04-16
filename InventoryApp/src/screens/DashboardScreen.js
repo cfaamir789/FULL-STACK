@@ -52,6 +52,7 @@ export default function DashboardScreen({ username }) {
   const [syncing, setSyncing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState("");
+  const [showAllRecent, setShowAllRecent] = useState(false);
 
   const loadData = useCallback(async () => {
     const [localStats, localAll, localPendingAll] = await Promise.all([
@@ -105,8 +106,10 @@ export default function DashboardScreen({ username }) {
               (tx.item_name && tx.item_name.toLowerCase().includes(q))
             );
           })
-        : recent.slice(0, 5),
-    [recent, query],
+        : showAllRecent
+          ? recent
+          : recent.slice(0, 5),
+    [recent, query, showAllRecent],
   );
 
   useFocusEffect(
@@ -242,6 +245,23 @@ export default function DashboardScreen({ username }) {
         ) : (
           filtered.map((tx) => <TransactionRow key={tx.id} item={tx} />)
         )}
+        {!query.trim() && recent.length > 5 && (
+          <TouchableOpacity
+            style={styles.expandBtn}
+            onPress={() => setShowAllRecent((v) => !v)}
+          >
+            <MaterialCommunityIcons
+              name={showAllRecent ? "chevron-up" : "chevron-down"}
+              size={18}
+              color={Colors.primary}
+            />
+            <Text style={styles.expandBtnText}>
+              {showAllRecent
+                ? "Collapse"
+                : `Show All ${recent.length} Transactions`}
+            </Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </View>
   );
@@ -282,6 +302,25 @@ const styles = StyleSheet.create({
   },
   empty: { alignItems: "center", paddingVertical: 32 },
   emptyText: { color: Colors.textLight, marginTop: 8 },
+  expandBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 10,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 6,
+  },
+  expandBtnText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.primary,
+  },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
