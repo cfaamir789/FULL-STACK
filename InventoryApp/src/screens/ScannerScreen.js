@@ -98,6 +98,13 @@ export default function ScannerScreen({ role = "worker" }) {
       if ((mode === "barcode" || mode === "itemcode") && showCamera) {
         setCameraActive(true);
       }
+      // Auto-focus the active tab's input when screen is navigated to
+      setTimeout(() => {
+        if (mode === "barcode") barcodeRef.current?.focus();
+        else if (mode === "itemcode") itemCodeRef.current?.focus();
+        else if (mode === "quickcode") quickCodeRef.current?.focus();
+        else if (mode === "itemname") itemNameRef.current?.focus();
+      }, 200);
       return () => setCameraActive(false);
     }, [mode, showCamera]),
   );
@@ -144,6 +151,13 @@ export default function ScannerScreen({ role = "worker" }) {
     setShowCamera(false);
     setCameraActive(false);
     setTorchOn(false);
+    // Auto-focus the primary input of the selected tab
+    setTimeout(() => {
+      if (m === "barcode") barcodeRef.current?.focus();
+      else if (m === "itemcode") itemCodeRef.current?.focus();
+      else if (m === "quickcode") quickCodeRef.current?.focus();
+      else if (m === "itemname") itemNameRef.current?.focus();
+    }, 120);
   };
 
   const applySelectedItem = (item) => {
