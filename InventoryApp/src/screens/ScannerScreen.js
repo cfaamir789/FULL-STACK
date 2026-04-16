@@ -42,11 +42,17 @@ import {
 import { attemptSync } from "../services/syncService";
 import CalcInput from "../components/CalcInput";
 // ClearButton — shows ✕ inside the input when there is text, invisible when empty
-const ClearButton = ({ value, onClear, style }) => {
+const ClearButton = ({ value, onClear, onClearFocus, style }) => {
   if (!value) return null;
   return (
     <TouchableOpacity
-      onPress={onClear}
+      onPress={() => {
+        onClear();
+        // Refocus on search field after clearing
+        if (onClearFocus) {
+          setTimeout(onClearFocus, 50);
+        }
+      }}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       style={[{ marginRight: 8, padding: 2 }, style]}
     >
@@ -93,6 +99,12 @@ export default function ScannerScreen({ role = "worker" }) {
 
   const digitsOnly = (text) => String(text || "").replace(/\D+/g, "");
 
+  const validateBinFormat = (bin) => {
+    if (!bin) return false;
+    // Only uppercase letters and numbers, no spaces
+    return /^[A-Z0-9]+$/.test(bin);
+  };
+
   const focusFromBin = () => setTimeout(() => fromBinRef.current?.focus(), 120);
 
   // Live search as user types in Item Name mode
@@ -119,6 +131,19 @@ export default function ScannerScreen({ role = "worker" }) {
       if (nameSearchTimer.current) clearTimeout(nameSearchTimer.current);
     };
   }, [itemName, mode]);
+
+  // Auto-fetch item when item code reaches 10 digits
+  useEffect(() => {
+    if (mode !== "itemcode" || !itemCode || itemCode.length !== 10 || scanned)
+      return;
+    const fetchItem = async () => {
+      setSearching(true);
+      const item = await getItemByItemCode(itemCode);
+      applySelectedItem(item);
+      setSearching(false);
+    };
+    fetchItem();
+  }, [itemCode, mode, scanned]);
 
   useFocusEffect(
     useCallback(() => {
@@ -307,6 +332,21 @@ export default function ScannerScreen({ role = "worker" }) {
     }
     if (!frombin.trim() || !tobin.trim()) {
       Alert.alert("Missing Bins", "From Bin and To Bin are required.");
+      return;
+    }
+    // Validate bin format (capital letters and numbers only, no spaces)
+    if (!validateBinFormat(frombin.trim())) {
+      Alert.alert(
+        "Invalid From Bin Format",
+        "Use only capital letters and numbers (e.g., A10101A, B192506B)",
+      );
+      return;
+    }
+    if (!validateBinFormat(tobin.trim())) {
+      Alert.alert(
+        "Invalid To Bin Format",
+        "Use only capital letters and numbers (e.g., A10101A, B192506B)",
+      );
       return;
     }
     // Use directQty if it's a valid numeric string (from CalcInput), else fall back to state
@@ -671,14 +711,32 @@ export default function ScannerScreen({ role = "worker" }) {
 
   const renderBinQtyFields = () => (
     <>
-      <Text style={styles.label}>From Bin</Text>
+      {!scanned && (
+        <View
+          style={{
+            backgroundColor: "#FFF8E1",
+            borderRadius: 10,
+            padding: 12,
+            marginTop: 12,
+            borderLeftWidth: 4,
+            borderLeftColor: "#F57F17",
+          }}
+        >
+          <Text style={{ color: "#F57F17", fontWeight: "600", fontSize: 13 }}>
+            ⚠️ Please scan or search for an item first
+          </Text>
+        </View>
+      )}
+      <Text style={[styles.label, !scanned && { opacity: 0.5 }]}>
+        From Bin
+      </Text>
       <View style={styles.inputWithMic}>
         <TextInput
           ref={fromBinRef}
-          style={styles.inputInner}
+          style={[styles.inputInner, !scanned && { opacity: 0.5 }]}
           value={frombin}
           onChangeText={uc(setFrombin)}
-          placeholder="e.g. A-01"
+          placeholder="e.g. A10101A"
           autoCapitalize="characters"
           returnKeyType="next"
           onSubmitEditing={() => toBinRef.current?.focus()}
@@ -686,18 +744,23 @@ export default function ScannerScreen({ role = "worker" }) {
             if (e.nativeEvent.key === "Enter") toBinRef.current?.focus();
           }}
           blurOnSubmit={false}
+          editable={scanned}
         />
-        <ClearButton value={frombin} onClear={() => setFrombin("")} />
+        <ClearButton
+          value={frombin}
+          onClear={() => setFrombin("")}
+          onClearFocus={() => fromBinRef.current?.focus()}
+        />
       </View>
 
-      <Text style={styles.label}>To Bin</Text>
+      <Text style={[styles.label, !scanned && { opacity: 0.5 }]}>To Bin</Text>
       <View style={styles.inputWithMic}>
         <TextInput
           ref={toBinRef}
-          style={styles.inputInner}
+          style={[styles.inputInner, !scanned && { opacity: 0.5 }]}
           value={tobin}
           onChangeText={uc(setTobin)}
-          placeholder="e.g. B-03"
+          placeholder="e.g. B192506B"
           autoCapitalize="characters"
           returnKeyType="next"
           onSubmitEditing={() => qtyRef.current?.focus()}
@@ -705,8 +768,13 @@ export default function ScannerScreen({ role = "worker" }) {
             if (e.nativeEvent.key === "Enter") qtyRef.current?.focus();
           }}
           blurOnSubmit={false}
+          editable={scanned}
         />
-        <ClearButton value={tobin} onClear={() => setTobin("")} />
+        <ClearButton
+          value={tobin}
+          onClear={() => setTobin("")}
+          onClearFocus={() => toBinRef.current?.focus()}
+        />
       </View>
 
       <Text style={styles.label}>
@@ -745,7 +813,11 @@ export default function ScannerScreen({ role = "worker" }) {
             if (e.nativeEvent.key === "Enter") handleSave();
           }}
         />
-        <ClearButton value={notes} onClear={() => setNotes("")} />
+        <ClearButton
+          value={notes}
+          onClear={() => setNotes("")}
+          onClearFocus={() => notesRef.current?.focus()}
+        />
       </View>
 
       <TouchableOpacity
