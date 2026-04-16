@@ -55,13 +55,18 @@ jobs:
       - name: Validate Expo token exists
         run: |
           if [ -z "${EXPO_TOKEN_PRIMARY}" ] && [ -z "${EXPO_TOKEN_SECONDARY}" ] && [ -z "${EXPO_TOKEN_TERTIARY}" ] && [ -z "${EXPO_TOKEN_QUATERNARY}" ]; then
-            echo "No Expo token found in secrets FULLSTACK/FULLSTACK2/EXPO_TOKEN/EXPO_TOKEN_2."
-            exit 1
+            echo "WARNING: No Expo token found in secrets FULLSTACK/FULLSTACK2/EXPO_TOKEN/EXPO_TOKEN_2."
+            echo "OTA update skipped — add an Expo token to GitHub secrets to enable OTA pushes."
+            echo "SKIP_OTA=true" >> "$GITHUB_ENV"
           fi
 
       - name: Select authorized Expo account
         shell: bash
         run: |
+          if [ "${SKIP_OTA:-}" = "true" ]; then
+            echo "No tokens available — skipping Expo account selection."
+            exit 0
+          fi
           set -euo pipefail
           TOKENS=("${EXPO_TOKEN_PRIMARY}" "${EXPO_TOKEN_SECONDARY}" "${EXPO_TOKEN_TERTIARY}" "${EXPO_TOKEN_QUATERNARY}")
           OWNER="aamirksa"
@@ -88,9 +93,10 @@ jobs:
           done
 
           if [ -z "$SELECTED" ]; then
-            echo "No provided token can access Expo project cff8e8a6-b732-42e2-ae2c-068893f7296c (owner aamirksa)."
+            echo "WARNING: No provided token can access Expo project (owner aamirksa)."
             echo "Add owner token to one of: FULLSTACK, FULLSTACK2, EXPO_TOKEN, EXPO_TOKEN_2"
-            exit 1
+            echo "SKIP_OTA=true" >> "$GITHUB_ENV"
+            exit 0
           fi
 
           {
@@ -100,6 +106,7 @@ jobs:
       - name: Push OTA update with retries (preview)
         shell: bash
         run: |
+          if [ "${SKIP_OTA:-}" = "true" ]; then echo "OTA skipped (no valid token)."; exit 0; fi
           set -euo pipefail
           eas whoami
           MSG="${{ github.event.inputs.message || format('Auto OTA: {0}', github.event.head_commit.message) }}"
@@ -119,6 +126,7 @@ jobs:
       - name: Push OTA update with retries (production)
         shell: bash
         run: |
+          if [ "${SKIP_OTA:-}" = "true" ]; then echo "OTA skipped (no valid token)."; exit 0; fi
           set -euo pipefail
           eas whoami
           MSG="${{ github.event.inputs.message || format('Auto OTA: {0}', github.event.head_commit.message) }}"
