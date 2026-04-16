@@ -22,7 +22,7 @@ export default React.memo(function TransactionRow({
       <View style={styles.info}>
         {/* Top line: item code + worker badge */}
         <View style={styles.topRow}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             {item.item_code && item.item_code.trim() !== "" ? (
               <Text style={styles.itemCode}>{item.item_code}</Text>
             ) : null}
@@ -158,6 +158,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.textPrimary,
     marginTop: 1,
+    flexShrink: 1,
   },
   barcode: {
     fontSize: 11,

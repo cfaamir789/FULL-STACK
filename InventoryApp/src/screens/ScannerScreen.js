@@ -299,7 +299,10 @@ export default function ScannerScreen({ role = "worker" }) {
       return;
     }
     if (!foundItem) {
-      Alert.alert("Unknown Item", "This barcode is not in the item master. Please sync items first.");
+      Alert.alert(
+        "Unknown Item",
+        "This barcode is not in the item master. Please sync items first.",
+      );
       return;
     }
     if (!frombin.trim() || !tobin.trim()) {
@@ -423,6 +426,15 @@ export default function ScannerScreen({ role = "worker" }) {
                 <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
               )}
             </TouchableOpacity>
+            {!IS_WEB && (
+              <TouchableOpacity style={styles.searchBtn} onPress={openScanner}>
+                <MaterialCommunityIcons
+                  name="barcode-scan"
+                  size={22}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+            )}
           </View>
         </>
       );
@@ -535,9 +547,7 @@ export default function ScannerScreen({ role = "worker" }) {
                   onPress={() => handleQuickCodeResultSelect(r)}
                 >
                   <Text style={styles.nameResultCode}>{r.item_code}</Text>
-                  <Text style={styles.nameResultName}>
-                    {r.item_name}
-                  </Text>
+                  <Text style={styles.nameResultName}>{r.item_name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -599,9 +609,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 onPress={() => handleNameResultSelect(r)}
               >
                 <Text style={styles.nameResultCode}>{r.item_code}</Text>
-                <Text style={styles.nameResultName}>
-                  {r.item_name}
-                </Text>
+                <Text style={styles.nameResultName}>{r.item_name}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
