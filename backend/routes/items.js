@@ -272,21 +272,36 @@ async function applyCsvItems(items, mode, onProgress, req, mergeId) {
     return result;
   }
 
-  // ── Merge mode — pre-fetch existing, compare, upsert, build diff report ──
+  // ── Merge mode — pre-fetch existing (only CSV barcodes), compare, upsert ──
 
-  // Step 1: Load all existing items into memory for O(1) lookup.
-  // For 1.6M items with 4 fields this is ~100-200 MB — acceptable for an admin op.
+  // Step 1: Load only items whose barcodes appear in the CSV — not the full collection.
+  // A full scan of 1.6M items costs 300-500 MB and crashes the server on Render free tier.
+  // Querying only the CSV barcodes (chunked $in) keeps peak RAM proportional to CSV size.
   onProgress?.({ processed: 0, total, inserted: 0, modified: 0, phase: "scanning" });
-  const existingCursor = rawCol.find(
-    {},
-    { projection: { Barcode: 1, ItemCode: 1, Item_Name: 1, UOM: 1, _id: 0 } },
-  );
+  const csvBarcodes = items.map((item) => item.Barcode);
+  const SCAN_CHUNK = 10000;
   const existingMap = new Map(); // Barcode → { ItemCode, Item_Name, UOM }
-  for await (const doc of existingCursor) {
-    existingMap.set(doc.Barcode, {
-      ItemCode: doc.ItemCode || "",
-      Item_Name: doc.Item_Name || "",
-      UOM: doc.UOM || "PCS",
+  for (let i = 0; i < csvBarcodes.length; i += SCAN_CHUNK) {
+    const batch = csvBarcodes.slice(i, i + SCAN_CHUNK);
+    const docs = await rawCol
+      .find(
+        { Barcode: { $in: batch } },
+        { projection: { Barcode: 1, ItemCode: 1, Item_Name: 1, UOM: 1, _id: 0 } },
+      )
+      .toArray();
+    for (const doc of docs) {
+      existingMap.set(doc.Barcode, {
+        ItemCode: doc.ItemCode || "",
+        Item_Name: doc.Item_Name || "",
+        UOM: doc.UOM || "PCS",
+      });
+    }
+    onProgress?.({
+      processed: Math.min(i + SCAN_CHUNK, total),
+      total,
+      inserted: 0,
+      modified: 0,
+      phase: "scanning",
     });
   }
 
