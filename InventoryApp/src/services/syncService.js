@@ -20,11 +20,19 @@ import {
 } from "../database/db";
 
 let _onStatusChange = null;
+let _onDataCleared = null;
 
 export const setSyncStatusListener = (fn) => {
   _onStatusChange = fn;
   return () => {
     _onStatusChange = null;
+  };
+};
+
+export const setDataClearedListener = (fn) => {
+  _onDataCleared = fn;
+  return () => {
+    _onDataCleared = null;
   };
 };
 
@@ -205,6 +213,7 @@ export const attemptSync = async () => {
           );
         }
         await ackClear();
+        if (_onDataCleared) _onDataCleared();
       }
     } catch (e) {
       console.log("[Sync] Clear check failed:", e.message);
@@ -280,6 +289,7 @@ export const attemptSync = async () => {
         );
       }
       await ackClear();
+      if (_onDataCleared) _onDataCleared();
     }
   } catch (e) {
     console.log("[Sync] Clear check failed:", e.message);

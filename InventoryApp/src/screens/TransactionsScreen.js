@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import {
   View,
   FlatList,
@@ -27,6 +27,7 @@ import {
   getAllServerTransactions,
   checkHealth,
 } from "../services/api";
+import { setDataClearedListener } from "../services/syncService";
 import TransactionRow from "../components/TransactionRow";
 import VoiceMic from "../components/VoiceMic";
 import CalcInput from "../components/CalcInput";
@@ -266,6 +267,12 @@ export default function TransactionsScreen({
       loadTransactions();
     }, [loadTransactions]),
   );
+
+  // Reload when admin clears phone data via background sync
+  useEffect(() => {
+    const unsub = setDataClearedListener(() => loadTransactions());
+    return unsub;
+  }, [loadTransactions]);
 
   const openEdit = (item) => {
     if (item._source === "server") {

@@ -454,7 +454,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton value={barcode} onClear={() => setBarcode("")} />
+              <ClearButton value={barcode} onClear={() => { setBarcode(""); setTimeout(() => barcodeRef.current?.focus(), 50); }} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -499,7 +499,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton value={itemCode} onClear={() => setItemCode("")} />
+              <ClearButton value={itemCode} onClear={() => { setItemCode(""); setTimeout(() => itemCodeRef.current?.focus(), 50); }} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
