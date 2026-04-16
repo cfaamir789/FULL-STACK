@@ -14,6 +14,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: write
 
@@ -58,7 +59,9 @@ jobs:
 
       - name: Build Release APK
         working-directory: InventoryApp/android
-        run: ./gradlew assembleRelease --no-daemon
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2 -Xmx3g -XX:MaxMetaspaceSize=512m"
+        run: ./gradlew assembleRelease --no-daemon --stacktrace --max-workers=2
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
