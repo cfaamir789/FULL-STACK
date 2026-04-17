@@ -13,6 +13,9 @@
       "distribution": "internal",
       "autoIncrement": true,
       "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://fullstck-production.up.railway.app"
+      },
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
@@ -22,6 +25,9 @@
       "distribution": "internal",
       "autoIncrement": true,
       "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://fullstck-production.up.railway.app"
+      },
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"

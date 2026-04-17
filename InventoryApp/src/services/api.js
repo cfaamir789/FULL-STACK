@@ -2,7 +2,9 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-export const CLOUD_SERVER_URL = "https://fullstck-production.up.railway.app";
+const EXPO_PUBLIC_API_URL = (process.env.EXPO_PUBLIC_API_URL || "").trim();
+export const CLOUD_SERVER_URL =
+  EXPO_PUBLIC_API_URL || "https://fullstck-production.up.railway.app";
 export const CLOUD_SERVER_FAILOVER =
   "https://fullstck.onrender.com";
 export const CLOUD_SERVERS = [CLOUD_SERVER_URL, CLOUD_SERVER_FAILOVER];
