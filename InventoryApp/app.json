@@ -60,7 +60,6 @@
     },
     "runtimeVersion": "inventory-launch-v1",
     "extra": {
-      "apiBaseUrl": "https://fullstck-production.up.railway.app",
       "eas": {
         "projectId": "cff8e8a6-b732-42e2-ae2c-068893f7296c"
       }
