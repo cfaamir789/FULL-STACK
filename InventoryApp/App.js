@@ -1,21 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-gesture-handler';
-import * as Updates from 'expo-updates';
-import { initDB } from './src/database/db';
-import { startAutoSync } from './src/services/syncService';
-import AppNavigator from './src/navigation/AppNavigator';
-import Colors from './src/theme/colors';
+import React, { useEffect, useState } from "react";
+import { View, ActivityIndicator, StyleSheet, Platform } from "react-native";
+import { StatusBar } from "expo-status-bar";
+import "react-native-gesture-handler";
+import * as Updates from "expo-updates";
+import { initDB } from "./src/database/db";
+import { startAutoSync, startClearPoller } from "./src/services/syncService";
+import AppNavigator from "./src/navigation/AppNavigator";
+import Colors from "./src/theme/colors";
 
 export default function App() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let stopSync;
+    let stopClearPoller;
 
     const applyOtaUpdateIfAvailable = async () => {
-      if (Platform.OS === 'web' || __DEV__ || !Updates.isEnabled) {
+      if (Platform.OS === "web" || __DEV__ || !Updates.isEnabled) {
         return;
       }
 
@@ -26,7 +27,7 @@ export default function App() {
           await Updates.reloadAsync();
         }
       } catch (e) {
-        console.warn('ota update check failed:', e);
+        console.warn("ota update check failed:", e);
       }
     };
 
@@ -35,15 +36,19 @@ export default function App() {
         await applyOtaUpdateIfAvailable();
         await initDB();
         stopSync = startAutoSync(30000);
+        stopClearPoller = startClearPoller(5000);
       } catch (e) {
-        console.warn('bootstrap error:', e);
+        console.warn("bootstrap error:", e);
       } finally {
         setReady(true);
       }
     };
 
     bootstrap();
-    return () => { if (stopSync) stopSync(); };
+    return () => {
+      if (stopSync) stopSync();
+      if (stopClearPoller) stopClearPoller();
+    };
   }, []);
 
   if (!ready) {
@@ -65,8 +70,8 @@ export default function App() {
 const styles = StyleSheet.create({
   loading: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: Colors.background,
   },
 });

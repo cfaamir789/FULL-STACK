@@ -18,7 +18,7 @@ import Papa from "papaparse";
 import { restoreTransactions } from "../database/db";
 
 // ─── Folder ───────────────────────────────────────────────────────────────────
-const BACKUP_DIR = FileSystem.documentDirectory + "InventoryManager/";
+const BACKUP_DIR = FileSystem.documentDirectory + "InventoryManagement/";
 const DOWNLOAD_URI_KEY = "androidDownloadsDirectoryUri";
 
 async function ensureBackupDir() {
@@ -228,12 +228,14 @@ export async function saveBackup(
   return {
     uri: fileUri,
     filename,
-    location: `AppDocuments/InventoryManager/${filename}`,
+    location: `InventoryManagement/${filename}`,
   };
 }
 
 /**
- * Save backup then immediately share/open it.
+ * Save backup to app's InventoryManagement folder then open native share sheet
+ * so the user can save to Downloads, Drive, email, etc.
+ * Always writes to app-private storage first (no permissions needed), then shares.
  */
 export async function saveAndShareBackup(
   transactions,
@@ -241,24 +243,43 @@ export async function saveAndShareBackup(
   format = "csv",
   isEntireDay = false,
 ) {
-  const { uri, filename, location } = await saveBackup(
-    transactions,
-    username,
-    format,
-    isEntireDay,
-  );
+  await ensureBackupDir();
+  const baseName = await nextFilename(username, isEntireDay);
+  const ext = format === "xlsx" ? "xlsx" : "csv";
+  const filename = `${baseName}.${ext}`;
+  const fileUri = BACKUP_DIR + filename;
+
+  if (format === "xlsx") {
+    const xlsxBase64 = await transactionsToXLSX(transactions);
+    await FileSystem.writeAsStringAsync(fileUri, xlsxBase64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+  } else {
+    const csv = transactionsToCSV(transactions);
+    await FileSystem.writeAsStringAsync(fileUri, csv, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+  }
+
   const mimeType =
     format === "xlsx"
       ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       : "text/csv";
+
   const canShare = await Sharing.isAvailableAsync();
   if (canShare) {
-    await Sharing.shareAsync(uri, {
+    await Sharing.shareAsync(fileUri, {
       mimeType,
-      dialogTitle: `Save ${filename}`,
+      dialogTitle: `Save ${filename} — choose Downloads or Drive`,
+      UTI: format === "xlsx" ? "org.openxmlformats.spreadsheetml.sheet" : "public.comma-separated-values-text",
     });
   }
-  return { uri, filename, location };
+
+  return {
+    uri: fileUri,
+    filename,
+    location: `InventoryManagement/${filename}`,
+  };
 }
 
 /**

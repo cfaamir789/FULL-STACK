@@ -260,9 +260,9 @@ router.post("/", requireDB, requireAuth, async (req, res) => {
     // ── BATCH LOOKUP: one query instead of N individual findOne calls ──────────
     // Build a map of all known clientTxIds in one round-trip
     const allClientTxIds = docs.map((d) => d.clientTxId);
-    const existingDocs = await Transaction.find(
-      { clientTxId: { $in: allClientTxIds } },
-    ).lean();
+    const existingDocs = await Transaction.find({
+      clientTxId: { $in: allClientTxIds },
+    }).lean();
     const existingMap = new Map(existingDocs.map((e) => [e.clientTxId, e]));
 
     let inserted = 0;
@@ -381,9 +381,7 @@ router.post("/", requireDB, requireAuth, async (req, res) => {
       const bulkOps = toUpdate.map(({ id, update }) => ({
         updateOne: { filter: { _id: id }, update },
       }));
-      writePromises.push(
-        Transaction.bulkWrite(bulkOps, { ordered: false }),
-      );
+      writePromises.push(Transaction.bulkWrite(bulkOps, { ordered: false }));
     }
 
     await Promise.all(writePromises);
@@ -728,19 +726,26 @@ router.post(
 
       const clearBefore = new Date();
       let updated = 0;
+      let serverDeleted = 0;
 
       if (workers === "all") {
-        const result = await WorkerSync.updateMany(
-          {},
-          { $set: { clearBefore } },
-        );
-        updated = result.modifiedCount || 0;
+        const [wsResult, delResult] = await Promise.all([
+          WorkerSync.updateMany({}, { $set: { clearBefore } }),
+          Transaction.deleteMany({}),
+        ]);
+        updated = wsResult.modifiedCount || 0;
+        serverDeleted = delResult.deletedCount || 0;
       } else if (Array.isArray(workers) && workers.length > 0) {
-        const result = await WorkerSync.updateMany(
-          { worker: { $in: workers } },
-          { $set: { clearBefore } },
-        );
-        updated = result.modifiedCount || 0;
+        const workerNames = workers.map((w) => String(w).trim().toUpperCase());
+        const [wsResult, delResult] = await Promise.all([
+          WorkerSync.updateMany(
+            { worker: { $in: workers } },
+            { $set: { clearBefore } },
+          ),
+          Transaction.deleteMany({ Worker_Name: { $in: workerNames } }),
+        ]);
+        updated = wsResult.modifiedCount || 0;
+        serverDeleted = delResult.deletedCount || 0;
       } else {
         return res
           .status(400)
@@ -754,12 +759,19 @@ router.post(
         req.user?.role || "admin",
         "clear_worker_phone",
         workerLabel,
-        `Cleared phone data for: ${workerLabel}`,
+        `Cleared phone + server data for: ${workerLabel} (${serverDeleted} server records deleted)`,
         "admin-panel",
       );
+
+      // Notify admin dashboards of the deletion
+      const broadcast = req.app.get("broadcast");
+      if (broadcast)
+        broadcast("transactions_updated", { deleted: serverDeleted });
+
       res.json({
         success: true,
         updated,
+        serverDeleted,
         clearBefore: clearBefore.toISOString(),
       });
     } catch (err) {

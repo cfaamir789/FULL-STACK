@@ -94,7 +94,12 @@ export const downloadItemMaster = async (onProgress) => {
   ]);
 
   onProgress?.({ phase: "done", percent: 100 });
-  return { success: true, count: items.length, version: serverVersion, delta: false };
+  return {
+    success: true,
+    count: items.length,
+    version: serverVersion,
+    delta: false,
+  };
 };
 
 // ─── Smart Delta Sync ─────────────────────────────────────────────────────────
@@ -251,9 +256,7 @@ export const attemptSync = async () => {
     // Verify which transactions the server already has and mark those as synced
     // so they don't get re-sent forever (fixes stuck-pending on slow phones).
     try {
-      const clientTxIds = pending
-        .map((tx) => tx.client_tx_id)
-        .filter(Boolean);
+      const clientTxIds = pending.map((tx) => tx.client_tx_id).filter(Boolean);
       if (clientTxIds.length > 0) {
         const verifyRes = await verifySyncedTxIds(clientTxIds);
         if (verifyRes?.found?.length > 0) {
@@ -266,7 +269,11 @@ export const attemptSync = async () => {
             synced = verifiedIds.length;
             // Return partial success so caller knows some were synced
             const lastSync = await getServerTimeISO();
-            notifyStatus({ online: true, lastSync, pendingCount: pending.length - synced });
+            notifyStatus({
+              online: true,
+              lastSync,
+              pendingCount: pending.length - synced,
+            });
             return { synced, reason: "partial_verified", lastSync };
           }
         }
@@ -308,4 +315,36 @@ export const startAutoSync = (intervalMs = 15000) => {
     clearTimeout(firstRun);
     clearInterval(timer);
   };
+};
+
+// ─── Fast Clear-Command Poller ────────────────────────────────────────────────
+// Independently polls for admin "Clear Phone" commands every 5 seconds.
+// Does NOT do a full sync — just checks the flag and clears local data immediately.
+export const startClearPoller = (intervalMs = 5000) => {
+  let running = false;
+  const poll = async () => {
+    if (running) return;
+    running = true;
+    try {
+      const isConnected = await checkConnectivity();
+      if (!isConnected) return;
+      const clearRes = await checkClearCommand();
+      if (clearRes?.clearBefore) {
+        const cleared = await clearSyncedTransactions();
+        await ackClear();
+        if (cleared > 0) {
+          console.log(
+            `[ClearPoller] Cleared ${cleared} synced transactions (admin command)`,
+          );
+        }
+        if (_onDataCleared) _onDataCleared();
+      }
+    } catch (_) {
+      // silently ignore — full sync will retry
+    } finally {
+      running = false;
+    }
+  };
+  const timer = setInterval(poll, intervalMs);
+  return () => clearInterval(timer);
 };

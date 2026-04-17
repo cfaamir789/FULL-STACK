@@ -317,7 +317,7 @@ export default function AdminPanelScreen({ navigation }) {
       );
       Alert.alert(
         "Export Saved",
-        `${txns.length} transactions saved as:\n${filename}\n\nIn InventoryManager folder.`,
+        `${txns.length} transactions saved as:\n${filename}\n\nIn InventoryManagement folder.`,
       );
     } catch (err) {
       Alert.alert("Export Failed", err.message);
@@ -400,7 +400,7 @@ export default function AdminPanelScreen({ navigation }) {
       );
       Alert.alert(
         "Entire Day Backup Saved",
-        `${txns.length} transactions backed up as:\n${filename}\n\nIn InventoryManager folder on this phone.`,
+        `${txns.length} transactions backed up as:\n${filename}\n\nIn InventoryManagement folder on this phone.`,
       );
     } catch (err) {
       Alert.alert("Backup Failed", err.message);
@@ -422,8 +422,9 @@ export default function AdminPanelScreen({ navigation }) {
         return;
       }
       const safeWorker = workerName.replace(/[^a-zA-Z0-9]/g, "_");
-      const fileUri =
-        FileSystem.documentDirectory + `transactions_${safeWorker}.csv`;
+      const datePart = new Date().toISOString().slice(0, 10);
+      const filename = `${safeWorker}_${datePart}.csv`;
+      const fileUri = FileSystem.documentDirectory + filename;
       const download = await FileSystem.downloadAsync(
         `${getExportUrl()}?worker=${encodeURIComponent(workerName)}`,
         fileUri,
@@ -432,8 +433,11 @@ export default function AdminPanelScreen({ navigation }) {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(download.uri, {
           mimeType: "text/csv",
-          dialogTitle: `${workerName}'s Transactions`,
+          dialogTitle: `Save ${filename} — choose Gmail or Drive`,
+          UTI: "public.comma-separated-values-text",
         });
+      } else {
+        Alert.alert("Saved", `File saved to app folder:\n${filename}`);
       }
     } catch (err) {
       Alert.alert("Export Failed", err.message);

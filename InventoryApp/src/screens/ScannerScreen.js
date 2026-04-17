@@ -284,7 +284,14 @@ export default function ScannerScreen({ role = "worker" }) {
       return;
     }
     setSearching(true);
-    const results = await searchItemsByItemCode(query.trim(), 50);
+    const raw = await searchItemsByItemCode(query.trim(), 50);
+    // Deduplicate by item_code — same item_code must appear only once
+    const seen = new Set();
+    const results = raw.filter((r) => {
+      if (seen.has(r.item_code)) return false;
+      seen.add(r.item_code);
+      return true;
+    });
     setQuickCodeResults(results);
     setScanned(false);
     setFoundItem(null);
@@ -398,6 +405,8 @@ export default function ScannerScreen({ role = "worker" }) {
   };
 
   const uc = (setter) => (text) => setter(text.toUpperCase());
+  // Bin fields: uppercase + strip everything except A-Z and 0-9 (no spaces, no special chars)
+  const binInput = (setter) => (text) => setter(text.toUpperCase().replace(/[^A-Z0-9]/g, ""));
 
   // ─── Reusable UI pieces ─────────────────────────────────────────────────────
 
@@ -454,7 +463,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton value={barcode} onClear={() => { setBarcode(""); setTimeout(() => barcodeRef.current?.focus(), 50); }} />
+              <ClearButton value={barcode} onClear={() => { setBarcode(""); setFoundItem(null); setScanned(false); setFrombin(""); setTobin(""); setQty(""); setNotes(""); setTimeout(() => barcodeRef.current?.focus(), 50); }} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -499,7 +508,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton value={itemCode} onClear={() => { setItemCode(""); setTimeout(() => itemCodeRef.current?.focus(), 50); }} />
+              <ClearButton value={itemCode} onClear={() => { setItemCode(""); setFoundItem(null); setScanned(false); setFrombin(""); setTobin(""); setQty(""); setNotes(""); setTimeout(() => itemCodeRef.current?.focus(), 50); }} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -735,7 +744,7 @@ export default function ScannerScreen({ role = "worker" }) {
           ref={fromBinRef}
           style={[styles.inputInner, !scanned && { opacity: 0.5 }]}
           value={frombin}
-          onChangeText={uc(setFrombin)}
+          onChangeText={binInput(setFrombin)}
           placeholder="e.g. A10101A"
           autoCapitalize="characters"
           returnKeyType="next"
@@ -759,7 +768,7 @@ export default function ScannerScreen({ role = "worker" }) {
           ref={toBinRef}
           style={[styles.inputInner, !scanned && { opacity: 0.5 }]}
           value={tobin}
-          onChangeText={uc(setTobin)}
+          onChangeText={binInput(setTobin)}
           placeholder="e.g. B192506B"
           autoCapitalize="characters"
           returnKeyType="next"

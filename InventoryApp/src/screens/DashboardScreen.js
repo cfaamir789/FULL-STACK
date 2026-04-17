@@ -24,7 +24,11 @@ import {
   getPendingTransactions,
 } from "../database/db";
 import { getDisplayUrl, getServerTransactions } from "../services/api";
-import { attemptSync, setSyncStatusListener } from "../services/syncService";
+import {
+  attemptSync,
+  setSyncStatusListener,
+  setDataClearedListener,
+} from "../services/syncService";
 import StatsCard from "../components/StatsCard";
 import SyncStatusBanner from "../components/SyncStatusBanner";
 import TransactionRow from "../components/TransactionRow";
@@ -126,6 +130,13 @@ export default function DashboardScreen({ username }) {
       if (typeof unsub === "function") unsub();
     };
   }, []);
+
+  useEffect(() => {
+    const unsub = setDataClearedListener(() => loadData());
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
+  }, [loadData]);
 
   const handleSyncNow = async () => {
     setSyncing(true);

@@ -2,9 +2,9 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-export const CLOUD_SERVER_URL = "https://fullstck.onrender.com";
+export const CLOUD_SERVER_URL = "https://fullstck-production.up.railway.app";
 export const CLOUD_SERVER_FAILOVER =
-  "https://inventory-backend-fdex.onrender.com";
+  "https://fullstck.onrender.com";
 export const CLOUD_SERVERS = [CLOUD_SERVER_URL, CLOUD_SERVER_FAILOVER];
 export const DEFAULT_SERVER_IP = CLOUD_SERVER_URL;
 

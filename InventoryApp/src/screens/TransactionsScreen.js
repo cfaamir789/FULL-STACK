@@ -115,7 +115,9 @@ export default function TransactionsScreen({
   const handleExportByFormat = async (format = "csv") => {
     setExporting(true);
     try {
-      const txns = await getAllTransactions();
+      // Use currently displayed transactions (merged server+local) so export
+      // matches what the user sees, even when local DB has been cleared.
+      const txns = transactions.length > 0 ? transactions : await getAllTransactions();
       if (!txns || txns.length === 0) {
         Alert.alert("No Data", "No transactions to export.");
         return;
@@ -189,7 +191,7 @@ export default function TransactionsScreen({
           `${txns.length} transactions downloaded as ${format.toUpperCase()}.`,
         );
       } else {
-        const { filename, location } = await backupSvc.saveBackup(
+        const { filename, location } = await backupSvc.saveAndShareBackup(
           txns,
           worker,
           format,
@@ -643,7 +645,7 @@ export default function TransactionsScreen({
               <TextInput
                 style={styles.input}
                 value={editFrombin}
-                onChangeText={setEditFrombin}
+                onChangeText={(t) => setEditFrombin(t.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
                 autoCapitalize="characters"
                 placeholder="e.g. A001"
               />
@@ -652,7 +654,7 @@ export default function TransactionsScreen({
               <TextInput
                 style={styles.input}
                 value={editTobin}
-                onChangeText={setEditTobin}
+                onChangeText={(t) => setEditTobin(t.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
                 autoCapitalize="characters"
                 placeholder="e.g. B002"
               />

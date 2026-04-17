@@ -2042,13 +2042,32 @@
         <div class="worker-top-grid">
           <div class="card status-card" id="workersStatusBlock">
             <div class="panel-head">
-              <div class="head-copy" style="display:flex;align-items:center;gap:8px">
-                <button onclick="toggleWorkerStatus()" id="workerStatusToggleBtn" title="Show/hide worker list" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:18px;color:#2e7d32;line-height:1;flex-shrink:0">&#9654;</button>
+              <div
+                class="head-copy"
+                style="display: flex; align-items: center; gap: 8px"
+              >
+                <button
+                  onclick="toggleWorkerStatus()"
+                  id="workerStatusToggleBtn"
+                  title="Show/hide worker list"
+                  style="
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    padding: 2px 4px;
+                    font-size: 18px;
+                    color: #2e7d32;
+                    line-height: 1;
+                    flex-shrink: 0;
+                  "
+                >
+                  &#9654;
+                </button>
                 <div>
-                  <h2 style="margin:0">&#128225; Worker Sync Status</h2>
-                  <p style="margin:4px 0 0">
-                    Refresh now updates both worker sync status and the ERP queue
-                    below.
+                  <h2 style="margin: 0">&#128225; Worker Sync Status</h2>
+                  <p style="margin: 4px 0 0">
+                    Refresh now updates both worker sync status and the ERP
+                    queue below.
                   </p>
                 </div>
               </div>
@@ -2060,7 +2079,7 @@
                 &#128260; Refresh Status + Queue
               </button>
             </div>
-            <div id="workerStatusContainer" style="display:none">
+            <div id="workerStatusContainer" style="display: none">
               <div class="loading">Loading...</div>
             </div>
           </div>
@@ -2133,66 +2152,318 @@
         </div>
 
         <!-- ─── ERP Workflow Guidelines ──────────────────────────────────────── -->
-        <div class="card" id="erpGuidelinesBlock" style="border-left:4px solid #2e7d32;background:linear-gradient(135deg,#f1f8e9,#e8f5e9)">
-          <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleErpGuide()">
-            <h2 style="margin:0;color:#2e7d32">&#128218; ERP Queue — How to Process</h2>
-            <span id="erpGuideToggleIcon" style="font-size:18px;color:#2e7d32;font-weight:700">&#9660;</span>
+        <div
+          class="card"
+          id="erpGuidelinesBlock"
+          style="
+            border-left: 4px solid #2e7d32;
+            background: linear-gradient(135deg, #f1f8e9, #e8f5e9);
+          "
+        >
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              cursor: pointer;
+            "
+            onclick="toggleErpGuide()"
+          >
+            <h2 style="margin: 0; color: #2e7d32">
+              &#128218; ERP Queue — How to Process
+            </h2>
+            <span
+              id="erpGuideToggleIcon"
+              style="font-size: 18px; color: #2e7d32; font-weight: 700"
+              >&#9660;</span
+            >
           </div>
-          <div id="erpGuideBody" style="margin-top:14px">
-            <div style="display:flex;flex-wrap:wrap;gap:12px">
-              <div style="flex:1;min-width:200px;background:#fff;border-radius:10px;padding:14px 16px;border:1.5px solid #a5d6a7;display:flex;gap:12px;align-items:flex-start">
-                <div style="background:#2e7d32;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">1</div>
+          <div id="erpGuideBody" style="margin-top: 14px">
+            <div style="display: flex; flex-wrap: wrap; gap: 12px">
+              <div
+                style="
+                  flex: 1;
+                  min-width: 200px;
+                  background: #fff;
+                  border-radius: 10px;
+                  padding: 14px 16px;
+                  border: 1.5px solid #a5d6a7;
+                  display: flex;
+                  gap: 12px;
+                  align-items: flex-start;
+                "
+              >
+                <div
+                  style="
+                    background: #2e7d32;
+                    color: #fff;
+                    border-radius: 50%;
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 700;
+                    font-size: 16px;
+                    flex-shrink: 0;
+                  "
+                >
+                  1
+                </div>
                 <div>
-                  <div style="font-weight:700;color:#1b5e20;margin-bottom:4px">&#128190; Take Backup</div>
-                  <div style="font-size:13px;color:#555">Go to <strong>Backup &amp; Restore</strong> and take a full backup of the current queue. Do this <em>before</em> marking anything done.</div>
+                  <div
+                    style="font-weight: 700; color: #1b5e20; margin-bottom: 4px"
+                  >
+                    &#128190; Take Backup
+                  </div>
+                  <div style="font-size: 13px; color: #555">
+                    Go to <strong>Backup &amp; Restore</strong> and take a full
+                    backup of the current queue. Do this <em>before</em> marking
+                    anything done.
+                  </div>
                 </div>
               </div>
-              <div style="flex:1;min-width:200px;background:#fff;border-radius:10px;padding:14px 16px;border:1.5px solid #a5d6a7;display:flex;gap:12px;align-items:flex-start">
-                <div style="background:#2e7d32;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">2</div>
+              <div
+                style="
+                  flex: 1;
+                  min-width: 200px;
+                  background: #fff;
+                  border-radius: 10px;
+                  padding: 14px 16px;
+                  border: 1.5px solid #a5d6a7;
+                  display: flex;
+                  gap: 12px;
+                  align-items: flex-start;
+                "
+              >
+                <div
+                  style="
+                    background: #2e7d32;
+                    color: #fff;
+                    border-radius: 50%;
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 700;
+                    font-size: 16px;
+                    flex-shrink: 0;
+                  "
+                >
+                  2
+                </div>
                 <div>
-                  <div style="font-weight:700;color:#1b5e20;margin-bottom:4px">&#11015;&#65039; Download Backup</div>
-                  <div style="font-size:13px;color:#555">Download the backup file to your computer. Keep it safe — this is your safety net if anything goes wrong.</div>
+                  <div
+                    style="font-weight: 700; color: #1b5e20; margin-bottom: 4px"
+                  >
+                    &#11015;&#65039; Download Backup
+                  </div>
+                  <div style="font-size: 13px; color: #555">
+                    Download the backup file to your computer. Keep it safe —
+                    this is your safety net if anything goes wrong.
+                  </div>
                 </div>
               </div>
-              <div style="flex:1;min-width:200px;background:#fff;border-radius:10px;padding:14px 16px;border:1.5px solid #a5d6a7;display:flex;gap:12px;align-items:flex-start">
-                <div style="background:#2e7d32;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">3</div>
+              <div
+                style="
+                  flex: 1;
+                  min-width: 200px;
+                  background: #fff;
+                  border-radius: 10px;
+                  padding: 14px 16px;
+                  border: 1.5px solid #a5d6a7;
+                  display: flex;
+                  gap: 12px;
+                  align-items: flex-start;
+                "
+              >
+                <div
+                  style="
+                    background: #2e7d32;
+                    color: #fff;
+                    border-radius: 50%;
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 700;
+                    font-size: 16px;
+                    flex-shrink: 0;
+                  "
+                >
+                  3
+                </div>
                 <div>
-                  <div style="font-weight:700;color:#1b5e20;margin-bottom:4px">&#10003; Select Workers &amp; Mark Done</div>
-                  <div style="font-size:13px;color:#555">Filter by one or more workers below. Review the rows, then use <strong>Mark Worker Done</strong> or <strong>Mark Filtered Done</strong> to move them to history.</div>
+                  <div
+                    style="font-weight: 700; color: #1b5e20; margin-bottom: 4px"
+                  >
+                    &#10003; Select Workers &amp; Mark Done
+                  </div>
+                  <div style="font-size: 13px; color: #555">
+                    Filter by one or more workers below. Review the rows, then
+                    use <strong>Mark Worker Done</strong> or
+                    <strong>Mark Filtered Done</strong> to move them to history.
+                  </div>
                 </div>
               </div>
-              <div style="flex:1;min-width:200px;background:#fff;border-radius:10px;padding:14px 16px;border:1.5px solid #ffcc80;display:flex;gap:12px;align-items:flex-start">
-                <div style="background:#e65100;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">4</div>
+              <div
+                style="
+                  flex: 1;
+                  min-width: 200px;
+                  background: #fff;
+                  border-radius: 10px;
+                  padding: 14px 16px;
+                  border: 1.5px solid #ffcc80;
+                  display: flex;
+                  gap: 12px;
+                  align-items: flex-start;
+                "
+              >
+                <div
+                  style="
+                    background: #e65100;
+                    color: #fff;
+                    border-radius: 50%;
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 700;
+                    font-size: 16px;
+                    flex-shrink: 0;
+                  "
+                >
+                  4
+                </div>
                 <div>
-                  <div style="font-weight:700;color:#bf360c;margin-bottom:4px">&#128247; Clear Phone</div>
-                  <div style="font-size:13px;color:#555">Once marked done, the worker can <strong>clear their phone queue</strong> on next sync. Workers will see 0 pending after their app syncs.</div>
+                  <div
+                    style="font-weight: 700; color: #bf360c; margin-bottom: 4px"
+                  >
+                    &#128247; Clear Phone
+                  </div>
+                  <div style="font-size: 13px; color: #555">
+                    Once marked done, the worker can
+                    <strong>clear their phone queue</strong> on next sync.
+                    Workers will see 0 pending after their app syncs.
+                  </div>
                 </div>
               </div>
             </div>
-            <div style="margin-top:12px;padding:10px 14px;background:#fffde7;border-radius:8px;border:1px solid #fff176;font-size:13px;color:#5d4037">
-              &#9888;&#65039; <strong>Important:</strong> Always take &amp; download the backup first (Steps 1–2) before marking rows as done. The <em>Date</em> column copies without time — use it when pasting into ERP.
+            <div
+              style="
+                margin-top: 12px;
+                padding: 10px 14px;
+                background: #fffde7;
+                border-radius: 8px;
+                border: 1px solid #fff176;
+                font-size: 13px;
+                color: #5d4037;
+              "
+            >
+              &#9888;&#65039; <strong>Important:</strong> Always take &amp;
+              download the backup first (Steps 1–2) before marking rows as done.
+              The <em>Date</em> column copies without time — use it when pasting
+              into ERP.
             </div>
           </div>
         </div>
 
         <div class="card table-card" id="workersQueueBlock">
           <!-- ─── Inline EOD Export (top of queue) ─────────────────────────── -->
-          <div style="border-bottom:1px solid #e8f5e9;margin-bottom:14px;padding-bottom:14px">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-              <span style="font-size:17px">&#128228;</span>
-              <strong style="color:#1b5e20;font-size:15px">Worker End-of-Day Export</strong>
-              <button onclick="toggleEodInline()" id="eodInlineToggleBtn" title="Show/hide export controls" style="background:none;border:none;cursor:pointer;font-size:15px;color:#2e7d32;padding:2px 4px;line-height:1">&#9654;</button>
+          <div
+            style="
+              border-bottom: 1px solid #e8f5e9;
+              margin-bottom: 14px;
+              padding-bottom: 14px;
+            "
+          >
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 10px;
+              "
+            >
+              <span style="font-size: 17px">&#128228;</span>
+              <strong style="color: #1b5e20; font-size: 15px"
+                >Worker End-of-Day Export</strong
+              >
+              <button
+                onclick="toggleEodInline()"
+                id="eodInlineToggleBtn"
+                title="Show/hide export controls"
+                style="
+                  background: none;
+                  border: none;
+                  cursor: pointer;
+                  font-size: 15px;
+                  color: #2e7d32;
+                  padding: 2px 4px;
+                  line-height: 1;
+                "
+              >
+                &#9654;
+              </button>
             </div>
-            <div id="eodInlineBody" style="display:none">
-              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-                <select id="eodWorkerSelectQueue" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;min-width:180px">
+            <div id="eodInlineBody" style="display: none">
+              <div
+                style="
+                  display: flex;
+                  gap: 8px;
+                  flex-wrap: wrap;
+                  align-items: center;
+                  margin-bottom: 8px;
+                "
+              >
+                <select
+                  id="eodWorkerSelectQueue"
+                  style="
+                    padding: 8px 12px;
+                    border: 1px solid #ddd;
+                    border-radius: 6px;
+                    font-size: 13px;
+                    min-width: 180px;
+                  "
+                >
                   <option value="">-- Select Worker --</option>
                 </select>
-                <button class="btn-sm btn-export" onclick="downloadWorkerEODQueue('csv')" title="Download CSV and mark as done">&#8659; CSV + Mark Done</button>
-                <button class="btn-sm" style="background:#217346;color:#fff;border-radius:6px;padding:6px 14px;font-size:13px;font-weight:600;border:none;cursor:pointer" onclick="downloadWorkerEODQueue('xlsx')" title="Download XLSX and mark as done">&#8659; XLSX + Mark Done</button>
-                <button class="btn-sm btn-copy" onclick="markWorkerDoneOnlyQueue()" title="Mark done without downloading">&#10003; Mark Done Only</button>
+                <button
+                  class="btn-sm btn-export"
+                  onclick="downloadWorkerEODQueue('csv')"
+                  title="Download CSV and mark as done"
+                >
+                  &#8659; CSV + Mark Done
+                </button>
+                <button
+                  class="btn-sm"
+                  style="
+                    background: #217346;
+                    color: #fff;
+                    border-radius: 6px;
+                    padding: 6px 14px;
+                    font-size: 13px;
+                    font-weight: 600;
+                    border: none;
+                    cursor: pointer;
+                  "
+                  onclick="downloadWorkerEODQueue('xlsx')"
+                  title="Download XLSX and mark as done"
+                >
+                  &#8659; XLSX + Mark Done
+                </button>
+                <button
+                  class="btn-sm btn-copy"
+                  onclick="markWorkerDoneOnlyQueue()"
+                  title="Mark done without downloading"
+                >
+                  &#10003; Mark Done Only
+                </button>
               </div>
-              <div id="eodResultQueue" style="margin-top:6px"></div>
+              <div id="eodResultQueue" style="margin-top: 6px"></div>
             </div>
           </div>
           <div class="tx-header">
@@ -2331,28 +2602,107 @@
           </p>
           <div class="tx-filters">
             <!-- Multi-worker dropdown -->
-            <div style="position:relative;display:inline-block" id="txWorkerMultiWrap">
-              <button id="txWorkerMultiBtn" onclick="toggleWorkerDropdown()" style="min-width:160px;max-width:220px;border:1px solid #ccc;border-radius:6px;padding:7px 12px;background:#fff;cursor:pointer;text-align:left;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:space-between;gap:6px">
+            <div
+              style="position: relative; display: inline-block"
+              id="txWorkerMultiWrap"
+            >
+              <button
+                id="txWorkerMultiBtn"
+                onclick="toggleWorkerDropdown()"
+                style="
+                  min-width: 160px;
+                  max-width: 220px;
+                  border: 1px solid #ccc;
+                  border-radius: 6px;
+                  padding: 7px 12px;
+                  background: #fff;
+                  cursor: pointer;
+                  text-align: left;
+                  font-size: 14px;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  gap: 6px;
+                "
+              >
                 <span id="txWorkerMultiLabel">All Workers</span>
                 <span>&#9660;</span>
               </button>
-              <div id="txWorkerMultiPanel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:200px;background:#fff;border:1px solid #ccc;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:999;padding:8px 0;max-height:260px;overflow-y:auto">
-                <label style="display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;font-weight:600;border-bottom:1px solid #eee">
-                  <input type="checkbox" id="txWorkerAll" checked onchange="onWorkerAllToggle()"> All Workers
+              <div
+                id="txWorkerMultiPanel"
+                style="
+                  display: none;
+                  position: absolute;
+                  top: calc(100% + 4px);
+                  left: 0;
+                  min-width: 200px;
+                  background: #fff;
+                  border: 1px solid #ccc;
+                  border-radius: 8px;
+                  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+                  z-index: 999;
+                  padding: 8px 0;
+                  max-height: 260px;
+                  overflow-y: auto;
+                "
+              >
+                <label
+                  style="
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 6px 14px;
+                    cursor: pointer;
+                    font-weight: 600;
+                    border-bottom: 1px solid #eee;
+                  "
+                >
+                  <input
+                    type="checkbox"
+                    id="txWorkerAll"
+                    checked
+                    onchange="onWorkerAllToggle()"
+                  />
+                  All Workers
                 </label>
                 <div id="txWorkerCheckList"></div>
               </div>
             </div>
             <!-- hidden legacy select kept for compatibility -->
-            <select id="txWorkerFilter" style="display:none"></select>
+            <select id="txWorkerFilter" style="display: none"></select>
             <select id="txStatusFilter" onchange="loadTransactions()">
               <option value="pending">Pending Queue</option>
               <option value="processed">Processed History</option>
               <option value="archived">Archived</option>
               <option value="all">All Statuses</option>
             </select>
-            <input type="date" id="txDateFrom" title="From date" onchange="filterTransactions()" style="border:1px solid #ccc;border-radius:6px;padding:7px 10px;font-size:14px">
-            <input type="date" id="txDateTo" title="To date" onchange="filterTransactions()" style="border:1px solid #ccc;border-radius:6px;padding:7px 10px;font-size:14px">
+            <input
+              type="date"
+              id="txDateFrom"
+              title="From date"
+              onchange="filterTransactions()"
+              style="
+                border: 1px solid #ccc;
+                border-radius: 6px;
+                padding: 7px 10px;
+                font-size: 14px;
+              "
+            />
+            <input
+              type="date"
+              id="txDateTo"
+              title="To date"
+              onchange="filterTransactions()"
+              style="
+                border: 1px solid #ccc;
+                border-radius: 6px;
+                padding: 7px 10px;
+                font-size: 14px;
+              "
+            />
             <input
               type="text"
               id="txSearch"
@@ -3167,12 +3517,13 @@
       // ─── Stats ───────────────────────────────────────────────────────────────────
       async function loadStats() {
         // Fire all 4 stats requests in parallel for speed
-        const [itemsRes, usersRes, statsRes, versionRes] = await Promise.allSettled([
-          apiFetch("/items/count"),
-          apiFetch("/auth/users"),
-          apiFetch("/transactions/stats"),
-          apiFetch("/items/version"),
-        ]);
+        const [itemsRes, usersRes, statsRes, versionRes] =
+          await Promise.allSettled([
+            apiFetch("/items/count"),
+            apiFetch("/auth/users"),
+            apiFetch("/transactions/stats"),
+            apiFetch("/items/version"),
+          ]);
         document.getElementById("statItems").textContent =
           itemsRes.status === "fulfilled" ? itemsRes.value.count || 0 : "?";
         document.getElementById("statUsers").textContent =
@@ -3787,7 +4138,9 @@
           const rest = sorted.slice(3);
           const restId = "topPerformersRest";
           html +=
-            '<div id="' + restId + '" style="display:none;margin-top:8px"><div class="podium-list">';
+            '<div id="' +
+            restId +
+            '" style="display:none;margin-top:8px"><div class="podium-list">';
           rest.forEach((w, i) => {
             const rank = i + 4;
             const pct = Math.round(((w.totalToday || 0) / maxScore) * 100);
@@ -4050,24 +4403,63 @@
             if (status.status === "done") {
               const totalSec = ((Date.now() - uploadStart) / 1000).toFixed(1);
               const isMerge = status.mergeId != null;
-              let html = '<div class="alert alert-success">&#10004; Uploaded in ' +
-                totalSec + "s! " + status.totalItems + " items on server.";
+              let html =
+                '<div class="alert alert-success">&#10004; Uploaded in ' +
+                totalSec +
+                "s! " +
+                status.totalItems +
+                " items on server.";
               if (isMerge) {
-                html += "<br><strong>New: " + (status.inserted || 0) +
-                  " &nbsp;|&nbsp; Updated: " + (status.modified || 0) +
-                  " &nbsp;|&nbsp; Unchanged: " + (status.unchanged || 0) + "</strong>";
-                html += '</div>';
+                html +=
+                  "<br><strong>New: " +
+                  (status.inserted || 0) +
+                  " &nbsp;|&nbsp; Updated: " +
+                  (status.modified || 0) +
+                  " &nbsp;|&nbsp; Unchanged: " +
+                  (status.unchanged || 0) +
+                  "</strong>";
+                html += "</div>";
                 // Diff report download buttons
-                const base = API + "/items/merge-report/" + encodeURIComponent(status.mergeId);
-                const tok = authToken ? "?_t=" + encodeURIComponent(authToken) : "";
-                html += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">';
-                html += '<button onclick="downloadMergeReport(\'' + status.mergeId + '\',\'new\')" style="padding:7px 14px;background:#16a34a;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;">&#11015; New Items (' + (status.inserted || 0) + ')</button>';
-                html += '<button onclick="downloadMergeReport(\'' + status.mergeId + '\',\'updated\')" style="padding:7px 14px;background:#d97706;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;">&#11015; Updated Items (' + (status.modified || 0) + ')</button>';
-                html += '<button onclick="downloadMergeReport(\'' + status.mergeId + '\',\'unchanged\')" style="padding:7px 14px;background:#6b7280;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;">&#11015; Unchanged (' + (status.unchanged || 0) + ')</button>';
-                html += '<button onclick="downloadMergeReport(\'' + status.mergeId + '\',\'all\')" style="padding:7px 14px;background:#1d4ed8;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;">&#11015; Full Report (All)</button>';
-                html += '</div><div style="margin-top:6px;font-size:12px;color:#6b7280;">Reports available for 2 hours.</div>';
+                const base =
+                  API +
+                  "/items/merge-report/" +
+                  encodeURIComponent(status.mergeId);
+                const tok = authToken
+                  ? "?_t=" + encodeURIComponent(authToken)
+                  : "";
+                html +=
+                  '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">';
+                html +=
+                  "<button onclick=\"downloadMergeReport('" +
+                  status.mergeId +
+                  "','new')\" style=\"padding:7px 14px;background:#16a34a;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;\">&#11015; New Items (" +
+                  (status.inserted || 0) +
+                  ")</button>";
+                html +=
+                  "<button onclick=\"downloadMergeReport('" +
+                  status.mergeId +
+                  "','updated')\" style=\"padding:7px 14px;background:#d97706;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;\">&#11015; Updated Items (" +
+                  (status.modified || 0) +
+                  ")</button>";
+                html +=
+                  "<button onclick=\"downloadMergeReport('" +
+                  status.mergeId +
+                  "','unchanged')\" style=\"padding:7px 14px;background:#6b7280;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;\">&#11015; Unchanged (" +
+                  (status.unchanged || 0) +
+                  ")</button>";
+                html +=
+                  "<button onclick=\"downloadMergeReport('" +
+                  status.mergeId +
+                  "','all')\" style=\"padding:7px 14px;background:#1d4ed8;color:#fff;border-radius:6px;border:none;cursor:pointer;font-weight:600;\">&#11015; Full Report (All)</button>";
+                html +=
+                  '</div><div style="margin-top:6px;font-size:12px;color:#6b7280;">Reports available for 2 hours.</div>';
               } else {
-                html += " (Inserted: " + status.inserted + ", Updated: " + status.modified + ")</div>";
+                html +=
+                  " (Inserted: " +
+                  status.inserted +
+                  ", Updated: " +
+                  status.modified +
+                  ")</div>";
               }
               resultDiv.innerHTML = html;
               loadStats();
@@ -4095,11 +4487,17 @@
           const headers = {};
           if (authToken) headers["Authorization"] = "Bearer " + authToken;
           const res = await fetch(
-            API + "/items/merge-report/" + encodeURIComponent(mergeId) + "?status=" + status,
+            API +
+              "/items/merge-report/" +
+              encodeURIComponent(mergeId) +
+              "?status=" +
+              status,
             { headers },
           );
           if (!res.ok) {
-            const err = await res.json().catch(() => ({ error: "Download failed" }));
+            const err = await res
+              .json()
+              .catch(() => ({ error: "Download failed" }));
             alert(err.error || "Download failed");
             return;
           }
@@ -4145,23 +4543,27 @@
       async function clearWorkerPhone(workerName) {
         if (
           !confirm(
-            "Clear all synced transactions from " +
+            "⚠️ Clear ALL transactions for " +
               workerName +
-              "'s phone?\n\nThis will remove processed data from their mobile app on next sync.",
+              "?\n\nThis will:\n• Immediately delete all server-side records for this worker\n• Clear their phone app history on next sync (within ~5 seconds)",
           )
         )
           return;
         try {
-          await apiFetch("/sync/clear-worker-data", {
+          const result = await apiFetch("/sync/clear-worker-data", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ workers: [workerName] }),
           });
           alert(
-            "Clear command sent to " +
-              workerName +
-              ".\\nData will be removed on their next sync.",
+            "✅ Cleared! " +
+              (result.serverDeleted || 0) +
+              " server records deleted.\nPhone will clear within ~5 seconds.",
           );
+          // Refresh the sync status table
+          if (typeof loadWorkerSyncStatus === "function")
+            loadWorkerSyncStatus();
+          if (typeof loadERPQueue === "function") loadERPQueue();
         } catch (err) {
           alert("Error: " + err.message);
         }
@@ -4170,7 +4572,7 @@
       async function clearAllWorkersPhones() {
         if (
           !confirm(
-            "⚠️ Clear ALL synced transactions from ALL workers' phones?\\n\\nThis affects every worker on next sync.",
+            "⚠️ Clear ALL transactions from ALL workers?\n\nThis will:\n• Immediately delete ALL server-side transaction records\n• Clear every phone app history within ~5 seconds",
           )
         )
           return;
@@ -4181,10 +4583,13 @@
             body: JSON.stringify({ workers: "all" }),
           });
           alert(
-            "Clear command sent to " +
-              (result.updated || 0) +
-              " worker(s).\\nData will be removed on their next sync.",
+            "✅ Cleared! " +
+              (result.serverDeleted || 0) +
+              " server records deleted.\nAll phones will clear within ~5 seconds.",
           );
+          if (typeof loadWorkerSyncStatus === "function")
+            loadWorkerSyncStatus();
+          if (typeof loadERPQueue === "function") loadERPQueue();
         } catch (err) {
           alert("Error: " + err.message);
         }
@@ -4687,7 +5092,8 @@
             list.innerHTML = workers
               .map((w) => {
                 const cnt = all.filter((t) => t.Worker_Name === w).length;
-                const checked = prevSelected.length === 0 || prevSelected.includes(w);
+                const checked =
+                  prevSelected.length === 0 || prevSelected.includes(w);
                 return `<label style="display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;border-bottom:1px solid #f5f5f5">
                   <input type="checkbox" class="txWorkerChk" value="${esc(w)}" ${checked ? "checked" : ""} onchange="onWorkerCheckChange()">
                   <span>${esc(w)} <span style="color:#888;font-size:12px">(${cnt})</span></span>
@@ -4698,8 +5104,11 @@
           updateWorkerMultiLabel(all.length);
           // Sync legacy hidden select for compatibility
           const sel = document.getElementById("txWorkerFilter");
-          sel.innerHTML = '<option value="">All Workers</option>' +
-            workers.map(w => `<option value="${esc(w)}">${esc(w)}</option>`).join("");
+          sel.innerHTML =
+            '<option value="">All Workers</option>' +
+            workers
+              .map((w) => `<option value="${esc(w)}">${esc(w)}</option>`)
+              .join("");
           // Apply filters & render
           filterTransactions();
         } catch (err) {
@@ -4716,7 +5125,11 @@
         const dateFrom = document.getElementById("txDateFrom")?.value; // "YYYY-MM-DD"
         const dateTo = document.getElementById("txDateTo")?.value;
         filteredTransactions = allTransactions.filter((tx) => {
-          if (selectedWorkers.length > 0 && !selectedWorkers.includes(tx.Worker_Name)) return false;
+          if (
+            selectedWorkers.length > 0 &&
+            !selectedWorkers.includes(tx.Worker_Name)
+          )
+            return false;
           if (dateFrom || dateTo) {
             const ts = tx.Timestamp ? new Date(tx.Timestamp) : null;
             if (!ts) return false;
@@ -4748,31 +5161,37 @@
       // ─── Multi-worker dropdown helpers ────────────────────────────────────────
       function getSelectedWorkers() {
         const checks = document.querySelectorAll(".txWorkerChk:checked");
-        return Array.from(checks).map(c => c.value);
+        return Array.from(checks).map((c) => c.value);
       }
 
       function updateWorkerMultiLabel(total) {
         const checks = Array.from(document.querySelectorAll(".txWorkerChk"));
-        const selected = checks.filter(c => c.checked);
+        const selected = checks.filter((c) => c.checked);
         const lbl = document.getElementById("txWorkerMultiLabel");
         if (!lbl) return;
         if (selected.length === 0 || selected.length === checks.length) {
-          lbl.textContent = "All Workers" + (total !== undefined ? " (" + total + ")" : "");
+          lbl.textContent =
+            "All Workers" + (total !== undefined ? " (" + total + ")" : "");
         } else {
-          lbl.textContent = selected.length === 1
-            ? selected[0].value
-            : selected.length + " Workers";
+          lbl.textContent =
+            selected.length === 1
+              ? selected[0].value
+              : selected.length + " Workers";
         }
       }
 
       function toggleWorkerDropdown() {
         const panel = document.getElementById("txWorkerMultiPanel");
-        if (panel) panel.style.display = panel.style.display === "none" ? "block" : "none";
+        if (panel)
+          panel.style.display =
+            panel.style.display === "none" ? "block" : "none";
       }
 
       function onWorkerAllToggle() {
         const allChk = document.getElementById("txWorkerAll");
-        document.querySelectorAll(".txWorkerChk").forEach(c => { c.checked = allChk.checked; });
+        document.querySelectorAll(".txWorkerChk").forEach((c) => {
+          c.checked = allChk.checked;
+        });
         updateWorkerMultiLabel();
         filterTransactions();
       }
@@ -4780,13 +5199,13 @@
       function onWorkerCheckChange() {
         const checks = Array.from(document.querySelectorAll(".txWorkerChk"));
         const allChk = document.getElementById("txWorkerAll");
-        if (allChk) allChk.checked = checks.every(c => c.checked);
+        if (allChk) allChk.checked = checks.every((c) => c.checked);
         updateWorkerMultiLabel();
         filterTransactions();
       }
 
       // Close multi-worker panel when clicking outside
-      document.addEventListener("click", function(e) {
+      document.addEventListener("click", function (e) {
         const wrap = document.getElementById("txWorkerMultiWrap");
         if (wrap && !wrap.contains(e.target)) {
           const panel = document.getElementById("txWorkerMultiPanel");
@@ -5252,7 +5671,10 @@
           alert("Select at least one worker from the dropdown first.");
           return;
         }
-        const workerLabel = selectedWorkers.length === 1 ? selectedWorkers[0] : selectedWorkers.length + " workers";
+        const workerLabel =
+          selectedWorkers.length === 1
+            ? selectedWorkers[0]
+            : selectedWorkers.length + " workers";
         const workerIds = allTransactions
           .filter((tx) => selectedWorkers.includes(tx.Worker_Name))
           .map((tx) => tx._id);
@@ -5260,7 +5682,12 @@
           alert("No pending transactions found for the selected worker(s).");
           return;
         }
-        await bulkSetTransactionStatus(workerIds, selectedWorkers[0], workerLabel, "processed");
+        await bulkSetTransactionStatus(
+          workerIds,
+          selectedWorkers[0],
+          workerLabel,
+          "processed",
+        );
       }
 
       function copyTransactionsToClipboard() {
@@ -5336,7 +5763,8 @@
 
       function downloadTransactionsCSV(format = "csv") {
         const selectedWorkers = getSelectedWorkers();
-        const workerFilter = selectedWorkers.length === 1 ? selectedWorkers[0] : "";
+        const workerFilter =
+          selectedWorkers.length === 1 ? selectedWorkers[0] : "";
         const statusFilter =
           document.getElementById("txStatusFilter")?.value || "pending";
         let url = API + "/transactions/export";

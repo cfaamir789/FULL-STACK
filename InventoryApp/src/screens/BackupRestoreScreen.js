@@ -114,6 +114,15 @@ export default function BackupRestoreScreen() {
 
   const handleCreateBackup = async () => {
     if (!backupSvc) return;
+    Alert.alert("Choose Format", "Select export format", [
+      { text: "CSV", onPress: () => doCreateBackup("csv") },
+      { text: "XLSX", onPress: () => doCreateBackup("xlsx") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const doCreateBackup = async (format) => {
+    if (!backupSvc) return;
     setWorking(true);
     try {
       const username = (await AsyncStorage.getItem("workerName")) || "backup";
@@ -122,16 +131,16 @@ export default function BackupRestoreScreen() {
         Alert.alert("No Data", "This phone has no transactions to back up.");
         return;
       }
-      const { filename } = await backupSvc.saveBackup(
+      const { filename, location } = await backupSvc.saveAndShareBackup(
         transactions,
         username,
-        "csv",
+        format,
         false,
       );
       await loadBackups();
       Alert.alert(
         "Backup Saved",
-        `${transactions.length} transaction(s) saved as:\n${filename}`,
+        `${transactions.length} transaction(s) saved as:\n${filename}\n\nLocation: ${location}`,
       );
     } catch (err) {
       Alert.alert("Backup Failed", err.message || "Could not create backup.");
