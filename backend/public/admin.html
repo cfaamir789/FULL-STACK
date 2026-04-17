@@ -459,6 +459,21 @@
         background: #aaa;
         cursor: default;
       }
+      .worker-saved-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+        color: #1b5e20;
+        border: 1px solid #a5d6a7;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        box-shadow: 0 1px 4px rgba(46,125,50,0.15);
+        white-space: nowrap;
+      }
       /* PIN reset modal */
       .pin-overlay {
         display: none;
@@ -1897,12 +1912,6 @@
           </button>
           <button
             class="section-chip"
-            onclick="scrollToBlock('masterPushBlock')"
-          >
-            Push to Phones
-          </button>
-          <button
-            class="section-chip"
             onclick="scrollToBlock('masterItemsBlock')"
           >
             Current Items
@@ -1916,26 +1925,29 @@
         </div>
 
         <div class="master-grid">
-          <div class="card" id="masterUploadBlock">
-            <h2>&#128194; Upload Master CSV</h2>
-            <p class="card-subtext">
-              CSV headers: <code>ItemCode, Barcode, Item_Name</code> or
-              <code>Item No., Barcode No., Item Description</code>. Future extra
-              fields like category, brand, or bin code will still fit because
-              the item table now scrolls horizontally.
-            </p>
+          <div class="card" id="masterUploadBlock" style="padding:0;overflow:hidden">
+            <!-- Compact upload header -->
+            <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(135deg,#fff8e1,#fff3cd);border-radius:10px 10px 0 0;border-bottom:1px solid #ffe082">
+              <span style="font-size:22px">&#128194;</span>
+              <div>
+                <div style="font-weight:700;font-size:14px;color:#5d4037">Upload Master CSV</div>
+                <div style="font-size:11px;color:#795548">Headers: <code style="background:#fff8e1;padding:1px 4px;border-radius:3px">ItemCode, Barcode, Item_Name</code> or <code style="background:#fff8e1;padding:1px 4px;border-radius:3px">Item No., Barcode No., Item Description</code></div>
+              </div>
+            </div>
+            <div style="padding:12px 16px">
             <div
               class="upload-area"
               id="dropZone"
               onclick="document.getElementById('csvFile').click()"
+              style="padding:18px 12px;min-height:70px"
             >
               <input type="file" id="csvFile" accept=".csv,text/csv" />
-              <div class="icon">&#128196;</div>
-              <p>Click or drag CSV file here</p>
+              <div class="icon" style="font-size:28px;margin-bottom:4px">&#128196;</div>
+              <p style="margin:0;font-size:12px">Click or drag CSV file here</p>
               <div class="filename" id="fileName"></div>
             </div>
 
-            <div class="mode-toggle">
+            <div class="mode-toggle" style="margin-top:10px;margin-bottom:10px">
               <button
                 id="modeReplace"
                 class="active"
@@ -1953,45 +1965,41 @@
               id="uploadBtn"
               onclick="uploadCSV()"
               disabled
+              style="margin-bottom:10px"
             >
               &#128640; Upload &amp; Push to Server
             </button>
             <div id="uploadResult"></div>
-          </div>
 
-          <div class="card accent-green" id="masterPushBlock">
-            <h2 style="color: #2e7d32">&#128225; Push Master to Phones</h2>
-            <p class="card-subtext" style="color: #38524a">
-              After upload or verification, push the current master to all
-              phones. Phones do not auto-download items until admin pushes or
-              the worker downloads manually.
-            </p>
-            <div class="insight-grid" style="margin-bottom: 14px">
-              <div class="mini-stat">
-                <div class="mini-label">Server Items</div>
-                <div class="mini-value" id="pushItemCount">-</div>
+            <!-- Push Master inline section -->
+            <div style="margin-top:14px;padding:12px 14px;background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border-radius:8px;border:1px solid #a5d6a7">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:18px">&#128225;</span>
+                  <span style="font-weight:700;font-size:13px;color:#2e7d32">Push Master to Phones</span>
+                </div>
+                <div style="display:flex;gap:14px">
+                  <div style="text-align:center">
+                    <div style="font-size:10px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Server Items</div>
+                    <div style="font-size:20px;font-weight:800;color:#1b5e20" id="pushItemCount">-</div>
+                  </div>
+                  <div style="text-align:center">
+                    <div style="font-size:10px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Version</div>
+                    <div style="font-size:20px;font-weight:800;color:#1b5e20" id="pushVersion">-</div>
+                  </div>
+                </div>
               </div>
-              <div class="mini-stat">
-                <div class="mini-label">Current Version</div>
-                <div class="mini-value" id="pushVersion">-</div>
-              </div>
-            </div>
-            <div class="soft-note">
-              <strong>Recommended workflow:</strong> upload, review the item
-              list below, then push one clean version to all phones. This keeps
-              worker devices aligned.
-            </div>
-            <div class="stack-actions" style="margin-top: 14px">
               <button
                 class="btn btn-primary"
                 id="pushMasterBtn"
                 onclick="pushMasterToPhones()"
-                style="background: #2e7d32; max-width: 360px"
+                style="background:#2e7d32;width:100%;margin:0"
               >
                 &#128640; Push Master Data to All Phones
               </button>
-              <div id="pushResult"></div>
+              <div id="pushResult" style="margin-top:6px"></div>
             </div>
+            </div><!-- /padding -->
           </div>
         </div>
 
@@ -2148,6 +2156,7 @@
               in history for audit and KPI reports.
             </div>
             <div id="eodResult" style="margin-top: 10px"></div>
+            </div><!-- /eodBody -->
           </div>
         </div>
 
@@ -2883,12 +2892,19 @@
           <p style="color: #888; margin-bottom: 14px; font-size: 13px">
             Manage users, reset PINs, and control access.
           </p>
-          <input
-            id="userSearchBox"
-            class="search-box"
-            placeholder="&#128269; Search by name, employee ID, or device..."
-            oninput="filterUsers()"
-          />
+          <!-- Beautiful 5D glow search bar -->
+          <div style="position:relative;margin-bottom:16px">
+            <div style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:17px;pointer-events:none;z-index:1">&#128269;</div>
+            <input
+              id="userSearchBox"
+              placeholder="Search by name, employee ID, or device..."
+              oninput="filterUsers()"
+              style="width:100%;box-sizing:border-box;padding:13px 16px 13px 44px;border:2px solid #a5d6a7;border-radius:12px;font-size:14px;background:linear-gradient(135deg,#f9fff9,#f0fff4);outline:none;box-shadow:0 4px 15px rgba(46,125,50,0.12),0 1px 4px rgba(46,125,50,0.08),inset 0 1px 3px rgba(255,255,255,0.9);transition:border-color 0.2s,box-shadow 0.2s;color:#1b5e20;font-weight:500"
+              onfocus="this.style.borderColor='#2e7d32';this.style.boxShadow='0 4px 20px rgba(46,125,50,0.25),0 2px 6px rgba(46,125,50,0.15),inset 0 1px 3px rgba(255,255,255,0.9)'"
+              onblur="this.style.borderColor='#a5d6a7';this.style.boxShadow='0 4px 15px rgba(46,125,50,0.12),0 1px 4px rgba(46,125,50,0.08),inset 0 1px 3px rgba(255,255,255,0.9)'"
+            />
+            <div id="userSearchClear" onclick="document.getElementById('userSearchBox').value='';filterUsers();this.style.display='none'" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:16px;font-weight:700">&times;</div>
+          </div>
           <div id="usersContainer"><div class="loading">Loading...</div></div>
         </div>
 
@@ -4684,11 +4700,16 @@
           const saved = localStorage.getItem("txColConfig");
           if (saved) {
             const parsed = JSON.parse(saved);
-            // Version check: reset if missing new columns (employeeId / deviceModel)
+            // Version check: reset if missing new columns (employeeId / deviceModel / separate date+time)
             const hasNewCols = parsed.some(
               (c) => c.key === "employeeId" || c.key === "deviceModel",
             );
-            if (hasNewCols) return parsed;
+            const hasSeparateDateTime = parsed.some(
+              (c) => c.key === "Timestamp_date",
+            ) && parsed.some(
+              (c) => c.key === "Timestamp_time",
+            );
+            if (hasNewCols && hasSeparateDateTime) return parsed;
           }
         } catch {}
         return DEFAULT_TX_COLS.map((c) => ({ ...c }));
@@ -4706,6 +4727,15 @@
         const open = body.style.display !== "none";
         body.style.display = open ? "none" : "block";
         if (icon) icon.textContent = open ? "▶" : "▼";
+      }
+
+      function toggleEodSection() {
+        const body = document.getElementById("eodBody");
+        const icon = document.getElementById("eodToggleIcon");
+        if (!body) return;
+        const open = body.style.display !== "none";
+        body.style.display = open ? "none" : "block";
+        if (icon) icon.style.transform = open ? "rotate(0deg)" : "rotate(90deg)";
       }
 
       function toggleWorkerStatus() {
@@ -5837,6 +5867,8 @@
         const q = (document.getElementById("userSearchBox").value || "")
           .trim()
           .toLowerCase();
+        const clearBtn = document.getElementById("userSearchClear");
+        if (clearBtn) clearBtn.style.display = q ? "block" : "none";
         if (!_allUsersCache.length) return;
         renderUsersToDOM(
           q
@@ -5981,6 +6013,12 @@
           // Worker info row (only for workers)
           if (!isSuperAdmin && !isAdmin) {
             h += '<div class="worker-info-row">';
+            const hasEmpId = !!(u.employeeId && u.employeeId.trim());
+            const hasDevice = !!(u.deviceModel && u.deviceModel.trim());
+            const isSaved = hasEmpId || hasDevice;
+            if (isSaved) {
+              h += '<span class="worker-saved-badge">&#10003; Saved</span>';
+            }
             h += "<label>&#128196; Emp ID</label>";
             h +=
               '<input type="text" class="worker-emp-id" data-user="' +
@@ -6100,6 +6138,15 @@
               if (!res.ok) throw new Error(data.error || "Request failed");
               saveBtn.textContent = "✓ Saved";
               saveBtn.style.background = "#388e3c";
+              // Update saved badge
+              let badge = card.querySelector(".worker-saved-badge");
+              if (!badge) {
+                badge = document.createElement("span");
+                badge.className = "worker-saved-badge";
+                const row = card.querySelector(".worker-info-row");
+                if (row) row.insertBefore(badge, row.firstChild);
+              }
+              badge.innerHTML = "&#10003; Saved";
               setTimeout(() => {
                 saveBtn.textContent = "✓ Save";
                 saveBtn.style.background = "";
