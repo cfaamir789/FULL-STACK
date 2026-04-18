@@ -1,8 +1,8 @@
 const express = require("express");
-const router  = express.Router();
-const multer  = require("multer");
-const Papa    = require("papaparse");
-const BinMaster  = require("../models/BinMaster");
+const router = express.Router();
+const multer = require("multer");
+const Papa = require("papaparse");
+const BinMaster = require("../models/BinMaster");
 const BinContent = require("../models/BinContent");
 const {
   requireAuth,
@@ -17,7 +17,9 @@ const upload = multer({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function normHeader(h) {
-  return String(h).toLowerCase().replace(/[^a-z0-9]/g, "");
+  return String(h)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function chunkArray(arr, size) {
@@ -36,30 +38,36 @@ function parseBinMasterCsv(csvText) {
   }
   if (!parsed.data[0]) throw new Error("CSV is empty");
 
-  const firstRow  = parsed.data[0];
+  const firstRow = parsed.data[0];
   const headerMap = {};
   for (const h of Object.keys(firstRow)) headerMap[normHeader(h)] = h;
 
   // "Code" → "code", "Bin Ranking" → "binranking", "Zone Code" → "zonecode"
-  const COL_CODE    = headerMap["code"];
+  const COL_CODE = headerMap["code"];
   const COL_RANKING = headerMap["binranking"] || headerMap["ranking"];
-  const COL_ZONE    = headerMap["zonecode"]   || headerMap["zone"];
+  const COL_ZONE = headerMap["zonecode"] || headerMap["zone"];
 
   if (!COL_CODE || !COL_RANKING || !COL_ZONE) {
     throw new Error(
       "CSV must have columns: Code, Bin Ranking, Zone Code. Got: " +
-      Object.keys(firstRow).join(", "),
+        Object.keys(firstRow).join(", "),
     );
   }
 
   const rowMap = new Map();
   for (const row of parsed.data) {
-    const binCode  = String(row[COL_CODE]    || "").trim();
-    const ranking  = parseFloat(String(row[COL_RANKING] || "0").replace(/,/g, ""));
-    const zoneCode = String(row[COL_ZONE]    || "").trim();
+    const binCode = String(row[COL_CODE] || "").trim();
+    const ranking = parseFloat(
+      String(row[COL_RANKING] || "0").replace(/,/g, ""),
+    );
+    const zoneCode = String(row[COL_ZONE] || "").trim();
 
     if (!binCode || isNaN(ranking)) continue;
-    rowMap.set(binCode, { BinCode: binCode, BinRanking: ranking, ZoneCode: zoneCode });
+    rowMap.set(binCode, {
+      BinCode: binCode,
+      BinRanking: ranking,
+      ZoneCode: zoneCode,
+    });
   }
 
   const rows = Array.from(rowMap.values());
@@ -89,11 +97,14 @@ router.get("/stats", async (req, res) => {
 // GET /api/bin-master — paginated list with optional search
 router.get("/", async (req, res) => {
   try {
-    const q     = req.query.q;
-    const zone  = req.query.zone ? String(req.query.zone).trim() : "";
-    const page  = Math.max(1, parseInt(req.query.page,  10) || 1);
-    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
-    const skip  = (page - 1) * limit;
+    const q = req.query.q;
+    const zone = req.query.zone ? String(req.query.zone).trim() : "";
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      200,
+      Math.max(1, parseInt(req.query.limit, 10) || 50),
+    );
+    const skip = (page - 1) * limit;
 
     const conditions = [];
     if (q) {
@@ -101,7 +112,12 @@ router.get("/", async (req, res) => {
       conditions.push({ $or: [{ BinCode: regex }, { ZoneCode: regex }] });
     }
     if (zone) conditions.push({ ZoneCode: zone });
-    const query = conditions.length === 0 ? {} : conditions.length === 1 ? conditions[0] : { $and: conditions };
+    const query =
+      conditions.length === 0
+        ? {}
+        : conditions.length === 1
+          ? conditions[0]
+          : { $and: conditions };
 
     const [bins, total] = await Promise.all([
       BinMaster.find(query, { _id: 0, BinCode: 1, BinRanking: 1, ZoneCode: 1 })
@@ -127,12 +143,14 @@ router.post(
   async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ success: false, error: "No file uploaded" });
+        return res
+          .status(400)
+          .json({ success: false, error: "No file uploaded" });
       }
 
       const csvText = req.file.buffer.toString("utf8");
-      const rows    = parseBinMasterCsv(csvText);
-      const total   = rows.length;
+      const rows = parseBinMasterCsv(csvText);
+      const total = rows.length;
       const writeTime = new Date();
 
       // Step 1 — Upsert into BinMaster (bins are never deleted, only added/updated)
@@ -142,8 +160,8 @@ router.post(
           update: {
             $set: {
               BinRanking: r.BinRanking,
-              ZoneCode:   r.ZoneCode,
-              updatedAt:  writeTime,
+              ZoneCode: r.ZoneCode,
+              updatedAt: writeTime,
             },
           },
           upsert: true,
@@ -153,9 +171,11 @@ router.post(
       let upserted = 0;
       let modified = 0;
       for (const chunk of chunkArray(masterOps, 3000)) {
-        const result = await BinMaster.collection.bulkWrite(chunk, { ordered: false });
-        upserted += result.upsertedCount  || 0;
-        modified += result.modifiedCount  || 0;
+        const result = await BinMaster.collection.bulkWrite(chunk, {
+          ordered: false,
+        });
+        upserted += result.upsertedCount || 0;
+        modified += result.modifiedCount || 0;
       }
 
       // Step 2 — Cascade: update matching BinContent records with new BinRanking + ZoneCode
@@ -168,16 +188,24 @@ router.post(
 
       let cascaded = 0;
       for (const chunk of chunkArray(cascadeOps, 3000)) {
-        const result = await BinContent.collection.bulkWrite(chunk, { ordered: false });
+        const result = await BinContent.collection.bulkWrite(chunk, {
+          ordered: false,
+        });
         cascaded += result.modifiedCount || 0;
       }
 
       // Broadcast to admin dashboards
       const broadcast = req.app.get("broadcast");
-      if (broadcast) broadcast("bin_master_updated", { total, upserted, modified, cascaded });
+      if (broadcast)
+        broadcast("bin_master_updated", {
+          total,
+          upserted,
+          modified,
+          cascaded,
+        });
 
       res.json({
-        success:  true,
+        success: true,
         total,
         upserted,
         modified,

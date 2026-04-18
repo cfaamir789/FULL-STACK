@@ -1,16 +1,16 @@
 const mongoose = require("mongoose");
 
 const binContentSchema = new mongoose.Schema({
-  BinCode:      { type: String, required: true },
-  ItemCode:     { type: String, required: true },
-  Item_Name:    { type: String, default: "" },
+  BinCode: { type: String, required: true },
+  ItemCode: { type: String, required: true },
+  Item_Name: { type: String, default: "" },
   CategoryCode: { type: String, default: "" },
-  Barcode:      { type: String, default: "" },
-  Qty:          { type: Number, default: 0 },
-  BinRanking:   { type: Number, required: true },
-  ZoneCode:     { type: String, default: "" },
-  notInMaster:  { type: Boolean, default: false }, // true when ItemCode had no Item Master match
-  updatedAt:    { type: Date, default: Date.now },
+  Barcode: { type: String, default: "" },
+  Qty: { type: Number, default: 0 },
+  BinRanking: { type: Number, required: true },
+  ZoneCode: { type: String, default: "" },
+  notInMaster: { type: Boolean, default: false }, // true when ItemCode had no Item Master match
+  updatedAt: { type: Date, default: Date.now },
 });
 
 // Unique per bin+item combination

@@ -2252,19 +2252,48 @@
                   >
                 </div>
                 <div style="font-size: 11px; color: #558b2f; margin-top: 2px">
-                  Authoritative bin registry &mdash; enriches Bin Content with ranking &amp; zone
+                  Authoritative bin registry &mdash; enriches Bin Content with
+                  ranking &amp; zone
                 </div>
               </div>
             </div>
             <div style="padding: 12px 16px">
               <div style="display: flex; gap: 16px; margin-bottom: 10px">
-                <div style="text-align: center; flex: 1; background: #e8f5e9; border-radius: 8px; padding: 6px 4px">
-                  <div style="font-size: 20px; font-weight: 700; color: #2e7d32" id="binMasterTotal">-</div>
+                <div
+                  style="
+                    text-align: center;
+                    flex: 1;
+                    background: #e8f5e9;
+                    border-radius: 8px;
+                    padding: 6px 4px;
+                  "
+                >
+                  <div
+                    style="font-size: 20px; font-weight: 700; color: #2e7d32"
+                    id="binMasterTotal"
+                  >
+                    -
+                  </div>
                   <div style="font-size: 10px; color: #388e3c">Total Bins</div>
                 </div>
-                <div style="text-align: center; flex: 1; background: #f1f8e9; border-radius: 8px; padding: 6px 4px">
-                  <div style="font-size: 20px; font-weight: 700; color: #558b2f" id="binMasterZones">-</div>
-                  <div style="font-size: 10px; color: #558b2f">Unique Zones</div>
+                <div
+                  style="
+                    text-align: center;
+                    flex: 1;
+                    background: #f1f8e9;
+                    border-radius: 8px;
+                    padding: 6px 4px;
+                  "
+                >
+                  <div
+                    style="font-size: 20px; font-weight: 700; color: #558b2f"
+                    id="binMasterZones"
+                  >
+                    -
+                  </div>
+                  <div style="font-size: 10px; color: #558b2f">
+                    Unique Zones
+                  </div>
                 </div>
               </div>
               <div
@@ -2273,7 +2302,11 @@
                 onclick="document.getElementById('binMasterCsvFile').click()"
                 style="padding: 18px 12px; min-height: 70px"
               >
-                <input type="file" id="binMasterCsvFile" accept=".csv,text/csv" />
+                <input
+                  type="file"
+                  id="binMasterCsvFile"
+                  accept=".csv,text/csv"
+                />
                 <div class="icon" style="font-size: 28px; margin-bottom: 4px">
                   &#128196;
                 </div>
@@ -2287,7 +2320,11 @@
                 id="binMasterUploadBtn"
                 onclick="uploadBinMasterCSV()"
                 disabled
-                style="margin-top: 10px; margin-bottom: 10px; background: linear-gradient(135deg, #2e7d32, #388e3c)"
+                style="
+                  margin-top: 10px;
+                  margin-bottom: 10px;
+                  background: linear-gradient(135deg, #2e7d32, #388e3c);
+                "
               >
                 &#128640; Upload Bin List
               </button>
@@ -7445,14 +7482,20 @@
           });
           const raw = await res.text();
           let data = {};
-          try { data = raw ? JSON.parse(raw) : {}; } catch {
+          try {
+            data = raw ? JSON.parse(raw) : {};
+          } catch {
             throw new Error("Server returned invalid response.");
           }
           if (!res.ok) throw new Error(data.error || "Upload failed");
           resultDiv.innerHTML =
             '<div class="alert alert-success">&#10004; Done! ' +
-            "Upserted: <strong>" + (data.upserted || 0) + "</strong>" +
-            " &nbsp;|&nbsp; Bins updated in content: <strong>" + (data.binContentUpdated || 0) + "</strong>" +
+            "Upserted: <strong>" +
+            (data.upserted || 0) +
+            "</strong>" +
+            " &nbsp;|&nbsp; Bins updated in content: <strong>" +
+            (data.binContentUpdated || 0) +
+            "</strong>" +
             "</div>";
           binMasterSelectedFile = null;
           document.getElementById("binMasterFileName").textContent = "";
@@ -7460,7 +7503,9 @@
           loadBinContent(currentBinPage);
         } catch (err) {
           resultDiv.innerHTML =
-            '<div class="alert alert-error">&#10008; ' + esc(err.message) + "</div>";
+            '<div class="alert alert-error">&#10008; ' +
+            esc(err.message) +
+            "</div>";
         } finally {
           btn.disabled = false;
           btn.textContent = "\u{1F680} Upload Bin List";

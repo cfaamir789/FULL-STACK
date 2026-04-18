@@ -8,7 +8,7 @@ const itemsRouter = require("./routes/items");
 const syncRouter = require("./routes/sync");
 const authRouter = require("./routes/auth");
 const binContentRouter = require("./routes/binContent");
-const binMasterRouter  = require("./routes/binMaster");
+const binMasterRouter = require("./routes/binMaster");
 const connectDB = require("./config/database");
 
 const compression = require("compression");
@@ -139,7 +139,7 @@ app.get("/api/db-status", (req, res) => {
 app.use("/api/auth", authRouter);
 app.use("/api/items", itemsRouter);
 app.use("/api/bin-content", binContentRouter);
-app.use("/api/bin-master",  binMasterRouter);
+app.use("/api/bin-master", binMasterRouter);
 app.use("/api/transactions", syncRouter);
 app.use("/api/sync", syncRouter);
 

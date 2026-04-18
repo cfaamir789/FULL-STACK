@@ -4,10 +4,10 @@ const mongoose = require("mongoose");
 // Bins are NEVER deleted (only new bins are added).
 // BinRanking and ZoneCode can change (rare), but BinCode is immutable.
 const binMasterSchema = new mongoose.Schema({
-  BinCode:    { type: String, required: true, unique: true },
+  BinCode: { type: String, required: true, unique: true },
   BinRanking: { type: Number, required: true },
-  ZoneCode:   { type: String, default: "" },
-  updatedAt:  { type: Date, default: Date.now },
+  ZoneCode: { type: String, default: "" },
+  updatedAt: { type: Date, default: Date.now },
 });
 
 binMasterSchema.index({ ZoneCode: 1 });
