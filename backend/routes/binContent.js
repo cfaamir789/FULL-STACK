@@ -109,12 +109,13 @@ function parseBinCsv(csvText) {
     headerMap["qty"] ||
     headerMap["quantity"];
   const COL_RANKING =
-    headerMap["binranking"] || // "Bin Ranking" / "BinRanking"
-    headerMap["ranking"];
+    headerMap["binranking"] || // "Bin Ranking" / "BinRanking" (optional — BinMaster is authoritative)
+    headerMap["ranking"] ||
+    null;
 
-  if (!COL_ITEM || !COL_BIN || !COL_QTY || !COL_RANKING) {
+  if (!COL_ITEM || !COL_BIN || !COL_QTY) {
     throw new Error(
-      "CSV must have columns: item code, bin code, available qty, bin ranking. " +
+      "CSV must have columns: item code, bin code, available qty. " +
         "Got: " +
         Object.keys(firstRow).join(", "),
     );
@@ -130,18 +131,18 @@ function parseBinCsv(csvText) {
     const binCode = String(row[COL_BIN] || "").trim();
     // Strip thousands commas before parsing (e.g. "1,512.00" → 1512)
     const qty = parseFloat(String(row[COL_QTY] || "0").replace(/,/g, "")) || 0;
-    const ranking = parseFloat(
-      String(row[COL_RANKING] || "0").replace(/,/g, ""),
-    );
+    // Ranking from CSV is optional — BinMaster overrides it in applyBinCsv
+    const ranking = COL_RANKING
+      ? parseFloat(String(row[COL_RANKING] || "0").replace(/,/g, "")) || 0
+      : 0;
 
     if (!itemCode || !binCode) continue;
-    if (isNaN(ranking)) continue;
 
     rowMap.set(`${itemCode}|${binCode}`, {
       ItemCode: itemCode,
       BinCode: binCode,
       Qty: qty,
-      BinRanking: ranking,
+      BinRanking: ranking, // may be 0; BinMaster lookup in applyBinCsv will override
     });
   }
 
