@@ -1121,6 +1121,18 @@
           </p>
           <div class="danger-item">
             <div class="desc">
+              <strong>Delete All Bin Content Records</strong><br />Remove every
+              bin content record. Bin Master (bin list) is kept.
+            </div>
+            <button
+              class="btn btn-danger btn-sm"
+              onclick="confirmDanger('deleteBinContent')"
+            >
+              Delete All Bin Records
+            </button>
+          </div>
+          <div class="danger-item">
+            <div class="desc">
               <strong>Delete All Transactions</strong><br />Remove every
               transaction and worker sync record from the system.
             </div>
@@ -1965,6 +1977,13 @@
       // ─── Data Management (Danger) ─────────────────────────────────────
       let pendingDanger = null;
       const DANGER_MAP = {
+        deleteBinContent: {
+          title: "Delete All Bin Content Records",
+          message:
+            "This will permanently delete ALL bin content records. Bin Master (bin list) will be kept.",
+          word: "DELETE",
+          exec: () => apiFetch("/bin-content/all", { method: "DELETE" }),
+        },
         resetAll: {
           title: "Reset All Data",
           message:

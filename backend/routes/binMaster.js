@@ -28,6 +28,13 @@ function chunkArray(arr, size) {
   return out;
 }
 
+// Derive a human-readable zone label from BinRanking when CSV ZoneCode is absent.
+function rankingToZone(ranking) {
+  if (ranking > 0) return "Display";
+  if (ranking < 0) return "Upper";
+  return "Floor";
+}
+
 // ─── CSV Parser ───────────────────────────────────────────────────────────────
 // Expected columns: Code, Bin Ranking, Zone Code
 // normHeader strips all non-alphanumerics so "Bin Ranking" → "binranking" etc.
@@ -60,7 +67,7 @@ function parseBinMasterCsv(csvText) {
     const ranking = parseFloat(
       String(row[COL_RANKING] || "0").replace(/,/g, ""),
     );
-    const zoneCode = String(row[COL_ZONE] || "").trim();
+    const zoneCode = String(row[COL_ZONE] || "").trim() || rankingToZone(ranking);
 
     if (!binCode || isNaN(ranking)) continue;
     rowMap.set(binCode, {
@@ -219,5 +226,76 @@ router.post(
     }
   },
 );
+
+// POST /api/bin-master/sync-zones
+// Backfills ZoneCode into every BinContent record from BinMaster.
+// If a BinMaster entry has no ZoneCode it derives one from BinRanking.
+// Also patches BinMaster rows that still have an empty ZoneCode.
+router.post("/sync-zones", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const binMasterDocs = await BinMaster.find(
+      {},
+      { BinCode: 1, BinRanking: 1, ZoneCode: 1, _id: 0 },
+    ).lean();
+
+    if (binMasterDocs.length === 0) {
+      return res.json({
+        success: false,
+        error: "BinMaster is empty — upload Bin List CSV first.",
+      });
+    }
+
+    // Step 1 — patch BinMaster rows where ZoneCode is missing
+    const masterPatchOps = [];
+    for (const doc of binMasterDocs) {
+      if (!doc.ZoneCode || !String(doc.ZoneCode).trim()) {
+        const derived = rankingToZone(doc.BinRanking);
+        masterPatchOps.push({
+          updateOne: {
+            filter: { BinCode: doc.BinCode },
+            update: { $set: { ZoneCode: derived } },
+          },
+        });
+        doc.ZoneCode = derived; // keep in-memory map consistent
+      }
+    }
+    if (masterPatchOps.length > 0) {
+      for (const chunk of chunkArray(masterPatchOps, 3000)) {
+        await BinMaster.collection.bulkWrite(chunk, { ordered: false });
+      }
+    }
+
+    // Step 2 — cascade into BinContent
+    const cascadeOps = binMasterDocs.map((doc) => ({
+      updateMany: {
+        filter: { BinCode: doc.BinCode },
+        update: { $set: { ZoneCode: doc.ZoneCode } },
+      },
+    }));
+
+    let cascaded = 0;
+    for (const chunk of chunkArray(cascadeOps, 3000)) {
+      const result = await BinContent.collection.bulkWrite(chunk, {
+        ordered: false,
+      });
+      cascaded += result.modifiedCount || 0;
+    }
+
+    const broadcast = req.app.get("broadcast");
+    if (broadcast) broadcast("bin_master_updated", { cascaded });
+
+    res.json({
+      success: true,
+      masterPatched: masterPatchOps.length,
+      cascaded,
+      message:
+        `✓ Zone codes synced. ` +
+        `${masterPatchOps.length} BinMaster rows derived from ranking. ` +
+        `${cascaded} Bin Content records updated.`,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 module.exports = router;

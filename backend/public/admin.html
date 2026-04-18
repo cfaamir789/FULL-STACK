@@ -2330,7 +2330,7 @@
                 disabled
                 style="
                   margin-top: 10px;
-                  margin-bottom: 10px;
+                  margin-bottom: 6px;
                   background: linear-gradient(135deg, #2e7d32, #388e3c);
                 "
               >
@@ -2422,6 +2422,22 @@
               <div id="binUploadResult"></div>
             </div>
           </div>
+        </div>
+
+        <!-- Bin Master Records table -->
+        <div class="card table-card" id="binMasterListBlock">
+          <h2>&#127968; Bin Master Records</h2>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+            <input
+              type="text"
+              class="search-box"
+              id="binMasterSearch"
+              placeholder="Search by bin code or zone code..."
+              oninput="debouncedBinMasterSearch()"
+              style="flex:1;min-width:200px;margin-bottom:0"
+            />
+          </div>
+          <div id="binMasterListContainer">Loading...</div>
         </div>
 
         <!-- Records table -->
@@ -4063,6 +4079,7 @@
             loadBinContent(1),
             loadBinCategories(),
             loadBinMasterStats(),
+            loadBinMasterList(1),
           ]);
           pageLoaded.binContent = true;
         }
@@ -7502,12 +7519,13 @@
             (data.upserted || 0) +
             "</strong>" +
             " &nbsp;|&nbsp; Bins updated in content: <strong>" +
-            (data.binContentUpdated || 0) +
+            (data.cascaded || 0) +
             "</strong>" +
             "</div>";
           binMasterSelectedFile = null;
           document.getElementById("binMasterFileName").textContent = "";
           loadBinMasterStats();
+          loadBinMasterList(1);
           loadBinContent(currentBinPage);
         } catch (err) {
           resultDiv.innerHTML =
@@ -7517,6 +7535,80 @@
         } finally {
           btn.disabled = false;
           btn.textContent = "\u{1F680} Upload Bin List";
+        }
+      }
+
+      // ─── Bin Master List ──────────────────────────────────────────────────────────
+      var currentBinMasterPage = 1;
+      var totalBinMasterPages = 1;
+
+      function debouncedBinMasterSearch() {
+        clearTimeout(debouncedBinMasterSearch._t);
+        debouncedBinMasterSearch._t = setTimeout(() => loadBinMasterList(1), 300);
+      }
+
+      async function loadBinMasterList(page) {
+        page = page || 1;
+        currentBinMasterPage = page;
+        const container = document.getElementById("binMasterListContainer");
+        if (!container) return;
+        const q = (document.getElementById("binMasterSearch")?.value || "").trim();
+        const params = new URLSearchParams({ page, limit: 50 });
+        if (q) params.set("q", q);
+        try {
+          const data = await apiFetch("/bin-master?" + params.toString());
+          const bins = data.bins || [];
+          const total = data.total || 0;
+          totalBinMasterPages = Math.ceil(total / 50) || 1;
+
+          if (bins.length === 0) {
+            container.innerHTML = '<p style="color:#888;padding:12px;">No bin records found.</p>';
+            return;
+          }
+
+          let zoneColor = function(z) {
+            if (!z) return '#888';
+            var l = z.toLowerCase();
+            if (l === 'display') return '#2e7d32';
+            if (l === 'upper') return '#c62828';
+            if (l === 'floor') return '#e65100';
+            return '#1565c0';
+          };
+
+          let html = '<p style="font-size:12px;color:#666;margin-bottom:6px;">Showing ' +
+            ((page - 1) * 50 + 1) + '–' + Math.min(page * 50, total) + ' of ' + total.toLocaleString() + ' bins</p>';
+          html += '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
+            '<th>#</th><th>Bin Code</th><th>Bin Ranking</th><th>Zone Code</th><th>Zone</th>' +
+            '</tr></thead><tbody>';
+
+          bins.forEach(function(b, i) {
+            var ranking = b.BinRanking ?? 0;
+            var zone = ranking > 0 ? 'Display' : ranking < 0 ? 'Upper' : 'Floor';
+            var zc = esc(b.ZoneCode || '');
+            var color = zoneColor(zone);
+            var badge = '<span style="background:' + color + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' + zone + '</span>';
+            html += '<tr>' +
+              '<td>' + ((page - 1) * 50 + i + 1) + '</td>' +
+              '<td><strong>' + esc(b.BinCode) + '</strong></td>' +
+              '<td>' + ranking + '</td>' +
+              '<td><span style="font-weight:600;color:#1565c0;">' + zc + '</span></td>' +
+              '<td>' + badge + '</td>' +
+              '</tr>';
+          });
+
+          html += '</tbody></table></div>';
+
+          if (totalBinMasterPages > 1) {
+            html += '<div class="pagination">';
+            html += '<button ' + (page <= 1 ? 'disabled' : '') + ' onclick="loadBinMasterList(' + (page - 1) + ')">Prev</button>';
+            html += '<span style="padding:6px;">' + page + ' / ' + totalBinMasterPages + '</span>';
+            html += '<button ' + (page >= totalBinMasterPages ? 'disabled' : '') + ' onclick="loadBinMasterList(' + (page + 1) + ')">Next</button>';
+            html += '</div>';
+          }
+
+          container.innerHTML = html;
+        } catch (err) {
+          container.innerHTML = '<p style="color:red;padding:12px;">Error: ' + esc(err.message) + '</p>';
         }
       }
 

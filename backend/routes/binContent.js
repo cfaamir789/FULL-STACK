@@ -67,6 +67,13 @@ function chunkArray(arr, size) {
   return out;
 }
 
+// Derive a human-readable zone label from BinRanking when BinMaster ZoneCode is absent.
+function rankingToZone(ranking) {
+  if (ranking > 0) return "Display";
+  if (ranking < 0) return "Upper";
+  return "Floor";
+}
+
 // ─── CSV Parser ───────────────────────────────────────────────────────────────
 // Accepts 4 user columns: item code, bin code, available qty, bin ranking
 // normHeader strips ALL non-alphanumeric chars so headers like
@@ -191,10 +198,13 @@ async function applyBinCsv(rows, mode, onProgress, req) {
   const enriched = rows.map((row) => {
     const master = masterMap.get(row.ItemCode);
     const binMaster = binMasterMap.get(row.BinCode);
-    // BinMaster wins for BinRanking and ZoneCode; fall back to CSV values if bin not in BinMaster
+    // BinMaster wins for BinRanking and ZoneCode; fall back to CSV values if bin not in BinMaster.
+    // If BinMaster exists but its ZoneCode is empty, derive the zone from BinRanking.
     const binRanking =
       binMaster != null ? binMaster.BinRanking : row.BinRanking;
-    const zoneCode = binMaster ? binMaster.ZoneCode : "";
+    const zoneCode =
+      (binMaster && binMaster.ZoneCode) ||
+      rankingToZone(binRanking);
     if (!master) {
       unresolved.push({
         itemCode: row.ItemCode,
