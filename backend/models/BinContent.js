@@ -7,7 +7,7 @@ const binContentSchema = new mongoose.Schema({
   CategoryCode: { type: String, default: "" },
   Barcode: { type: String, default: "" },
   Qty: { type: Number, default: 0 },
-  BinRanking:   { type: Number, default: 0 },  // overridden by BinMaster on upload
+  BinRanking: { type: Number, default: 0 }, // overridden by BinMaster on upload
   ZoneCode: { type: String, default: "" },
   notInMaster: { type: Boolean, default: false }, // true when ItemCode had no Item Master match
   updatedAt: { type: Date, default: Date.now },
