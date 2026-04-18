@@ -2426,18 +2426,23 @@
 
         <!-- Bin Master Records table -->
         <div class="card table-card" id="binMasterListBlock">
-          <h2>&#127968; Bin Master Records</h2>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
-            <input
-              type="text"
-              class="search-box"
-              id="binMasterSearch"
-              placeholder="Search by bin code or zone code..."
-              oninput="debouncedBinMasterSearch()"
-              style="flex:1;min-width:200px;margin-bottom:0"
-            />
+          <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleBinMasterList()">
+            <h2 style="margin:0;">&#127968; Bin Master Records</h2>
+            <button id="binMasterToggleBtn" style="background:none;border:1px solid #a5d6a7;border-radius:6px;padding:3px 10px;font-size:12px;color:#2e7d32;cursor:pointer;">&#9660; Show</button>
           </div>
-          <div id="binMasterListContainer">Loading...</div>
+          <div id="binMasterListBody" style="display:none;margin-top:10px;">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+              <input
+                type="text"
+                class="search-box"
+                id="binMasterSearch"
+                placeholder="Search by bin code or zone code..."
+                oninput="debouncedBinMasterSearch()"
+                style="flex:1;min-width:200px;margin-bottom:0"
+              />
+            </div>
+            <div id="binMasterListContainer"></div>
+          </div>
         </div>
 
         <!-- Records table -->
@@ -4079,8 +4084,8 @@
             loadBinContent(1),
             loadBinCategories(),
             loadBinMasterStats(),
-            loadBinMasterList(1),
           ]);
+          binMasterListLoaded = false;
           pageLoaded.binContent = true;
         }
         if (page === "users") {
@@ -7525,7 +7530,7 @@
           binMasterSelectedFile = null;
           document.getElementById("binMasterFileName").textContent = "";
           loadBinMasterStats();
-          loadBinMasterList(1);
+          binMasterListLoaded = false;
           loadBinContent(currentBinPage);
         } catch (err) {
           resultDiv.innerHTML =
@@ -7541,6 +7546,19 @@
       // ─── Bin Master List ──────────────────────────────────────────────────────────
       var currentBinMasterPage = 1;
       var totalBinMasterPages = 1;
+      var binMasterListLoaded = false;
+
+      function toggleBinMasterList() {
+        const body = document.getElementById("binMasterListBody");
+        const btn = document.getElementById("binMasterToggleBtn");
+        const hidden = body.style.display === "none";
+        body.style.display = hidden ? "block" : "none";
+        btn.innerHTML = hidden ? "&#9650; Hide" : "&#9660; Show";
+        if (hidden && !binMasterListLoaded) {
+          loadBinMasterList(1);
+          binMasterListLoaded = true;
+        }
+      }
 
       function debouncedBinMasterSearch() {
         clearTimeout(debouncedBinMasterSearch._t);
