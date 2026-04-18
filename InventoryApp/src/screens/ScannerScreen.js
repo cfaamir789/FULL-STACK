@@ -53,10 +53,10 @@ const ClearButton = ({ value, onClear, onClearFocus, style }) => {
           setTimeout(onClearFocus, 50);
         }
       }}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      style={[{ marginRight: 8, padding: 2 }, style]}
+      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      style={[{ marginRight: 6, padding: 6 }, style]}
     >
-      <MaterialCommunityIcons name="close-circle" size={18} color="#9e9e9e" />
+      <MaterialCommunityIcons name="close-circle" size={26} color="#757575" />
     </TouchableOpacity>
   );
 };
@@ -560,7 +560,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton value={quickCode} onClear={() => setQuickCode("")} />
+              <ClearButton value={quickCode} onClear={() => { setQuickCode(""); setFoundItem(null); setScanned(false); setQuickCodeResults([]); setFrombin(""); setTobin(""); setQty(""); setNotes(""); setTimeout(() => quickCodeRef.current?.focus(), 50); }} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -632,7 +632,7 @@ export default function ScannerScreen({ role = "worker" }) {
               }}
               blurOnSubmit={false}
             />
-            <ClearButton value={itemName} onClear={() => setItemName("")} />
+            <ClearButton value={itemName} onClear={() => { setItemName(""); setFoundItem(null); setScanned(false); setNameResults([]); setFrombin(""); setTobin(""); setQty(""); setNotes(""); setTimeout(() => itemNameRef.current?.focus(), 50); }} />
           </View>
           <TouchableOpacity
             style={styles.searchBtn}
