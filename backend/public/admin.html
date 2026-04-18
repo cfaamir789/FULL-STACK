@@ -471,7 +471,7 @@
         font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.3px;
-        box-shadow: 0 1px 4px rgba(46,125,50,0.15);
+        box-shadow: 0 1px 4px rgba(46, 125, 50, 0.15);
         white-space: nowrap;
       }
       /* PIN reset modal */
@@ -1515,6 +1515,9 @@
         <button id="navMaster" onclick="switchPage('master')">
           Item Master
         </button>
+        <button id="navBinContent" onclick="switchPage('binContent')">
+          Bin Content
+        </button>
         <button id="navUsers" onclick="switchPage('users')">Users</button>
       </div>
 
@@ -1925,81 +1928,191 @@
         </div>
 
         <div class="master-grid">
-          <div class="card" id="masterUploadBlock" style="padding:0;overflow:hidden">
+          <div
+            class="card"
+            id="masterUploadBlock"
+            style="padding: 0; overflow: hidden"
+          >
             <!-- Compact upload header -->
-            <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:linear-gradient(135deg,#fff8e1,#fff3cd);border-radius:10px 10px 0 0;border-bottom:1px solid #ffe082">
-              <span style="font-size:22px">&#128194;</span>
-              <div>
-                <div style="font-weight:700;font-size:14px;color:#5d4037">Upload Master CSV</div>
-                <div style="font-size:11px;color:#795548">Headers: <code style="background:#fff8e1;padding:1px 4px;border-radius:3px">ItemCode, Barcode, Item_Name</code> or <code style="background:#fff8e1;padding:1px 4px;border-radius:3px">Item No., Barcode No., Item Description</code></div>
-              </div>
-            </div>
-            <div style="padding:12px 16px">
             <div
-              class="upload-area"
-              id="dropZone"
-              onclick="document.getElementById('csvFile').click()"
-              style="padding:18px 12px;min-height:70px"
+              style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 12px 16px;
+                background: linear-gradient(135deg, #fff8e1, #fff3cd);
+                border-radius: 10px 10px 0 0;
+                border-bottom: 1px solid #ffe082;
+              "
             >
-              <input type="file" id="csvFile" accept=".csv,text/csv" />
-              <div class="icon" style="font-size:28px;margin-bottom:4px">&#128196;</div>
-              <p style="margin:0;font-size:12px">Click or drag CSV file here</p>
-              <div class="filename" id="fileName"></div>
-            </div>
-
-            <div class="mode-toggle" style="margin-top:10px;margin-bottom:10px">
-              <button
-                id="modeReplace"
-                class="active"
-                onclick="setMode('replace')"
-              >
-                &#128260; Replace All Items
-              </button>
-              <button id="modeMerge" onclick="setMode('merge')">
-                &#128279; Merge (Add/Update)
-              </button>
-            </div>
-
-            <button
-              class="btn btn-primary"
-              id="uploadBtn"
-              onclick="uploadCSV()"
-              disabled
-              style="margin-bottom:10px"
-            >
-              &#128640; Upload &amp; Push to Server
-            </button>
-            <div id="uploadResult"></div>
-
-            <!-- Push Master inline section -->
-            <div style="margin-top:14px;padding:12px 14px;background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border-radius:8px;border:1px solid #a5d6a7">
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
-                <div style="display:flex;align-items:center;gap:8px">
-                  <span style="font-size:18px">&#128225;</span>
-                  <span style="font-weight:700;font-size:13px;color:#2e7d32">Push Master to Phones</span>
+              <span style="font-size: 22px">&#128194;</span>
+              <div>
+                <div style="font-weight: 700; font-size: 14px; color: #5d4037">
+                  Upload Master CSV
                 </div>
-                <div style="display:flex;gap:14px">
-                  <div style="text-align:center">
-                    <div style="font-size:10px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Server Items</div>
-                    <div style="font-size:20px;font-weight:800;color:#1b5e20" id="pushItemCount">-</div>
-                  </div>
-                  <div style="text-align:center">
-                    <div style="font-size:10px;color:#666;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Version</div>
-                    <div style="font-size:20px;font-weight:800;color:#1b5e20" id="pushVersion">-</div>
-                  </div>
+                <div style="font-size: 11px; color: #795548">
+                  Headers:
+                  <code
+                    style="
+                      background: #fff8e1;
+                      padding: 1px 4px;
+                      border-radius: 3px;
+                    "
+                    >ItemCode, Barcode, Item_Name</code
+                  >
+                  or
+                  <code
+                    style="
+                      background: #fff8e1;
+                      padding: 1px 4px;
+                      border-radius: 3px;
+                    "
+                    >Item No., Barcode No., Item Description</code
+                  >
+                  &mdash; optional:
+                  <code
+                    style="
+                      background: #fff8e1;
+                      padding: 1px 4px;
+                      border-radius: 3px;
+                    "
+                    >Item Category Code</code
+                  >
                 </div>
               </div>
+            </div>
+            <div style="padding: 12px 16px">
+              <div
+                class="upload-area"
+                id="dropZone"
+                onclick="document.getElementById('csvFile').click()"
+                style="padding: 18px 12px; min-height: 70px"
+              >
+                <input type="file" id="csvFile" accept=".csv,text/csv" />
+                <div class="icon" style="font-size: 28px; margin-bottom: 4px">
+                  &#128196;
+                </div>
+                <p style="margin: 0; font-size: 12px">
+                  Click or drag CSV file here
+                </p>
+                <div class="filename" id="fileName"></div>
+              </div>
+
+              <div
+                class="mode-toggle"
+                style="margin-top: 10px; margin-bottom: 10px"
+              >
+                <button
+                  id="modeReplace"
+                  class="active"
+                  onclick="setMode('replace')"
+                >
+                  &#128260; Replace All Items
+                </button>
+                <button id="modeMerge" onclick="setMode('merge')">
+                  &#128279; Merge (Add/Update)
+                </button>
+              </div>
+
               <button
                 class="btn btn-primary"
-                id="pushMasterBtn"
-                onclick="pushMasterToPhones()"
-                style="background:#2e7d32;width:100%;margin:0"
+                id="uploadBtn"
+                onclick="uploadCSV()"
+                disabled
+                style="margin-bottom: 10px"
               >
-                &#128640; Push Master Data to All Phones
+                &#128640; Upload &amp; Push to Server
               </button>
-              <div id="pushResult" style="margin-top:6px"></div>
+              <div id="uploadResult"></div>
+
+              <!-- Push Master inline section -->
+              <div
+                style="
+                  margin-top: 14px;
+                  padding: 12px 14px;
+                  background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+                  border-radius: 8px;
+                  border: 1px solid #a5d6a7;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    margin-bottom: 10px;
+                  "
+                >
+                  <div style="display: flex; align-items: center; gap: 8px">
+                    <span style="font-size: 18px">&#128225;</span>
+                    <span
+                      style="font-weight: 700; font-size: 13px; color: #2e7d32"
+                      >Push Master to Phones</span
+                    >
+                  </div>
+                  <div style="display: flex; gap: 14px">
+                    <div style="text-align: center">
+                      <div
+                        style="
+                          font-size: 10px;
+                          color: #666;
+                          font-weight: 600;
+                          text-transform: uppercase;
+                          letter-spacing: 0.5px;
+                        "
+                      >
+                        Server Items
+                      </div>
+                      <div
+                        style="
+                          font-size: 20px;
+                          font-weight: 800;
+                          color: #1b5e20;
+                        "
+                        id="pushItemCount"
+                      >
+                        -
+                      </div>
+                    </div>
+                    <div style="text-align: center">
+                      <div
+                        style="
+                          font-size: 10px;
+                          color: #666;
+                          font-weight: 600;
+                          text-transform: uppercase;
+                          letter-spacing: 0.5px;
+                        "
+                      >
+                        Version
+                      </div>
+                      <div
+                        style="
+                          font-size: 20px;
+                          font-weight: 800;
+                          color: #1b5e20;
+                        "
+                        id="pushVersion"
+                      >
+                        -
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  class="btn btn-primary"
+                  id="pushMasterBtn"
+                  onclick="pushMasterToPhones()"
+                  style="background: #2e7d32; width: 100%; margin: 0"
+                >
+                  &#128640; Push Master Data to All Phones
+                </button>
+                <div id="pushResult" style="margin-top: 6px"></div>
+              </div>
             </div>
-            </div><!-- /padding -->
+            <!-- /padding -->
           </div>
         </div>
 
@@ -2024,6 +2137,222 @@
           </button>
         </div>
       </div>
+
+      <!-- ═══════════════════ BIN CONTENT PAGE ═══════════════════ -->
+      <div id="pageBinContent" class="panel-page hidden">
+        <div class="section-rail">
+          <button
+            class="section-chip"
+            onclick="scrollToBlock('binUploadBlock')"
+          >
+            Upload
+          </button>
+          <button class="section-chip" onclick="scrollToBlock('binStatsBlock')">
+            Stats
+          </button>
+          <button class="section-chip" onclick="scrollToBlock('binItemsBlock')">
+            Records
+          </button>
+          <button
+            class="section-chip"
+            onclick="scrollToBlock('binDangerBlock')"
+          >
+            Danger Zone
+          </button>
+        </div>
+
+        <!-- Stats overview -->
+        <div class="card" id="binStatsBlock">
+          <h2>&#128200; Bin Content Overview</h2>
+          <div class="stats-row">
+            <div class="stat">
+              <div class="num" id="binStatTotal">-</div>
+              <div class="label">Total Records</div>
+            </div>
+            <div class="stat">
+              <div class="num" id="binStatUniqueBins">-</div>
+              <div class="label">Unique Bins</div>
+            </div>
+            <div class="stat" style="border-left: 3px solid #e53935">
+              <div class="num" id="binStatUpper" style="color: #e53935">-</div>
+              <div
+                class="label"
+                style="font-size: 13px; font-weight: 600; color: #e53935"
+              >
+                &#128308; Upper (Ranking &lt; 0)
+              </div>
+            </div>
+            <div class="stat" style="border-left: 3px solid #f9a825">
+              <div class="num" id="binStatFloor" style="color: #f9a825">-</div>
+              <div
+                class="label"
+                style="font-size: 13px; font-weight: 600; color: #f9a825"
+              >
+                &#128993; Floor (Ranking = 0)
+              </div>
+            </div>
+            <div class="stat" style="border-left: 3px solid #2e7d32">
+              <div class="num" id="binStatDisplay" style="color: #2e7d32">
+                -
+              </div>
+              <div
+                class="label"
+                style="font-size: 13px; font-weight: 600; color: #2e7d32"
+              >
+                &#128994; Display (Ranking &gt; 0)
+              </div>
+            </div>
+            <div class="stat" style="border-left: 3px solid #ff8f00">
+              <div class="num" id="binStatUnresolved" style="color: #ff8f00">
+                -
+              </div>
+              <div
+                class="label"
+                style="font-size: 13px; font-weight: 600; color: #ff8f00"
+              >
+                &#9888;&#65039; Not in Item Master
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upload card -->
+        <div class="master-grid">
+          <div
+            class="card"
+            id="binUploadBlock"
+            style="padding: 0; overflow: hidden"
+          >
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 12px 16px;
+                background: linear-gradient(135deg, #e3f2fd, #e1f5fe);
+                border-radius: 10px 10px 0 0;
+                border-bottom: 1px solid #90caf9;
+              "
+            >
+              <span style="font-size: 22px">&#128218;</span>
+              <div>
+                <div style="font-weight: 700; font-size: 14px; color: #1565c0">
+                  Upload Bin Content CSV
+                </div>
+                <div style="font-size: 11px; color: #1976d2">
+                  Required columns:
+                  <code
+                    style="
+                      background: #e3f2fd;
+                      padding: 1px 4px;
+                      border-radius: 3px;
+                    "
+                    >item code, bin code, available qty, bin ranking</code
+                  >
+                </div>
+                <div style="font-size: 11px; color: #5c6bc0; margin-top: 2px">
+                  Barcode, description &amp; category auto-filled from Item
+                  Master
+                </div>
+              </div>
+            </div>
+            <div style="padding: 12px 16px">
+              <div
+                class="upload-area"
+                id="binDropZone"
+                onclick="document.getElementById('binCsvFile').click()"
+                style="padding: 18px 12px; min-height: 70px"
+              >
+                <input type="file" id="binCsvFile" accept=".csv,text/csv" />
+                <div class="icon" style="font-size: 28px; margin-bottom: 4px">
+                  &#128196;
+                </div>
+                <p style="margin: 0; font-size: 12px">
+                  Click or drag CSV file here
+                </p>
+                <div class="filename" id="binFileName"></div>
+              </div>
+              <div
+                class="mode-toggle"
+                style="margin-top: 10px; margin-bottom: 10px"
+              >
+                <button
+                  id="binModeReplace"
+                  class="active"
+                  onclick="setBinMode('replace')"
+                >
+                  &#128260; Replace All
+                </button>
+                <button id="binModeMerge" onclick="setBinMode('merge')">
+                  &#128279; Merge (Add/Update)
+                </button>
+              </div>
+              <button
+                class="btn btn-primary"
+                id="binUploadBtn"
+                onclick="uploadBinCSV()"
+                disabled
+                style="margin-bottom: 10px"
+              >
+                &#128640; Upload Bin Data
+              </button>
+              <div id="binUploadResult"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Records table -->
+        <div class="card table-card" id="binItemsBlock">
+          <h2>&#128230; Bin Content Records</h2>
+          <div
+            style="
+              display: flex;
+              gap: 10px;
+              flex-wrap: wrap;
+              align-items: center;
+              margin-bottom: 8px;
+            "
+          >
+            <input
+              type="text"
+              class="search-box"
+              id="binSearch"
+              placeholder="Search by bin code, item code, name..."
+              oninput="debouncedBinSearch()"
+              style="flex: 1; min-width: 200px; margin-bottom: 0"
+            />
+            <select
+              id="binCategoryFilter"
+              onchange="loadBinContent(1)"
+              style="
+                height: 40px;
+                border: 1.5px solid #c8e6c9;
+                border-radius: 8px;
+                padding: 0 12px;
+                font-size: 13px;
+                color: #333;
+                background: #fff;
+                min-width: 160px;
+                cursor: pointer;
+              "
+            >
+              <option value="">All Categories</option>
+            </select>
+          </div>
+          <div id="binContainer">
+            <div class="loading">Open this page to load bin records...</div>
+          </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="card danger-card" id="binDangerBlock">
+          <h2 style="color: #e53935">&#9888;&#65039; Danger Zone</h2>
+          <button class="btn btn-danger" onclick="clearAllBinContent()">
+            Delete All Bin Records
+          </button>
+        </div>
+      </div>
+      <!-- ═══════════════════ END BIN CONTENT PAGE ═══════════════════ -->
 
       <div id="pageWorkers" class="panel-page hidden">
         <div class="section-rail">
@@ -2892,17 +3221,75 @@
             Manage users, reset PINs, and control access.
           </p>
           <!-- Beautiful 5D glow search bar -->
-          <div style="position:relative;margin-bottom:16px">
-            <div style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:17px;pointer-events:none;z-index:1">&#128269;</div>
+          <div style="position: relative; margin-bottom: 16px">
+            <div
+              style="
+                position: absolute;
+                left: 14px;
+                top: 50%;
+                transform: translateY(-50%);
+                font-size: 17px;
+                pointer-events: none;
+                z-index: 1;
+              "
+            >
+              &#128269;
+            </div>
             <input
               id="userSearchBox"
               placeholder="Search by name, employee ID, or device..."
               oninput="filterUsers()"
-              style="width:100%;box-sizing:border-box;padding:13px 16px 13px 44px;border:2px solid #a5d6a7;border-radius:12px;font-size:14px;background:linear-gradient(135deg,#f9fff9,#f0fff4);outline:none;box-shadow:0 4px 15px rgba(46,125,50,0.12),0 1px 4px rgba(46,125,50,0.08),inset 0 1px 3px rgba(255,255,255,0.9);transition:border-color 0.2s,box-shadow 0.2s;color:#1b5e20;font-weight:500"
-              onfocus="this.style.borderColor='#2e7d32';this.style.boxShadow='0 4px 20px rgba(46,125,50,0.25),0 2px 6px rgba(46,125,50,0.15),inset 0 1px 3px rgba(255,255,255,0.9)'"
-              onblur="this.style.borderColor='#a5d6a7';this.style.boxShadow='0 4px 15px rgba(46,125,50,0.12),0 1px 4px rgba(46,125,50,0.08),inset 0 1px 3px rgba(255,255,255,0.9)'"
+              style="
+                width: 100%;
+                box-sizing: border-box;
+                padding: 13px 16px 13px 44px;
+                border: 2px solid #a5d6a7;
+                border-radius: 12px;
+                font-size: 14px;
+                background: linear-gradient(135deg, #f9fff9, #f0fff4);
+                outline: none;
+                box-shadow:
+                  0 4px 15px rgba(46, 125, 50, 0.12),
+                  0 1px 4px rgba(46, 125, 50, 0.08),
+                  inset 0 1px 3px rgba(255, 255, 255, 0.9);
+                transition:
+                  border-color 0.2s,
+                  box-shadow 0.2s;
+                color: #1b5e20;
+                font-weight: 500;
+              "
+              onfocus="
+                this.style.borderColor = '#2e7d32';
+                this.style.boxShadow =
+                  '0 4px 20px rgba(46,125,50,0.25),0 2px 6px rgba(46,125,50,0.15),inset 0 1px 3px rgba(255,255,255,0.9)';
+              "
+              onblur="
+                this.style.borderColor = '#a5d6a7';
+                this.style.boxShadow =
+                  '0 4px 15px rgba(46,125,50,0.12),0 1px 4px rgba(46,125,50,0.08),inset 0 1px 3px rgba(255,255,255,0.9)';
+              "
             />
-            <div id="userSearchClear" onclick="document.getElementById('userSearchBox').value='';filterUsers();this.style.display='none'" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:#888;font-size:16px;font-weight:700">&times;</div>
+            <div
+              id="userSearchClear"
+              onclick="
+                document.getElementById('userSearchBox').value = '';
+                filterUsers();
+                this.style.display = 'none';
+              "
+              style="
+                display: none;
+                position: absolute;
+                right: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                cursor: pointer;
+                color: #888;
+                font-size: 16px;
+                font-weight: 700;
+              "
+            >
+              &times;
+            </div>
           </div>
           <div id="usersContainer"><div class="loading">Loading...</div></div>
         </div>
@@ -3067,11 +3454,16 @@
         dashboard: false,
         processed: false,
         master: false,
+        binContent: false,
         workers: false,
         users: false,
       };
       let currentItemsPage = 1;
       let currentItemsPages = 1;
+      let binUploadMode = "replace";
+      let binSelectedFile = null;
+      let currentBinPage = 1;
+      let currentBinPages = 1;
       let liveRefreshTimer = null;
       let currentPage = "dashboard";
       let workerRefreshInFlight = false;
@@ -3111,6 +3503,12 @@
               }
               if (currentPage === "dashboard" && pageLoaded.dashboard) {
                 loadDashboardPanels(true);
+              }
+            }
+            if (msg.type === "bin_content_updated") {
+              if (currentPage === "binContent" && pageLoaded.binContent) {
+                loadBinStats();
+                loadBinContent(currentBinPage);
               }
             }
             if (msg.type === "transactions_updated") {
@@ -3491,7 +3889,14 @@
 
       async function switchPage(page) {
         currentPage = page;
-        const pages = ["dashboard", "processed", "master", "workers", "users"];
+        const pages = [
+          "dashboard",
+          "processed",
+          "master",
+          "binContent",
+          "workers",
+          "users",
+        ];
         pages.forEach((p) => {
           document
             .getElementById("page" + p.charAt(0).toUpperCase() + p.slice(1))
@@ -3522,6 +3927,14 @@
         if (page === "workers") {
           await refreshWorkersPage();
           pageLoaded.workers = true;
+        }
+        if (page === "binContent") {
+          await Promise.allSettled([
+            loadBinStats(),
+            loadBinContent(1),
+            loadBinCategories(),
+          ]);
+          pageLoaded.binContent = true;
         }
         if (page === "users") {
           await Promise.allSettled([loadStats(), loadUsers()]);
@@ -4350,6 +4763,36 @@
         }
       });
 
+      // ─── Bin Content file drop zone ───────────────────────────────────────────
+      const binDropZone = document.getElementById("binDropZone");
+      const binCsvInput = document.getElementById("binCsvFile");
+
+      binCsvInput.addEventListener("change", (e) => {
+        binSelectedFile = e.target.files[0];
+        if (binSelectedFile) {
+          document.getElementById("binFileName").textContent =
+            binSelectedFile.name;
+          document.getElementById("binUploadBtn").disabled = false;
+        }
+      });
+      binDropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        binDropZone.classList.add("dragover");
+      });
+      binDropZone.addEventListener("dragleave", () =>
+        binDropZone.classList.remove("dragover"),
+      );
+      binDropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        binDropZone.classList.remove("dragover");
+        if (e.dataTransfer.files.length) {
+          binSelectedFile = e.dataTransfer.files[0];
+          document.getElementById("binFileName").textContent =
+            binSelectedFile.name;
+          document.getElementById("binUploadBtn").disabled = false;
+        }
+      });
+
       function setMode(mode) {
         uploadMode = mode;
         document.getElementById("modeReplace").className =
@@ -4703,11 +5146,9 @@
             const hasNewCols = parsed.some(
               (c) => c.key === "employeeId" || c.key === "deviceModel",
             );
-            const hasSeparateDateTime = parsed.some(
-              (c) => c.key === "Timestamp_date",
-            ) && parsed.some(
-              (c) => c.key === "Timestamp_time",
-            );
+            const hasSeparateDateTime =
+              parsed.some((c) => c.key === "Timestamp_date") &&
+              parsed.some((c) => c.key === "Timestamp_time");
             if (hasNewCols && hasSeparateDateTime) return parsed;
           }
         } catch {}
@@ -4734,7 +5175,8 @@
         if (!body) return;
         const open = body.style.display !== "none";
         body.style.display = open ? "none" : "block";
-        if (icon) icon.style.transform = open ? "rotate(0deg)" : "rotate(90deg)";
+        if (icon)
+          icon.style.transform = open ? "rotate(0deg)" : "rotate(90deg)";
       }
 
       function toggleWorkerStatus() {
@@ -6536,6 +6978,335 @@
           loadStats();
           loadItems(1);
           alert("All items deleted.");
+        } catch (err) {
+          alert("Error: " + err.message);
+        }
+      }
+
+      // ─── Bin Content ──────────────────────────────────────────────────────────
+      async function loadBinStats() {
+        try {
+          const data = await apiFetch("/bin-content/stats");
+          document.getElementById("binStatTotal").textContent =
+            data.total ?? "-";
+          document.getElementById("binStatUniqueBins").textContent =
+            data.uniqueBins ?? "-";
+          document.getElementById("binStatUpper").textContent =
+            data.upper ?? "-";
+          document.getElementById("binStatFloor").textContent =
+            data.floor ?? "-";
+          document.getElementById("binStatDisplay").textContent =
+            data.display ?? "-";
+          document.getElementById("binStatUnresolved").textContent =
+            data.unresolved ?? "-";
+        } catch {}
+      }
+
+      // Debounce + request-ID guard: only the latest request updates the UI
+      var _binSearchTimer = null;
+      var _binReqId = 0;
+      function debouncedBinSearch() {
+        clearTimeout(_binSearchTimer);
+        _binSearchTimer = setTimeout(function () {
+          loadBinContent(1);
+        }, 350);
+      }
+
+      async function loadBinCategories() {
+        try {
+          const data = await apiFetch("/bin-content/categories");
+          const sel = document.getElementById("binCategoryFilter");
+          if (!sel) return;
+          const current = sel.value;
+          sel.innerHTML = '<option value="">All Categories</option>';
+          (data.categories || []).forEach(function (c) {
+            const opt = document.createElement("option");
+            opt.value = c;
+            opt.textContent = c;
+            if (String(c) === current) opt.selected = true;
+            sel.appendChild(opt);
+          });
+        } catch (e) {
+          /* non-critical */
+        }
+      }
+
+      async function loadBinContent(page = 1) {
+        const container = document.getElementById("binContainer");
+        container.innerHTML =
+          '<div class="loading">Loading bin records...</div>';
+        const reqId = ++_binReqId;
+        try {
+          const q = (document.getElementById("binSearch")?.value || "").trim();
+          const category = (
+            document.getElementById("binCategoryFilter")?.value || ""
+          ).trim();
+          let url = "/bin-content?page=" + page + "&limit=50";
+          if (q) url += "&q=" + encodeURIComponent(q);
+          if (category) url += "&category=" + encodeURIComponent(category);
+          const data = await apiFetch(url);
+          if (reqId !== _binReqId) return; // stale response — a newer request is in flight
+          currentBinPage = data.page || 1;
+          currentBinPages = Math.max(1, Math.ceil((data.total || 0) / 50));
+          renderBinContent(
+            data.bins || [],
+            data.total || 0,
+            data.totalQty || 0,
+          );
+        } catch (err) {
+          if (reqId !== _binReqId) return;
+          container.innerHTML =
+            '<div class="alert alert-error">' + esc(err.message) + "</div>";
+        }
+      }
+
+      function renderBinContent(bins, total, totalQty) {
+        const container = document.getElementById("binContainer");
+        if (bins.length === 0) {
+          container.innerHTML =
+            '<div class="loading">No bin records found. Upload a CSV to get started.</div>';
+          return;
+        }
+        const start = (currentBinPage - 1) * 50;
+        const q = (document.getElementById("binSearch")?.value || "").trim();
+        let html =
+          '<div class="preview-count">Showing ' +
+          (start + 1) +
+          "\u2013" +
+          (start + bins.length) +
+          " of " +
+          total +
+          " bins";
+        if (q) {
+          html +=
+            ' &mdash; <strong style="color:#2e7d32">Total Qty: ' +
+            totalQty.toLocaleString() +
+            "</strong> across " +
+            total +
+            " bin" +
+            (total !== 1 ? "s" : "");
+        }
+        html += "</div>";
+        // Qty summary card — always visible when a filter is active
+        if (q) {
+          html +=
+            '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">' +
+            '<div style="background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:1px solid #a5d6a7;border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px">' +
+            '<span style="font-size:22px">&#128230;</span>' +
+            '<div><div style="font-size:11px;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Total Qty</div>' +
+            '<div style="font-size:24px;font-weight:800;color:#1b5e20">' +
+            totalQty.toLocaleString() +
+            "</div></div>" +
+            "</div>" +
+            '<div style="background:linear-gradient(135deg,#e3f2fd,#f0f4ff);border:1px solid #90caf9;border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px">' +
+            '<span style="font-size:22px">&#128204;</span>' +
+            '<div><div style="font-size:11px;color:#555;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Bins</div>' +
+            '<div style="font-size:24px;font-weight:800;color:#0d47a1">' +
+            total.toLocaleString() +
+            "</div></div>" +
+            "</div>" +
+            "</div>";
+        }
+        html +=
+          '<div class="table-shell wide"><div class="table-wrap medium"><table><thead><tr>' +
+          "<th>#</th><th>Bin Code</th><th>Item Code</th><th>Item Name</th>" +
+          "<th>Category</th><th>Barcode</th><th>Qty</th><th>Ranking</th><th>Zone</th>" +
+          "</tr></thead><tbody>";
+
+        bins.forEach(function (b, i) {
+          var zone =
+            b.BinRanking < 0
+              ? '<span style="background:#ffcdd2;color:#c62828;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">&#128308; Upper</span>'
+              : b.BinRanking > 0
+                ? '<span style="background:#c8e6c9;color:#2e7d32;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">&#128994; Display</span>'
+                : '<span style="background:#fff3cd;color:#856404;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">&#128993; Floor</span>';
+          var rowStyle = b.notInMaster
+            ? ' style="background:#fff8e1;border-left:3px solid #ff8f00;"'
+            : "";
+          var warning = b.notInMaster
+            ? ' title="\u26a0\ufe0f Item not found in Item Master"'
+            : "";
+          html +=
+            "<tr" +
+            rowStyle +
+            warning +
+            ">" +
+            "<td>" +
+            (start + i + 1) +
+            "</td>" +
+            "<td>" +
+            esc(b.BinCode || "") +
+            "</td>" +
+            "<td>" +
+            esc(b.ItemCode || "") +
+            "</td>" +
+            "<td>" +
+            esc(b.Item_Name || "") +
+            (b.notInMaster
+              ? ' <span style="color:#ff8f00;font-size:11px;">&#9888;&#65039;</span>'
+              : "") +
+            "</td>" +
+            "<td>" +
+            esc(b.CategoryCode || "") +
+            "</td>" +
+            "<td>" +
+            esc(b.Barcode || "") +
+            "</td>" +
+            "<td>" +
+            esc(String(b.Qty ?? 0)) +
+            "</td>" +
+            "<td>" +
+            esc(String(b.BinRanking ?? 0)) +
+            "</td>" +
+            "<td>" +
+            zone +
+            "</td>" +
+            "</tr>";
+        });
+
+        html += "</tbody></table></div></div>";
+        if (currentBinPages > 1) {
+          html += '<div class="pagination">';
+          html +=
+            "<button " +
+            (currentBinPage <= 1 ? "disabled" : "") +
+            ' onclick="loadBinContent(' +
+            (currentBinPage - 1) +
+            ')">Prev</button>';
+          html +=
+            '<span style="padding:6px;">' +
+            currentBinPage +
+            " / " +
+            currentBinPages +
+            "</span>";
+          html +=
+            "<button " +
+            (currentBinPage >= currentBinPages ? "disabled" : "") +
+            ' onclick="loadBinContent(' +
+            (currentBinPage + 1) +
+            ')">Next</button>';
+          html += "</div>";
+        }
+        container.innerHTML = html;
+      }
+
+      function setBinMode(mode) {
+        binUploadMode = mode;
+        document.getElementById("binModeReplace").className =
+          mode === "replace" ? "active" : "";
+        document.getElementById("binModeMerge").className =
+          mode === "merge" ? "active" : "";
+      }
+
+      async function uploadBinCSV() {
+        if (!binSelectedFile) return;
+        const btn = document.getElementById("binUploadBtn");
+        const resultDiv = document.getElementById("binUploadResult");
+        btn.disabled = true;
+        btn.textContent = "Uploading...";
+        resultDiv.innerHTML = "";
+        const uploadStart = Date.now();
+        const formData = new FormData();
+        formData.append("file", binSelectedFile);
+        try {
+          const headers = {};
+          if (authToken) headers["Authorization"] = "Bearer " + authToken;
+          const res = await fetch(
+            API + "/bin-content/upload-csv-async?mode=" + binUploadMode,
+            { method: "POST", headers, body: formData },
+          );
+          const raw = await res.text();
+          let data = {};
+          try {
+            data = raw ? JSON.parse(raw) : {};
+          } catch {
+            throw new Error(
+              "Server returned invalid response. Hard refresh browser (Ctrl+F5), login again, and retry.",
+            );
+          }
+          if (!res.ok) throw new Error(data.error || "Upload failed");
+          const jobId = data.jobId;
+          if (!jobId) throw new Error("Upload job was not created");
+
+          while (true) {
+            const status = await apiFetch(
+              "/bin-content/upload-csv-status/" + encodeURIComponent(jobId),
+            );
+            if (status.status === "processing") {
+              const pct =
+                status.total > 0
+                  ? Math.round((status.processed / status.total) * 100)
+                  : 0;
+              const elapsed = ((Date.now() - uploadStart) / 1000).toFixed(0);
+              const phase =
+                status.phase === "loading master"
+                  ? "Loading Item Master..."
+                  : status.phase === "merging"
+                    ? "Merging records..."
+                    : status.phase === "replacing"
+                      ? "Replacing records..."
+                      : status.phase === "inserting"
+                        ? "Inserting..."
+                        : "Processing...";
+              btn.textContent = phase + " " + pct + "% (" + elapsed + "s)";
+            }
+            if (status.status === "done") {
+              const totalSec = ((Date.now() - uploadStart) / 1000).toFixed(1);
+              let html =
+                '<div class="alert alert-success">&#10004; Done in ' +
+                totalSec +
+                "s! " +
+                "New: <strong>" +
+                (status.inserted || 0) +
+                "</strong>" +
+                " &nbsp;|&nbsp; Updated: <strong>" +
+                (status.modified || 0) +
+                "</strong>" +
+                " &nbsp;|&nbsp; Total rows: <strong>" +
+                (status.total || 0) +
+                "</strong>";
+              if (status.unresolved && status.unresolved.length > 0) {
+                html +=
+                  '<br><span style="color:#ff8f00;font-weight:600;">' +
+                  "&#9888;&#65039; " +
+                  status.unresolved.length +
+                  " item code(s) not found in Item Master \u2014 saved with blank description/barcode/category.</span>";
+              }
+              html += "</div>";
+              resultDiv.innerHTML = html;
+              loadBinStats();
+              loadBinContent(1);
+              binSelectedFile = null;
+              document.getElementById("binFileName").textContent = "";
+              break;
+            }
+            if (status.status === "error")
+              throw new Error(status.error || "Upload failed");
+            await new Promise((r) => setTimeout(r, 500));
+          }
+        } catch (err) {
+          resultDiv.innerHTML =
+            '<div class="alert alert-error">&#10008; ' +
+            esc(err.message) +
+            "</div>";
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "\u{1F680} Upload Bin Data";
+        }
+      }
+
+      async function clearAllBinContent() {
+        if (
+          !confirm(
+            "DELETE ALL BIN RECORDS from the server? This cannot be undone!",
+          )
+        )
+          return;
+        try {
+          await apiFetch("/bin-content/all", { method: "DELETE" });
+          loadBinStats();
+          loadBinContent(1);
+          alert("All bin records deleted.");
         } catch (err) {
           alert("Error: " + err.message);
         }

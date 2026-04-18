@@ -24,24 +24,44 @@ let _buildPromise = null;
 
 async function _buildBulkCache() {
   const [items, version] = await Promise.all([
-    Item.find({}, { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1, UOM: 1 })
+    Item.find(
+      {},
+      {
+        _id: 0,
+        ItemCode: 1,
+        Barcode: 1,
+        Item_Name: 1,
+        CategoryCode: 1,
+        UOM: 1,
+      },
+    )
       .sort({ Item_Name: 1 })
       .lean(),
     getItemsVersion(),
   ]);
-  const payload = JSON.stringify({ success: true, version, total: items.length, items });
+  const payload = JSON.stringify({
+    success: true,
+    version,
+    total: items.length,
+    items,
+  });
   const gzBuf = await gzip(Buffer.from(payload, "utf8"), { level: 6 });
   _bulkCache = { version, gzBuf, etag: `"v${version}"` };
-  console.log(`[items-cache] built v${version} — ${items.length} items, ${(gzBuf.length / 1024).toFixed(0)} KB gzipped`);
+  console.log(
+    `[items-cache] built v${version} — ${items.length} items, ${(gzBuf.length / 1024).toFixed(0)} KB gzipped`,
+  );
   return _bulkCache;
 }
 
 // Public: returns cache, building it if needed. Concurrent callers share one build.
 async function getBulkCache() {
   const currentVersion = await getItemsVersion();
-  if (_bulkCache.version === currentVersion && _bulkCache.gzBuf) return _bulkCache;
+  if (_bulkCache.version === currentVersion && _bulkCache.gzBuf)
+    return _bulkCache;
   if (!_buildPromise) {
-    _buildPromise = _buildBulkCache().finally(() => { _buildPromise = null; });
+    _buildPromise = _buildBulkCache().finally(() => {
+      _buildPromise = null;
+    });
   }
   return _buildPromise;
 }
@@ -117,12 +137,15 @@ function storeMergeReport(mergeId, report) {
 }
 
 // Clean stale reports older than 2 hours on startup too
-setInterval(() => {
-  const cutoff = Date.now() - 2 * 60 * 60 * 1000;
-  for (const [id, r] of mergeReports) {
-    if (r.createdAt < cutoff) mergeReports.delete(id);
-  }
-}, 30 * 60 * 1000);
+setInterval(
+  () => {
+    const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+    for (const [id, r] of mergeReports) {
+      if (r.createdAt < cutoff) mergeReports.delete(id);
+    }
+  },
+  30 * 60 * 1000,
+);
 
 function parseCsvItems(csvText) {
   const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
@@ -146,6 +169,16 @@ function parseCsvItems(csvText) {
     );
   }
 
+  // Detect optional category column — accepts: 'item category code', 'item_category_code', 'CategoryCode', 'category code', 'cat code'
+  const catCol = Object.keys(firstRow).find((k) => {
+    const norm = k.toLowerCase().replace(/[\s_]/g, "");
+    return (
+      norm === "itemcategorycode" ||
+      norm === "categorycode" ||
+      norm === "catcode"
+    );
+  });
+
   const dedup = new Map();
   for (const row of parsed.data) {
     const rawBarcode = hasOldFormat ? row["Barcode No."] : row.Barcode;
@@ -158,10 +191,13 @@ function parseCsvItems(csvText) {
 
     dedup.set(barcode, {
       ItemCode: String(
-        hasOldFormat ? row["Item No."] || rawBarcode : row.ItemCode || rawBarcode,
+        hasOldFormat
+          ? row["Item No."] || rawBarcode
+          : row.ItemCode || rawBarcode,
       ).trim(),
       Barcode: barcode,
       Item_Name: itemName,
+      CategoryCode: catCol ? String(row[catCol] || "").trim() : "",
       UOM: "PCS",
     });
   }
@@ -240,7 +276,11 @@ async function replaceItemsAtomically(items, onProgress) {
 
   try {
     await dropCollectionIfExists(tempCol);
-    const { inserted } = await bulkInsertReplaceItems(items, tempCol, onProgress);
+    const { inserted } = await bulkInsertReplaceItems(
+      items,
+      tempCol,
+      onProgress,
+    );
     onProgress?.({
       processed: total,
       total,
@@ -250,7 +290,13 @@ async function replaceItemsAtomically(items, onProgress) {
     });
     await createItemIndexes(tempCol);
     await tempCol.rename(liveName, { dropTarget: true });
-    return { inserted, modified: 0, totalItems: total, processed: total, total };
+    return {
+      inserted,
+      modified: 0,
+      totalItems: total,
+      processed: total,
+      total,
+    };
   } catch (err) {
     try {
       await dropCollectionIfExists(tempCol);
@@ -277,7 +323,13 @@ async function applyCsvItems(items, mode, onProgress, req, mergeId) {
   // Step 1: Load only items whose barcodes appear in the CSV — not the full collection.
   // A full scan of 1.6M items costs 300-500 MB and crashes the server on Render free tier.
   // Querying only the CSV barcodes (chunked $in) keeps peak RAM proportional to CSV size.
-  onProgress?.({ processed: 0, total, inserted: 0, modified: 0, phase: "scanning" });
+  onProgress?.({
+    processed: 0,
+    total,
+    inserted: 0,
+    modified: 0,
+    phase: "scanning",
+  });
   const csvBarcodes = items.map((item) => item.Barcode);
   const SCAN_CHUNK = 10000;
   const existingMap = new Map(); // Barcode → { ItemCode, Item_Name, UOM }
@@ -286,13 +338,23 @@ async function applyCsvItems(items, mode, onProgress, req, mergeId) {
     const docs = await rawCol
       .find(
         { Barcode: { $in: batch } },
-        { projection: { Barcode: 1, ItemCode: 1, Item_Name: 1, UOM: 1, _id: 0 } },
+        {
+          projection: {
+            Barcode: 1,
+            ItemCode: 1,
+            Item_Name: 1,
+            CategoryCode: 1,
+            UOM: 1,
+            _id: 0,
+          },
+        },
       )
       .toArray();
     for (const doc of docs) {
       existingMap.set(doc.Barcode, {
         ItemCode: doc.ItemCode || "",
         Item_Name: doc.Item_Name || "",
+        CategoryCode: doc.CategoryCode || "",
         UOM: doc.UOM || "PCS",
       });
     }
@@ -319,7 +381,8 @@ async function applyCsvItems(items, mode, onProgress, req, mergeId) {
       if (
         ex.ItemCode !== (item.ItemCode || "") ||
         ex.Item_Name !== (item.Item_Name || "") ||
-        ex.UOM !== uom
+        ex.UOM !== uom ||
+        (ex.CategoryCode || "") !== (item.CategoryCode || "")
       ) {
         updatedItems.push(item);
       } else {
@@ -347,6 +410,7 @@ async function applyCsvItems(items, mode, onProgress, req, mergeId) {
             ItemCode: item.ItemCode,
             Barcode: item.Barcode,
             Item_Name: item.Item_Name,
+            CategoryCode: item.CategoryCode || "",
             UOM: item.UOM || "PCS",
             updatedAt: mergeTime,
           },
@@ -451,7 +515,7 @@ router.get("/bulk", async (req, res) => {
     res.set({
       "Content-Type": "application/json; charset=utf-8",
       "Content-Encoding": "gzip",
-      "ETag": cache.etag,
+      ETag: cache.etag,
       "Cache-Control": "no-cache",
       "Content-Length": cache.gzBuf.length,
     });
@@ -471,12 +535,16 @@ router.get("/delta", async (req, res) => {
     const lastFullSyncRaw = req.query.lastFullSync;
 
     if (!sinceRaw) {
-      return res.status(400).json({ success: false, error: "since param required" });
+      return res
+        .status(400)
+        .json({ success: false, error: "since param required" });
     }
 
     const since = new Date(sinceRaw);
     if (isNaN(since.getTime())) {
-      return res.status(400).json({ success: false, error: "invalid since date" });
+      return res
+        .status(400)
+        .json({ success: false, error: "invalid since date" });
     }
 
     const serverTime = new Date();
@@ -568,7 +636,7 @@ router.get("/", async (req, res) => {
     if (paginated) {
       const [items, total] = await Promise.all([
         Item.find(query)
-          .select("ItemCode Barcode Item_Name UOM")
+          .select("ItemCode Barcode Item_Name CategoryCode UOM")
           .sort({ Item_Name: 1 })
           .skip(skip)
           .limit(limit)
@@ -586,7 +654,7 @@ router.get("/", async (req, res) => {
     }
 
     const items = await Item.find(query)
-      .select("ItemCode Barcode Item_Name UOM")
+      .select("ItemCode Barcode Item_Name CategoryCode UOM")
       .sort({ Item_Name: 1 })
       .lean();
     res.json({ success: true, count: items.length, items });
@@ -607,7 +675,15 @@ router.post("/", async (req, res) => {
     }
     const item = await Item.findOneAndUpdate(
       { Barcode },
-      { $set: { ItemCode, Barcode, Item_Name, UOM: "PCS", updatedAt: new Date() } },
+      {
+        $set: {
+          ItemCode,
+          Barcode,
+          Item_Name,
+          UOM: "PCS",
+          updatedAt: new Date(),
+        },
+      },
       { upsert: true, new: true },
     );
     await bumpItemsVersion(req);
@@ -687,7 +763,11 @@ router.post("/replace", requireAuth, requireAdmin, async (req, res) => {
         .json({ success: false, error: "items array is required" });
     }
     const result = await applyCsvItems(items, "replace", null, req);
-    res.json({ success: true, inserted: result.inserted, totalItems: result.totalItems });
+    res.json({
+      success: true,
+      inserted: result.inserted,
+      totalItems: result.totalItems,
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -835,11 +915,12 @@ router.get(
     if (status === "new") rows = report.new;
     else if (status === "updated") rows = report.updated;
     else if (status === "unchanged") rows = report.unchanged;
-    else rows = [
-      ...report.new.map((r) => ({ ...r, Status: "New" })),
-      ...report.updated.map((r) => ({ ...r, Status: "Updated" })),
-      ...report.unchanged.map((r) => ({ ...r, Status: "Unchanged" })),
-    ];
+    else
+      rows = [
+        ...report.new.map((r) => ({ ...r, Status: "New" })),
+        ...report.updated.map((r) => ({ ...r, Status: "Updated" })),
+        ...report.unchanged.map((r) => ({ ...r, Status: "Unchanged" })),
+      ];
 
     // Add Status column for single-status downloads too
     if (status !== "all") {

@@ -7,6 +7,7 @@ const path = require("path");
 const itemsRouter = require("./routes/items");
 const syncRouter = require("./routes/sync");
 const authRouter = require("./routes/auth");
+const binContentRouter = require("./routes/binContent");
 const connectDB = require("./config/database");
 
 const compression = require("compression");
@@ -50,12 +51,14 @@ app.set("broadcast", broadcast);
 
 // Middleware
 // Skip compression for routes that send a pre-gzipped buffer (res.locals.noCompress)
-app.use(compression({
-  filter: (req, res) => {
-    if (res.locals.noCompress) return false;
-    return compression.filter(req, res);
-  },
-}));
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (res.locals.noCompress) return false;
+      return compression.filter(req, res);
+    },
+  }),
+);
 app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 
@@ -134,6 +137,7 @@ app.get("/api/db-status", (req, res) => {
 // Routes
 app.use("/api/auth", authRouter);
 app.use("/api/items", itemsRouter);
+app.use("/api/bin-content", binContentRouter);
 app.use("/api/transactions", syncRouter);
 app.use("/api/sync", syncRouter);
 
