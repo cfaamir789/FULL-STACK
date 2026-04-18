@@ -5,13 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Inventory Admin Panel</title>
     <!-- Primary PNG favicon (best compatibility) -->
-    <link rel="icon" type="image/png" sizes="256x256" href="/admin/logo3_favicon.png" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="256x256"
+      href="/admin/logo3_favicon.png"
+    />
     <!-- GIF fallback -->
-    <link rel="alternate icon" type="image/gif" href="/admin/logo3_favicon.gif" />
+    <link
+      rel="alternate icon"
+      type="image/gif"
+      href="/admin/logo3_favicon.gif"
+    />
     <!-- Apple devices -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/admin/logo3_favicon.png" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="/admin/logo3_favicon.png"
+    />
     <!-- Android / Chrome -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/admin/logo3_favicon.png" />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="192x192"
+      href="/admin/logo3_favicon.png"
+    />
     <!-- SheetJS for XLSX export -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -223,6 +241,99 @@
       .search-box:focus {
         outline: none;
         border-color: #2e7d32;
+      }
+      /* ── Multi-select filter widget ─────────────────────────── */
+      .ms-wrap {
+        position: relative;
+        min-width: 150px;
+      }
+      .ms-trigger {
+        height: 40px;
+        border: 1.5px solid #c8e6c9;
+        border-radius: 8px;
+        padding: 0 30px 0 12px;
+        font-size: 13px;
+        color: #333;
+        background: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        user-select: none;
+        position: relative;
+      }
+      .ms-trigger::after {
+        content: "▾";
+        position: absolute;
+        right: 10px;
+        color: #555;
+        font-size: 12px;
+        pointer-events: none;
+      }
+      .ms-trigger.has-selection {
+        border-color: #2e7d32;
+        background: #f1f8f1;
+        color: #1b5e20;
+        font-weight: 600;
+      }
+      .ms-dropdown {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        min-width: 100%;
+        max-width: 260px;
+        max-height: 260px;
+        overflow-y: auto;
+        background: #fff;
+        border: 1.5px solid #c8e6c9;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+        z-index: 9000;
+        padding: 6px 0;
+      }
+      .ms-dropdown.open {
+        display: block;
+      }
+      .ms-dropdown label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        font-size: 13px;
+        cursor: pointer;
+        white-space: nowrap;
+        color: #333;
+      }
+      .ms-dropdown label:hover {
+        background: #f1f8e9;
+      }
+      .ms-dropdown label.all-opt {
+        border-bottom: 1px solid #e8f5e9;
+        font-weight: 600;
+        color: #2e7d32;
+        margin-bottom: 2px;
+      }
+      .ms-dropdown input[type="checkbox"] {
+        accent-color: #2e7d32;
+        width: 14px;
+        height: 14px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      /* Sort select */
+      .bin-sort-select {
+        height: 40px;
+        border: 1.5px solid #c8e6c9;
+        border-radius: 8px;
+        padding: 0 12px;
+        font-size: 13px;
+        color: #333;
+        background: #fff;
+        min-width: 175px;
+        cursor: pointer;
       }
       .loading {
         text-align: center;
@@ -2170,54 +2281,331 @@
         </div>
 
         <!-- Stats overview -->
-        <div class="card" id="binStatsBlock" style="padding:18px 20px;">
-          <h2 style="margin:0 0 14px 0;">&#128200; Bin Content Overview</h2>
+        <div class="card" id="binStatsBlock" style="padding: 18px 20px">
+          <h2 style="margin: 0 0 14px 0">&#128200; Bin Content Overview</h2>
 
           <!-- Row 1: Summary badges -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px;">
-            <div style="background:linear-gradient(135deg,#e3f2fd,#bbdefb);border-radius:12px;padding:12px 14px;text-align:center;">
-              <div style="font-size:24px;font-weight:800;color:#1565c0;line-height:1.1;" id="binStatTotalBins">-</div>
-              <div style="font-size:11px;font-weight:700;color:#1565c0;margin-top:4px;text-transform:uppercase;letter-spacing:.5px;">&#128204; Total Bins</div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+              gap: 10px;
+              margin-bottom: 12px;
+            "
+          >
+            <div
+              style="
+                background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+                border-radius: 12px;
+                padding: 12px 14px;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-size: 24px;
+                  font-weight: 800;
+                  color: #1565c0;
+                  line-height: 1.1;
+                "
+                id="binStatTotalBins"
+              >
+                -
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #1565c0;
+                  margin-top: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                &#128204; Total Bins
+              </div>
             </div>
-            <div style="background:linear-gradient(135deg,#f3e5f5,#e1bee7);border-radius:12px;padding:12px 14px;text-align:center;">
-              <div style="font-size:24px;font-weight:800;color:#6a1b9a;line-height:1.1;" id="binStatUniqueItems">-</div>
-              <div style="font-size:11px;font-weight:700;color:#6a1b9a;margin-top:4px;text-transform:uppercase;letter-spacing:.5px;">&#128230; Unique Items</div>
+            <div
+              style="
+                background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+                border-radius: 12px;
+                padding: 12px 14px;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-size: 24px;
+                  font-weight: 800;
+                  color: #6a1b9a;
+                  line-height: 1.1;
+                "
+                id="binStatUniqueItems"
+              >
+                -
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #6a1b9a;
+                  margin-top: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                &#128230; Unique Items
+              </div>
             </div>
-            <div style="background:linear-gradient(135deg,#e0f7fa,#b2ebf2);border-radius:12px;padding:12px 14px;text-align:center;">
-              <div style="font-size:24px;font-weight:800;color:#00838f;line-height:1.1;" id="binStatTotalQty">-</div>
-              <div style="font-size:11px;font-weight:700;color:#00838f;margin-top:4px;text-transform:uppercase;letter-spacing:.5px;">&#128230; Total Quantity</div>
+            <div
+              style="
+                background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
+                border-radius: 12px;
+                padding: 12px 14px;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-size: 24px;
+                  font-weight: 800;
+                  color: #00838f;
+                  line-height: 1.1;
+                "
+                id="binStatTotalQty"
+              >
+                -
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #00838f;
+                  margin-top: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                &#128230; Total Quantity
+              </div>
             </div>
-            <div style="background:linear-gradient(135deg,#f9fbe7,#f0f4c3);border-radius:12px;padding:12px 14px;text-align:center;">
-              <div style="font-size:24px;font-weight:800;color:#558b2f;line-height:1.1;" id="binStatTotal">-</div>
-              <div style="font-size:11px;font-weight:700;color:#558b2f;margin-top:4px;text-transform:uppercase;letter-spacing:.5px;">&#128203; Total Records</div>
+            <div
+              style="
+                background: linear-gradient(135deg, #f9fbe7, #f0f4c3);
+                border-radius: 12px;
+                padding: 12px 14px;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-size: 24px;
+                  font-weight: 800;
+                  color: #558b2f;
+                  line-height: 1.1;
+                "
+                id="binStatTotal"
+              >
+                -
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #558b2f;
+                  margin-top: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                &#128203; Total Records
+              </div>
             </div>
-            <div style="background:linear-gradient(135deg,#fce4ec,#f8bbd0);border-radius:12px;padding:12px 14px;text-align:center;">
-              <div style="font-size:24px;font-weight:800;color:#ad1457;line-height:1.1;" id="binStatUniqueBins">-</div>
-              <div style="font-size:11px;font-weight:700;color:#ad1457;margin-top:4px;text-transform:uppercase;letter-spacing:.5px;">&#128204; Unique Bins</div>
+            <div
+              style="
+                background: linear-gradient(135deg, #fce4ec, #f8bbd0);
+                border-radius: 12px;
+                padding: 12px 14px;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-size: 24px;
+                  font-weight: 800;
+                  color: #ad1457;
+                  line-height: 1.1;
+                "
+                id="binStatUniqueBins"
+              >
+                -
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #ad1457;
+                  margin-top: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                &#128204; Unique Bins
+              </div>
             </div>
           </div>
 
           <!-- Row 2: Zone breakdown -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
-            <div style="background:#fff5f5;border:1.5px solid #ffcdd2;border-radius:12px;padding:12px 14px;text-align:center;">
-              <div style="font-size:24px;font-weight:800;color:#e53935;line-height:1.1;" id="binStatUpper">-</div>
-              <div style="font-size:11px;font-weight:700;color:#e53935;margin-top:4px;text-transform:uppercase;letter-spacing:.5px;">&#128308; Upper</div>
-              <div style="font-size:10px;color:#999;margin-top:2px;">Ranking &lt; 0</div>
+          <div
+            style="
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+              gap: 10px;
+            "
+          >
+            <div
+              style="
+                background: #fff5f5;
+                border: 1.5px solid #ffcdd2;
+                border-radius: 12px;
+                padding: 12px 14px;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-size: 24px;
+                  font-weight: 800;
+                  color: #e53935;
+                  line-height: 1.1;
+                "
+                id="binStatUpper"
+              >
+                -
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #e53935;
+                  margin-top: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                &#128308; Upper
+              </div>
+              <div style="font-size: 10px; color: #999; margin-top: 2px">
+                Ranking &lt; 0
+              </div>
             </div>
-            <div style="background:#fffde7;border:1.5px solid #fff176;border-radius:12px;padding:12px 14px;text-align:center;">
-              <div style="font-size:24px;font-weight:800;color:#f9a825;line-height:1.1;" id="binStatFloor">-</div>
-              <div style="font-size:11px;font-weight:700;color:#f9a825;margin-top:4px;text-transform:uppercase;letter-spacing:.5px;">&#128993; Floor</div>
-              <div style="font-size:10px;color:#999;margin-top:2px;">Ranking = 0</div>
+            <div
+              style="
+                background: #fffde7;
+                border: 1.5px solid #fff176;
+                border-radius: 12px;
+                padding: 12px 14px;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-size: 24px;
+                  font-weight: 800;
+                  color: #f9a825;
+                  line-height: 1.1;
+                "
+                id="binStatFloor"
+              >
+                -
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #f9a825;
+                  margin-top: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                &#128993; Floor
+              </div>
+              <div style="font-size: 10px; color: #999; margin-top: 2px">
+                Ranking = 0
+              </div>
             </div>
-            <div style="background:#f1f8e9;border:1.5px solid #c5e1a5;border-radius:12px;padding:12px 14px;text-align:center;">
-              <div style="font-size:24px;font-weight:800;color:#2e7d32;line-height:1.1;" id="binStatDisplay">-</div>
-              <div style="font-size:11px;font-weight:700;color:#2e7d32;margin-top:4px;text-transform:uppercase;letter-spacing:.5px;">&#128994; Display</div>
-              <div style="font-size:10px;color:#999;margin-top:2px;">Ranking &gt; 0</div>
+            <div
+              style="
+                background: #f1f8e9;
+                border: 1.5px solid #c5e1a5;
+                border-radius: 12px;
+                padding: 12px 14px;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-size: 24px;
+                  font-weight: 800;
+                  color: #2e7d32;
+                  line-height: 1.1;
+                "
+                id="binStatDisplay"
+              >
+                -
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #2e7d32;
+                  margin-top: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                &#128994; Display
+              </div>
+              <div style="font-size: 10px; color: #999; margin-top: 2px">
+                Ranking &gt; 0
+              </div>
             </div>
-            <div style="background:#fff8e1;border:1.5px solid #ffe082;border-radius:12px;padding:12px 14px;text-align:center;">
-              <div style="font-size:24px;font-weight:800;color:#ff8f00;line-height:1.1;" id="binStatUnresolved">-</div>
-              <div style="font-size:11px;font-weight:700;color:#ff8f00;margin-top:4px;text-transform:uppercase;letter-spacing:.5px;">&#9888;&#65039; Not in Master</div>
-              <div style="font-size:10px;color:#999;margin-top:2px;">Unresolved items</div>
+            <div
+              style="
+                background: #fff8e1;
+                border: 1.5px solid #ffe082;
+                border-radius: 12px;
+                padding: 12px 14px;
+                text-align: center;
+              "
+            >
+              <div
+                style="
+                  font-size: 24px;
+                  font-weight: 800;
+                  color: #ff8f00;
+                  line-height: 1.1;
+                "
+                id="binStatUnresolved"
+              >
+                -
+              </div>
+              <div
+                style="
+                  font-size: 11px;
+                  font-weight: 700;
+                  color: #ff8f00;
+                  margin-top: 4px;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                &#9888;&#65039; Not in Master
+              </div>
+              <div style="font-size: 10px; color: #999; margin-top: 2px">
+                Unresolved items
+              </div>
             </div>
           </div>
         </div>
@@ -2265,13 +2653,41 @@
             </div>
             <div style="padding: 12px 16px">
               <div style="display: flex; gap: 10px; margin-bottom: 10px">
-                <div style="text-align:center;flex:1;background:#e8f5e9;border-radius:8px;padding:5px 4px;">
-                  <div style="font-size:18px;font-weight:700;color:#2e7d32" id="binMasterTotal">-</div>
-                  <div style="font-size:10px;color:#388e3c">Total Bins</div>
+                <div
+                  style="
+                    text-align: center;
+                    flex: 1;
+                    background: #e8f5e9;
+                    border-radius: 8px;
+                    padding: 5px 4px;
+                  "
+                >
+                  <div
+                    style="font-size: 18px; font-weight: 700; color: #2e7d32"
+                    id="binMasterTotal"
+                  >
+                    -
+                  </div>
+                  <div style="font-size: 10px; color: #388e3c">Total Bins</div>
                 </div>
-                <div style="text-align:center;flex:1;background:#f1f8e9;border-radius:8px;padding:5px 4px;">
-                  <div style="font-size:18px;font-weight:700;color:#558b2f" id="binMasterZones">-</div>
-                  <div style="font-size:10px;color:#558b2f">Unique Zones</div>
+                <div
+                  style="
+                    text-align: center;
+                    flex: 1;
+                    background: #f1f8e9;
+                    border-radius: 8px;
+                    padding: 5px 4px;
+                  "
+                >
+                  <div
+                    style="font-size: 18px; font-weight: 700; color: #558b2f"
+                    id="binMasterZones"
+                  >
+                    -
+                  </div>
+                  <div style="font-size: 10px; color: #558b2f">
+                    Unique Zones
+                  </div>
                 </div>
               </div>
               <div
@@ -2293,7 +2709,10 @@
                 </p>
                 <div class="filename" id="binMasterFileName"></div>
               </div>
-              <div class="mode-toggle" style="margin-top: 10px; margin-bottom: 6px">
+              <div
+                class="mode-toggle"
+                style="margin-top: 10px; margin-bottom: 6px"
+              >
                 <button
                   id="binMasterModeReplace"
                   class="active"
@@ -2301,7 +2720,10 @@
                 >
                   &#128260; Replace All
                 </button>
-                <button id="binMasterModeMerge" onclick="setBinMasterMode('merge')">
+                <button
+                  id="binMasterModeMerge"
+                  onclick="setBinMasterMode('merge')"
+                >
                   &#128279; Merge (Add/Update)
                 </button>
               </div>
@@ -2320,19 +2742,52 @@
               <div id="binMasterUploadResult"></div>
 
               <!-- Bin Master Records (collapsed by default) -->
-              <div style="border-top:1px solid #c8e6c9;margin-top:10px;padding-top:10px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleBinMasterList()">
-                  <span style="font-size:13px;font-weight:600;color:#2e7d32;">&#127968; View Bin Master Records</span>
-                  <button id="binMasterToggleBtn" style="background:none;border:1px solid #a5d6a7;border-radius:6px;padding:3px 10px;font-size:12px;color:#2e7d32;cursor:pointer;">&#9660; Show</button>
+              <div
+                style="
+                  border-top: 1px solid #c8e6c9;
+                  margin-top: 10px;
+                  padding-top: 10px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    cursor: pointer;
+                  "
+                  onclick="toggleBinMasterList()"
+                >
+                  <span
+                    style="font-size: 13px; font-weight: 600; color: #2e7d32"
+                    >&#127968; View Bin Master Records</span
+                  >
+                  <button
+                    id="binMasterToggleBtn"
+                    style="
+                      background: none;
+                      border: 1px solid #a5d6a7;
+                      border-radius: 6px;
+                      padding: 3px 10px;
+                      font-size: 12px;
+                      color: #2e7d32;
+                      cursor: pointer;
+                    "
+                  >
+                    &#9660; Show
+                  </button>
                 </div>
-                <div id="binMasterListBody" style="display:none;margin-top:10px;">
+                <div
+                  id="binMasterListBody"
+                  style="display: none; margin-top: 10px"
+                >
                   <input
                     type="text"
                     class="search-box"
                     id="binMasterSearch"
                     placeholder="Search by bin code or zone code..."
                     oninput="debouncedBinMasterSearch()"
-                    style="width:100%;margin-bottom:8px;"
+                    style="width: 100%; margin-bottom: 8px"
                   />
                   <div id="binMasterListContainer"></div>
                 </div>
@@ -2381,13 +2836,41 @@
             </div>
             <div style="padding: 12px 16px">
               <div style="display: flex; gap: 10px; margin-bottom: 10px">
-                <div style="text-align:center;flex:1;background:#e3f2fd;border-radius:8px;padding:5px 4px;">
-                  <div style="font-size:18px;font-weight:700;color:#1565c0" id="binContentTotal">-</div>
-                  <div style="font-size:10px;color:#1976d2">Total Records</div>
+                <div
+                  style="
+                    text-align: center;
+                    flex: 1;
+                    background: #e3f2fd;
+                    border-radius: 8px;
+                    padding: 5px 4px;
+                  "
+                >
+                  <div
+                    style="font-size: 18px; font-weight: 700; color: #1565c0"
+                    id="binContentTotal"
+                  >
+                    -
+                  </div>
+                  <div style="font-size: 10px; color: #1976d2">
+                    Total Records
+                  </div>
                 </div>
-                <div style="text-align:center;flex:1;background:#e1f5fe;border-radius:8px;padding:5px 4px;">
-                  <div style="font-size:18px;font-weight:700;color:#0277bd" id="binContentUniqueBins">-</div>
-                  <div style="font-size:10px;color:#0277bd">Unique Bins</div>
+                <div
+                  style="
+                    text-align: center;
+                    flex: 1;
+                    background: #e1f5fe;
+                    border-radius: 8px;
+                    padding: 5px 4px;
+                  "
+                >
+                  <div
+                    style="font-size: 18px; font-weight: 700; color: #0277bd"
+                    id="binContentUniqueBins"
+                  >
+                    -
+                  </div>
+                  <div style="font-size: 10px; color: #0277bd">Unique Bins</div>
                 </div>
               </div>
               <div
@@ -2454,22 +2937,112 @@
               oninput="debouncedBinSearch()"
               style="flex: 1; min-width: 200px; margin-bottom: 0"
             />
+            <!-- Category multi-select -->
+            <div class="ms-wrap" id="msCategoryWrap">
+              <div
+                class="ms-trigger"
+                id="msCategoryTrigger"
+                onclick="msToggle('msCategory')"
+              >
+                <span id="msCategoryLabel">All Categories</span>
+              </div>
+              <div class="ms-dropdown" id="msCategoryDropdown">
+                <label class="all-opt">
+                  <input
+                    type="checkbox"
+                    id="msCategoryAll"
+                    checked
+                    onchange="msToggleAll('msCategory', this)"
+                  />
+                  All Categories
+                </label>
+              </div>
+            </div>
+            <!-- Zone Code multi-select -->
+            <div class="ms-wrap" id="msZoneCodeWrap">
+              <div
+                class="ms-trigger"
+                id="msZoneCodeTrigger"
+                onclick="msToggle('msZoneCode')"
+              >
+                <span id="msZoneCodeLabel">All Zone Codes</span>
+              </div>
+              <div class="ms-dropdown" id="msZoneCodeDropdown">
+                <label class="all-opt">
+                  <input
+                    type="checkbox"
+                    id="msZoneCodeAll"
+                    checked
+                    onchange="msToggleAll('msZoneCode', this)"
+                  />
+                  All Zone Codes
+                </label>
+              </div>
+            </div>
+            <!-- Zone (Display/Floor/Upper) multi-select -->
+            <div class="ms-wrap" id="msZoneWrap">
+              <div
+                class="ms-trigger"
+                id="msZoneTrigger"
+                onclick="msToggle('msZone')"
+              >
+                <span id="msZoneLabel">All Zones</span>
+              </div>
+              <div class="ms-dropdown" id="msZoneDropdown">
+                <label class="all-opt">
+                  <input
+                    type="checkbox"
+                    id="msZoneAll"
+                    checked
+                    onchange="msToggleAll('msZone', this)"
+                  />
+                  All Zones
+                </label>
+                <label
+                  ><input
+                    type="checkbox"
+                    class="msZone-opt"
+                    value="Display"
+                    onchange="msOptionChange('msZone')"
+                  />
+                  🟢 Display</label
+                >
+                <label
+                  ><input
+                    type="checkbox"
+                    class="msZone-opt"
+                    value="Floor"
+                    onchange="msOptionChange('msZone')"
+                  />
+                  🟡 Floor</label
+                >
+                <label
+                  ><input
+                    type="checkbox"
+                    class="msZone-opt"
+                    value="Upper"
+                    onchange="msOptionChange('msZone')"
+                  />
+                  🔴 Upper</label
+                >
+              </div>
+            </div>
+            <!-- Sort -->
             <select
-              id="binCategoryFilter"
+              class="bin-sort-select"
+              id="binSort"
               onchange="loadBinContent(1)"
-              style="
-                height: 40px;
-                border: 1.5px solid #c8e6c9;
-                border-radius: 8px;
-                padding: 0 12px;
-                font-size: 13px;
-                color: #333;
-                background: #fff;
-                min-width: 160px;
-                cursor: pointer;
-              "
             >
-              <option value="">All Categories</option>
+              <option value="BinCode_asc">Bin Code A → Z</option>
+              <option value="BinCode_desc">Bin Code Z → A</option>
+              <option value="ItemCode_asc">Item Code A → Z</option>
+              <option value="ItemCode_desc">Item Code Z → A</option>
+              <option value="Category_asc">Category A → Z</option>
+              <option value="Category_desc">Category Z → A</option>
+              <option value="Qty_asc">Qty: Small → Large</option>
+              <option value="Qty_desc">Qty: Large → Small</option>
+              <option value="Ranking_asc">Ranking: Low → High</option>
+              <option value="Ranking_desc">Ranking: High → Low</option>
             </select>
           </div>
           <div id="binContainer">
@@ -4072,6 +4645,7 @@
             loadBinStats(),
             loadBinContent(1),
             loadBinCategories(),
+            loadBinZoneCodes(),
             loadBinMasterStats(),
           ]);
           binMasterListLoaded = false;
@@ -7162,19 +7736,35 @@
             apiFetch("/bin-master/stats").catch(() => ({})),
           ]);
           const elTotalBins = document.getElementById("binStatTotalBins");
-          if (elTotalBins) elTotalBins.textContent = masterData.total != null ? Number(masterData.total).toLocaleString() : "-";
+          if (elTotalBins)
+            elTotalBins.textContent =
+              masterData.total != null
+                ? Number(masterData.total).toLocaleString()
+                : "-";
           document.getElementById("binStatTotal").textContent =
             data.total != null ? Number(data.total).toLocaleString() : "-";
           document.getElementById("binStatUniqueBins").textContent =
-            data.uniqueBins != null ? Number(data.uniqueBins).toLocaleString() : "-";
+            data.uniqueBins != null
+              ? Number(data.uniqueBins).toLocaleString()
+              : "-";
           document.getElementById("binStatUniqueItems").textContent =
-            data.uniqueItems != null ? Number(data.uniqueItems).toLocaleString() : "-";
+            data.uniqueItems != null
+              ? Number(data.uniqueItems).toLocaleString()
+              : "-";
           document.getElementById("binStatTotalQty").textContent =
-            data.totalQty != null ? Number(data.totalQty).toLocaleString() : "-";
+            data.totalQty != null
+              ? Number(data.totalQty).toLocaleString()
+              : "-";
           const elTotal = document.getElementById("binContentTotal");
           const elBins = document.getElementById("binContentUniqueBins");
-          if (elTotal) elTotal.textContent = data.total != null ? Number(data.total).toLocaleString() : "-";
-          if (elBins) elBins.textContent = data.uniqueBins != null ? Number(data.uniqueBins).toLocaleString() : "-";
+          if (elTotal)
+            elTotal.textContent =
+              data.total != null ? Number(data.total).toLocaleString() : "-";
+          if (elBins)
+            elBins.textContent =
+              data.uniqueBins != null
+                ? Number(data.uniqueBins).toLocaleString()
+                : "-";
           document.getElementById("binStatUpper").textContent =
             data.upper ?? "-";
           document.getElementById("binStatFloor").textContent =
@@ -7199,19 +7789,124 @@
       async function loadBinCategories() {
         try {
           const data = await apiFetch("/bin-content/categories");
-          const sel = document.getElementById("binCategoryFilter");
-          if (!sel) return;
-          const current = sel.value;
-          sel.innerHTML = '<option value="">All Categories</option>';
-          (data.categories || []).forEach(function (c) {
-            const opt = document.createElement("option");
-            opt.value = c;
-            opt.textContent = c;
-            if (String(c) === current) opt.selected = true;
-            sel.appendChild(opt);
-          });
+          msPopulate("msCategory", data.categories || [], "All Categories");
         } catch (e) {
           /* non-critical */
+        }
+      }
+
+      async function loadBinZoneCodes() {
+        try {
+          const data = await apiFetch("/bin-content/zone-codes");
+          msPopulate("msZoneCode", data.zoneCodes || [], "All Zone Codes");
+        } catch (e) {
+          /* non-critical */
+        }
+      }
+
+      // ── Multi-select widget helpers ───────────────────────────────────────────
+      // msToggle: open/close a dropdown
+      function msToggle(id) {
+        const dd = document.getElementById(id + "Dropdown");
+        const isOpen = dd.classList.contains("open");
+        // Close all open dropdowns first
+        document.querySelectorAll(".ms-dropdown.open").forEach(function (el) {
+          el.classList.remove("open");
+        });
+        if (!isOpen) dd.classList.add("open");
+      }
+      // Close on outside click
+      document.addEventListener("click", function (e) {
+        if (!e.target.closest(".ms-wrap")) {
+          document.querySelectorAll(".ms-dropdown.open").forEach(function (el) {
+            el.classList.remove("open");
+          });
+        }
+      });
+
+      // Populate a multi-select dropdown with items (preserves existing static options)
+      function msPopulate(id, items, allLabel) {
+        const dd = document.getElementById(id + "Dropdown");
+        if (!dd) return;
+        // Remove any previously dynamically added options (keep .all-opt)
+        dd.querySelectorAll("label:not(.all-opt)").forEach(function (l) {
+          l.remove();
+        });
+        items.forEach(function (val) {
+          const lbl = document.createElement("label");
+          const chk = document.createElement("input");
+          chk.type = "checkbox";
+          chk.className = id + "-opt";
+          chk.value = val;
+          chk.addEventListener("change", function () {
+            msOptionChange(id);
+          });
+          lbl.appendChild(chk);
+          lbl.appendChild(document.createTextNode(" " + val));
+          dd.appendChild(lbl);
+        });
+        msUpdateTrigger(id, allLabel);
+      }
+
+      // Called when "All" checkbox changes
+      function msToggleAll(id, allChk) {
+        const dd = document.getElementById(id + "Dropdown");
+        dd.querySelectorAll("." + id + "-opt").forEach(function (c) {
+          c.checked = allChk.checked;
+        });
+        msUpdateTrigger(id);
+        loadBinContent(1);
+      }
+
+      // Called when any individual option checkbox changes
+      function msOptionChange(id) {
+        const dd = document.getElementById(id + "Dropdown");
+        const opts = dd.querySelectorAll("." + id + "-opt");
+        const allChk = document.getElementById(id + "All");
+        const allChecked = Array.from(opts).every(function (c) {
+          return c.checked;
+        });
+        const noneChecked = Array.from(opts).every(function (c) {
+          return !c.checked;
+        });
+        if (allChk) allChk.checked = allChecked || noneChecked;
+        msUpdateTrigger(id);
+        loadBinContent(1);
+      }
+
+      // Return array of selected values (empty = all)
+      function msGetSelected(id) {
+        const dd = document.getElementById(id + "Dropdown");
+        if (!dd) return [];
+        const allChk = document.getElementById(id + "All");
+        if (allChk && allChk.checked) return [];
+        const checked = Array.from(
+          dd.querySelectorAll("." + id + "-opt:checked"),
+        ).map(function (c) {
+          return c.value;
+        });
+        return checked;
+      }
+
+      // Update the trigger label + styling
+      function msUpdateTrigger(id, allLabel) {
+        const trigger = document.getElementById(id + "Trigger");
+        const labelEl = document.getElementById(id + "Label");
+        if (!trigger || !labelEl) return;
+        const selected = msGetSelected(id);
+        const defaultLabel =
+          allLabel || trigger.dataset.allLabel || labelEl.textContent;
+        if (!trigger.dataset.allLabel && allLabel)
+          trigger.dataset.allLabel = allLabel;
+        if (selected.length === 0) {
+          labelEl.textContent = trigger.dataset.allLabel || defaultLabel;
+          trigger.classList.remove("has-selection");
+        } else if (selected.length === 1) {
+          labelEl.textContent = selected[0];
+          trigger.classList.add("has-selection");
+        } else {
+          labelEl.textContent = selected.length + " selected";
+          trigger.classList.add("has-selection");
         }
       }
 
@@ -7222,12 +7917,23 @@
         const reqId = ++_binReqId;
         try {
           const q = (document.getElementById("binSearch")?.value || "").trim();
-          const category = (
-            document.getElementById("binCategoryFilter")?.value || ""
-          ).trim();
-          let url = "/bin-content?page=" + page + "&limit=50";
+          const categories = msGetSelected("msCategory");
+          const zoneCodes = msGetSelected("msZoneCode");
+          const zones = msGetSelected("msZone");
+          const sort =
+            document.getElementById("binSort")?.value || "BinCode_asc";
+          let url =
+            "/bin-content?page=" +
+            page +
+            "&limit=50&sort=" +
+            encodeURIComponent(sort);
           if (q) url += "&q=" + encodeURIComponent(q);
-          if (category) url += "&category=" + encodeURIComponent(category);
+          if (categories.length)
+            url += "&categories=" + encodeURIComponent(categories.join(","));
+          if (zoneCodes.length)
+            url += "&zoneCodes=" + encodeURIComponent(zoneCodes.join(","));
+          if (zones.length)
+            url += "&zones=" + encodeURIComponent(zones.join(","));
           const data = await apiFetch(url);
           if (reqId !== _binReqId) return; // stale response — a newer request is in flight
           currentBinPage = data.page || 1;
@@ -7253,6 +7959,11 @@
         }
         const start = (currentBinPage - 1) * 50;
         const q = (document.getElementById("binSearch")?.value || "").trim();
+        const hasFilter =
+          q ||
+          msGetSelected("msCategory").length ||
+          msGetSelected("msZoneCode").length ||
+          msGetSelected("msZone").length;
         let html =
           '<div class="preview-count">Showing ' +
           (start + 1) +
@@ -7261,7 +7972,7 @@
           " of " +
           total +
           " bins";
-        if (q) {
+        if (hasFilter) {
           html +=
             ' &mdash; <strong style="color:#2e7d32">Total Qty: ' +
             totalQty.toLocaleString() +
@@ -7272,7 +7983,7 @@
         }
         html += "</div>";
         // Qty summary card — always visible when a filter is active
-        if (q) {
+        if (hasFilter) {
           html +=
             '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">' +
             '<div style="background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border:1px solid #a5d6a7;border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px">' +
@@ -7574,7 +8285,10 @@
 
       function debouncedBinMasterSearch() {
         clearTimeout(debouncedBinMasterSearch._t);
-        debouncedBinMasterSearch._t = setTimeout(() => loadBinMasterList(1), 300);
+        debouncedBinMasterSearch._t = setTimeout(
+          () => loadBinMasterList(1),
+          300,
+        );
       }
 
       async function loadBinMasterList(page) {
@@ -7582,7 +8296,9 @@
         currentBinMasterPage = page;
         const container = document.getElementById("binMasterListContainer");
         if (!container) return;
-        const q = (document.getElementById("binMasterSearch")?.value || "").trim();
+        const q = (
+          document.getElementById("binMasterSearch")?.value || ""
+        ).trim();
         const params = new URLSearchParams({ page, limit: 50 });
         if (q) params.set("q", q);
         try {
@@ -7592,53 +8308,96 @@
           totalBinMasterPages = Math.ceil(total / 50) || 1;
 
           if (bins.length === 0) {
-            container.innerHTML = '<p style="color:#888;padding:12px;">No bin records found.</p>';
+            container.innerHTML =
+              '<p style="color:#888;padding:12px;">No bin records found.</p>';
             return;
           }
 
-          let zoneColor = function(z) {
-            if (!z) return '#888';
+          let zoneColor = function (z) {
+            if (!z) return "#888";
             var l = z.toLowerCase();
-            if (l === 'display') return '#2e7d32';
-            if (l === 'upper') return '#c62828';
-            if (l === 'floor') return '#e65100';
-            return '#1565c0';
+            if (l === "display") return "#2e7d32";
+            if (l === "upper") return "#c62828";
+            if (l === "floor") return "#e65100";
+            return "#1565c0";
           };
 
-          let html = '<p style="font-size:12px;color:#666;margin-bottom:6px;">Showing ' +
-            ((page - 1) * 50 + 1) + '–' + Math.min(page * 50, total) + ' of ' + total.toLocaleString() + ' bins</p>';
-          html += '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
-            '<th>#</th><th>Bin Code</th><th>Bin Ranking</th><th>Zone Code</th><th>Zone</th>' +
-            '</tr></thead><tbody>';
+          let html =
+            '<p style="font-size:12px;color:#666;margin-bottom:6px;">Showing ' +
+            ((page - 1) * 50 + 1) +
+            "–" +
+            Math.min(page * 50, total) +
+            " of " +
+            total.toLocaleString() +
+            " bins</p>";
+          html +=
+            '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
+            "<th>#</th><th>Bin Code</th><th>Bin Ranking</th><th>Zone Code</th><th>Zone</th>" +
+            "</tr></thead><tbody>";
 
-          bins.forEach(function(b, i) {
+          bins.forEach(function (b, i) {
             var ranking = b.BinRanking ?? 0;
-            var zone = ranking > 0 ? 'Display' : ranking < 0 ? 'Upper' : 'Floor';
-            var zc = esc(b.ZoneCode || '');
+            var zone =
+              ranking > 0 ? "Display" : ranking < 0 ? "Upper" : "Floor";
+            var zc = esc(b.ZoneCode || "");
             var color = zoneColor(zone);
-            var badge = '<span style="background:' + color + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' + zone + '</span>';
-            html += '<tr>' +
-              '<td>' + ((page - 1) * 50 + i + 1) + '</td>' +
-              '<td><strong>' + esc(b.BinCode) + '</strong></td>' +
-              '<td>' + ranking + '</td>' +
-              '<td><span style="font-weight:600;color:#1565c0;">' + zc + '</span></td>' +
-              '<td>' + badge + '</td>' +
-              '</tr>';
+            var badge =
+              '<span style="background:' +
+              color +
+              ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' +
+              zone +
+              "</span>";
+            html +=
+              "<tr>" +
+              "<td>" +
+              ((page - 1) * 50 + i + 1) +
+              "</td>" +
+              "<td><strong>" +
+              esc(b.BinCode) +
+              "</strong></td>" +
+              "<td>" +
+              ranking +
+              "</td>" +
+              '<td><span style="font-weight:600;color:#1565c0;">' +
+              zc +
+              "</span></td>" +
+              "<td>" +
+              badge +
+              "</td>" +
+              "</tr>";
           });
 
-          html += '</tbody></table></div>';
+          html += "</tbody></table></div>";
 
           if (totalBinMasterPages > 1) {
             html += '<div class="pagination">';
-            html += '<button ' + (page <= 1 ? 'disabled' : '') + ' onclick="loadBinMasterList(' + (page - 1) + ')">Prev</button>';
-            html += '<span style="padding:6px;">' + page + ' / ' + totalBinMasterPages + '</span>';
-            html += '<button ' + (page >= totalBinMasterPages ? 'disabled' : '') + ' onclick="loadBinMasterList(' + (page + 1) + ')">Next</button>';
-            html += '</div>';
+            html +=
+              "<button " +
+              (page <= 1 ? "disabled" : "") +
+              ' onclick="loadBinMasterList(' +
+              (page - 1) +
+              ')">Prev</button>';
+            html +=
+              '<span style="padding:6px;">' +
+              page +
+              " / " +
+              totalBinMasterPages +
+              "</span>";
+            html +=
+              "<button " +
+              (page >= totalBinMasterPages ? "disabled" : "") +
+              ' onclick="loadBinMasterList(' +
+              (page + 1) +
+              ')">Next</button>';
+            html += "</div>";
           }
 
           container.innerHTML = html;
         } catch (err) {
-          container.innerHTML = '<p style="color:red;padding:12px;">Error: ' + esc(err.message) + '</p>';
+          container.innerHTML =
+            '<p style="color:red;padding:12px;">Error: ' +
+            esc(err.message) +
+            "</p>";
         }
       }
 

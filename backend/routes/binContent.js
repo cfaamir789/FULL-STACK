@@ -203,8 +203,7 @@ async function applyBinCsv(rows, mode, onProgress, req) {
     const binRanking =
       binMaster != null ? binMaster.BinRanking : row.BinRanking;
     const zoneCode =
-      (binMaster && binMaster.ZoneCode) ||
-      rankingToZone(binRanking);
+      (binMaster && binMaster.ZoneCode) || rankingToZone(binRanking);
     if (!master) {
       unresolved.push({
         itemCode: row.ItemCode,
@@ -321,6 +320,8 @@ router.get("/stats", async (req, res) => {
           display: [{ $match: { BinRanking: { $gt: 0 } } }, { $count: "n" }],
           unresolved: [{ $match: { notInMaster: true } }, { $count: "n" }],
           uniqueBins: [{ $group: { _id: "$BinCode" } }, { $count: "n" }],
+          uniqueItems: [{ $group: { _id: "$ItemCode" } }, { $count: "n" }],
+          totalQty: [{ $group: { _id: null, sum: { $sum: "$Qty" } } }],
         },
       },
     ]);
@@ -332,6 +333,8 @@ router.get("/stats", async (req, res) => {
       display: result.display[0]?.n ?? 0,
       unresolved: result.unresolved[0]?.n ?? 0,
       uniqueBins: result.uniqueBins[0]?.n ?? 0,
+      uniqueItems: result.uniqueItems[0]?.n ?? 0,
+      totalQty: result.totalQty[0]?.sum ?? 0,
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -353,13 +356,25 @@ router.get("/categories", async (req, res) => {
   }
 });
 
-// GET /api/bin-content — paginated list with optional search + category filter
+// GET /api/bin-content/zone-codes — distinct sorted zone codes (for dropdown)
+router.get("/zone-codes", async (req, res) => {
+  try {
+    const codes = await BinContent.distinct("ZoneCode");
+    const sorted = codes
+      .filter((c) => c && String(c).trim() !== "")
+      .sort((a, b) =>
+        String(a).localeCompare(String(b), undefined, { numeric: true }),
+      );
+    res.json({ success: true, zoneCodes: sorted });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/bin-content — paginated list with optional search + multi-filters + sort
 router.get("/", async (req, res) => {
   try {
     const q = req.query.q;
-    const category = req.query.category
-      ? String(req.query.category).trim()
-      : "";
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(
       200,
@@ -367,7 +382,35 @@ router.get("/", async (req, res) => {
     );
     const skip = (page - 1) * limit;
 
-    let query = {};
+    // Multi-value filters: comma-separated strings
+    const parseList = (v) =>
+      v
+        ? String(v)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
+    const categories = parseList(req.query.categories || req.query.category);
+    const zoneCodes = parseList(req.query.zoneCodes || req.query.zoneCode);
+    // zones = Display | Floor | Upper — maps to BinRanking comparison
+    const zones = parseList(req.query.zones || req.query.zone);
+
+    // Sort: field_direction, e.g. BinCode_asc, Qty_desc
+    const SORT_MAP = {
+      BinCode_asc: { BinCode: 1 },
+      BinCode_desc: { BinCode: -1 },
+      ItemCode_asc: { ItemCode: 1 },
+      ItemCode_desc: { ItemCode: -1 },
+      Category_asc: { CategoryCode: 1 },
+      Category_desc: { CategoryCode: -1 },
+      Qty_asc: { Qty: 1 },
+      Qty_desc: { Qty: -1 },
+      Ranking_asc: { BinRanking: 1 },
+      Ranking_desc: { BinRanking: -1 },
+    };
+    const sortParam = req.query.sort || "BinCode_asc";
+    const sortObj = SORT_MAP[sortParam] || { BinCode: 1, ItemCode: 1 };
+
     const conditions = [];
     if (q) {
       const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
@@ -380,9 +423,30 @@ router.get("/", async (req, res) => {
         ],
       });
     }
-    if (category) {
-      conditions.push({ CategoryCode: category });
+    if (categories.length === 1) {
+      conditions.push({ CategoryCode: categories[0] });
+    } else if (categories.length > 1) {
+      conditions.push({ CategoryCode: { $in: categories } });
     }
+    if (zoneCodes.length === 1) {
+      conditions.push({ ZoneCode: zoneCodes[0] });
+    } else if (zoneCodes.length > 1) {
+      conditions.push({ ZoneCode: { $in: zoneCodes } });
+    }
+    if (zones.length > 0) {
+      const zoneConditions = zones.map((z) => {
+        if (z === "Display") return { BinRanking: { $gt: 0 } };
+        if (z === "Upper") return { BinRanking: { $lt: 0 } };
+        return { BinRanking: 0 }; // Floor
+      });
+      conditions.push(
+        zoneConditions.length === 1
+          ? zoneConditions[0]
+          : { $or: zoneConditions },
+      );
+    }
+
+    let query = {};
     if (conditions.length === 1) query = conditions[0];
     else if (conditions.length > 1) query = { $and: conditions };
 
@@ -396,9 +460,10 @@ router.get("/", async (req, res) => {
         Barcode: 1,
         Qty: 1,
         BinRanking: 1,
+        ZoneCode: 1,
         notInMaster: 1,
       })
-        .sort({ BinCode: 1, ItemCode: 1 })
+        .sort(sortObj)
         .skip(skip)
         .limit(limit)
         .lean(),

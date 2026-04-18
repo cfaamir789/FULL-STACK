@@ -67,7 +67,8 @@ function parseBinMasterCsv(csvText) {
     const ranking = parseFloat(
       String(row[COL_RANKING] || "0").replace(/,/g, ""),
     );
-    const zoneCode = String(row[COL_ZONE] || "").trim() || rankingToZone(ranking);
+    const zoneCode =
+      String(row[COL_ZONE] || "").trim() || rankingToZone(ranking);
 
     if (!binCode || isNaN(ranking)) continue;
     rowMap.set(binCode, {
