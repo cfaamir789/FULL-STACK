@@ -159,30 +159,53 @@ router.post(
       const rows = parseBinMasterCsv(csvText);
       const total = rows.length;
       const writeTime = new Date();
+      const mode = req.body.mode === "replace" ? "replace" : "merge";
 
-      // Step 1 — Upsert into BinMaster (bins are never deleted, only added/updated)
-      const masterOps = rows.map((r) => ({
-        updateOne: {
-          filter: { BinCode: r.BinCode },
-          update: {
-            $set: {
+      // Step 1 — Replace All or Merge (upsert)
+      let upserted = 0;
+      let modified = 0;
+
+      if (mode === "replace") {
+        // Wipe BinMaster and re-insert everything fresh
+        await BinMaster.deleteMany({});
+        const insertOps = rows.map((r) => ({
+          insertOne: {
+            document: {
+              BinCode: r.BinCode,
               BinRanking: r.BinRanking,
               ZoneCode: r.ZoneCode,
               updatedAt: writeTime,
             },
           },
-          upsert: true,
-        },
-      }));
-
-      let upserted = 0;
-      let modified = 0;
-      for (const chunk of chunkArray(masterOps, 3000)) {
-        const result = await BinMaster.collection.bulkWrite(chunk, {
-          ordered: false,
-        });
-        upserted += result.upsertedCount || 0;
-        modified += result.modifiedCount || 0;
+        }));
+        for (const chunk of chunkArray(insertOps, 3000)) {
+          const result = await BinMaster.collection.bulkWrite(chunk, {
+            ordered: false,
+          });
+          upserted += result.insertedCount || 0;
+        }
+      } else {
+        // Merge — upsert each row (never delete existing bins)
+        const masterOps = rows.map((r) => ({
+          updateOne: {
+            filter: { BinCode: r.BinCode },
+            update: {
+              $set: {
+                BinRanking: r.BinRanking,
+                ZoneCode: r.ZoneCode,
+                updatedAt: writeTime,
+              },
+            },
+            upsert: true,
+          },
+        }));
+        for (const chunk of chunkArray(masterOps, 3000)) {
+          const result = await BinMaster.collection.bulkWrite(chunk, {
+            ordered: false,
+          });
+          upserted += result.upsertedCount || 0;
+          modified += result.modifiedCount || 0;
+        }
       }
 
       // Step 2 — Cascade: update matching BinContent records with new BinRanking + ZoneCode
