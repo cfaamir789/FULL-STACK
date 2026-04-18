@@ -5,7 +5,8 @@ const multer = require("multer");
 const Papa = require("papaparse");
 const { randomUUID } = require("crypto");
 const BinContent = require("../models/BinContent");
-const Item = require("../models/Item");
+const Item       = require("../models/Item");
+const BinMaster  = require("../models/BinMaster");
 const Meta = require("../models/Meta");
 const {
   requireAuth,
@@ -156,7 +157,7 @@ async function applyBinCsv(rows, mode, onProgress, req) {
   const rawCol = BinContent.collection;
   const total = rows.length;
 
-  // Step 1: Load all Item Master once
+  // Step 1: Load all Item Master + BinMaster once (parallel)
   onProgress?.({
     processed: 0,
     total,
@@ -164,42 +165,56 @@ async function applyBinCsv(rows, mode, onProgress, req) {
     modified: 0,
     phase: "loading master",
   });
-  const masterDocs = await Item.find(
-    {},
-    { ItemCode: 1, Barcode: 1, Item_Name: 1, CategoryCode: 1, _id: 0 },
-  ).lean();
+  const [masterDocs, binMasterDocs] = await Promise.all([
+    Item.find({}, { ItemCode: 1, Barcode: 1, Item_Name: 1, CategoryCode: 1, _id: 0 }).lean(),
+    BinMaster.find({}, { BinCode: 1, BinRanking: 1, ZoneCode: 1, _id: 0 }).lean(),
+  ]);
   const masterMap = new Map();
   for (const doc of masterDocs) {
     if (doc.ItemCode) masterMap.set(String(doc.ItemCode).trim(), doc);
   }
+  // BinMaster is authoritative for BinRanking and ZoneCode
+  const binMasterMap = new Map();
+  for (const doc of binMasterDocs) {
+    if (doc.BinCode) binMasterMap.set(String(doc.BinCode).trim(), doc);
+  }
 
-  // Step 2: Enrich every row — populate Barcode/Item_Name/CategoryCode from master
+  // Step 2: Enrich every row — Item Master for name/barcode/category, BinMaster for ranking/zone
   const unresolved = [];
   const enriched = rows.map((row) => {
-    const master = masterMap.get(row.ItemCode);
+    const master    = masterMap.get(row.ItemCode);
+    const binMaster = binMasterMap.get(row.BinCode);
+    // BinMaster wins for BinRanking and ZoneCode; fall back to CSV values if bin not in BinMaster
+    const binRanking = binMaster != null ? binMaster.BinRanking : row.BinRanking;
+    const zoneCode   = binMaster        ? binMaster.ZoneCode    : "";
     if (!master) {
       unresolved.push({
         itemCode: row.ItemCode,
-        binCode: row.BinCode,
+        binCode:  row.BinCode,
         warning: "not found in Item Master",
       });
       return {
         ...row,
-        Barcode: "",
-        Item_Name: "",
+        Barcode:      "",
+        Item_Name:    "",
         CategoryCode: "",
-        notInMaster: true,
+        BinRanking:   binRanking,
+        ZoneCode:     zoneCode,
+        notInMaster:  true,
       };
     }
     return {
       ...row,
-      Barcode: master.Barcode || "",
-      Item_Name: master.Item_Name || "",
+      Barcode:      master.Barcode      || "",
+      Item_Name:    master.Item_Name    || "",
       CategoryCode: master.CategoryCode || "",
-      notInMaster: false,
+      BinRanking:   binRanking,
+      ZoneCode:     zoneCode,
+      notInMaster:  false,
     };
   });
-  masterMap.clear(); // free memory immediately
+  masterMap.clear();
+  binMasterMap.clear(); // free memory
 
   const writeTime = new Date();
   let inserted = 0;
@@ -249,13 +264,14 @@ async function applyBinCsv(rows, mode, onProgress, req) {
         filter: { BinCode: r.BinCode, ItemCode: r.ItemCode },
         update: {
           $set: {
-            Item_Name: r.Item_Name,
+            Item_Name:    r.Item_Name,
             CategoryCode: r.CategoryCode,
-            Barcode: r.Barcode,
-            Qty: r.Qty,
-            BinRanking: r.BinRanking,
-            notInMaster: r.notInMaster,
-            updatedAt: writeTime,
+            Barcode:      r.Barcode,
+            Qty:          r.Qty,
+            BinRanking:   r.BinRanking,
+            ZoneCode:     r.ZoneCode,
+            notInMaster:  r.notInMaster,
+            updatedAt:    writeTime,
           },
         },
         upsert: true,
