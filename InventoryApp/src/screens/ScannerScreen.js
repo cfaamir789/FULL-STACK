@@ -96,6 +96,8 @@ export default function ScannerScreen({ role = "worker" }) {
   const quickCodeRef = useRef(null);
   const itemNameRef = useRef(null);
   const nameSearchTimer = useRef(null);
+  const skipFocusFromBin = useRef(false);
+  const isResetting = useRef(false);
 
   const digitsOnly = (text) => String(text || "").replace(/\D+/g, "");
 
@@ -105,11 +107,15 @@ export default function ScannerScreen({ role = "worker" }) {
     return /^[A-Z0-9]+$/.test(bin);
   };
 
-  const focusFromBin = () => setTimeout(() => fromBinRef.current?.focus(), 120);
+  const focusFromBin = () => setTimeout(() => {
+    if (skipFocusFromBin.current) { skipFocusFromBin.current = false; return; }
+    fromBinRef.current?.focus();
+  }, 120);
 
   // Live search as user types in Item Name mode
   useEffect(() => {
     if (mode !== "itemname") return;
+    if (scanned) return;
     if (nameSearchTimer.current) clearTimeout(nameSearchTimer.current);
     if (!itemName.trim() || itemName.trim().length < 2) {
       setNameResults([]);
@@ -134,6 +140,7 @@ export default function ScannerScreen({ role = "worker" }) {
 
   // Auto-fetch item when item code reaches 10 digits
   useEffect(() => {
+    if (isResetting.current) return;
     if (mode !== "itemcode" || !itemCode || itemCode.length !== 10 || scanned)
       return;
     const fetchItem = async () => {
@@ -162,6 +169,8 @@ export default function ScannerScreen({ role = "worker" }) {
   );
 
   const resetForm = () => {
+    isResetting.current = true;
+    setTimeout(() => { isResetting.current = false; }, 300);
     setScanned(false);
     setFoundItem(null);
     setBarcode("");
@@ -389,6 +398,7 @@ export default function ScannerScreen({ role = "worker" }) {
         from: frombin.trim().toUpperCase(),
         to: tobin.trim().toUpperCase(),
       });
+      skipFocusFromBin.current = true;
       resetForm();
       setSaving(false);
       attemptSync().catch(() => {});
@@ -397,7 +407,7 @@ export default function ScannerScreen({ role = "worker" }) {
         else if (mode === "itemcode") itemCodeRef.current?.focus();
         else if (mode === "quickcode") quickCodeRef.current?.focus();
         else if (mode === "itemname") itemNameRef.current?.focus();
-      }, 50);
+      }, 150);
     } catch (err) {
       Alert.alert("Error", err.message);
       setSaving(false);
