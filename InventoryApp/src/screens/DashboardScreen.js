@@ -20,8 +20,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   getDashboardStats,
-  getAllTransactions,
   getPendingTransactions,
+  getTransactionsPage,
 } from "../database/db";
 import { getDisplayUrl, getServerTransactions } from "../services/api";
 import {
@@ -42,6 +42,7 @@ import {
 
 export default function DashboardScreen({ username }) {
   const queryRef = useRef(null);
+  const lastLoadedAtRef = useRef(0);
   const [stats, setStats] = useState({
     totalItems: 0,
     totalTransactions: 0,
@@ -59,17 +60,11 @@ export default function DashboardScreen({ username }) {
   const [showAllRecent, setShowAllRecent] = useState(false);
 
   const loadData = useCallback(async () => {
-    const [localStats, localAll, localPendingAll] = await Promise.all([
+    const [localStats, localRecent, localPending] = await Promise.all([
       getDashboardStats(),
-      getAllTransactions(),
-      getPendingTransactions(),
+      getTransactionsPage(50, 0, username),
+      getPendingTransactions(username),
     ]);
-    const localRecent = localAll.filter((tx) =>
-      isTransactionOwnedByUser(tx, username),
-    );
-    const localPending = localPendingAll.filter((tx) =>
-      isTransactionOwnedByUser(tx, username),
-    );
 
     let nextStats = {
       totalItems: localStats.totalItems,
@@ -97,6 +92,7 @@ export default function DashboardScreen({ username }) {
 
     setStats(nextStats);
     setRecent(nextRecent);
+    lastLoadedAtRef.current = Date.now();
   }, [username]);
 
   const filtered = useMemo(
@@ -118,8 +114,10 @@ export default function DashboardScreen({ username }) {
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-    }, [loadData]),
+      if (recent.length === 0 || Date.now() - lastLoadedAtRef.current > 15000) {
+        loadData();
+      }
+    }, [loadData, recent.length]),
   );
 
   useEffect(() => {

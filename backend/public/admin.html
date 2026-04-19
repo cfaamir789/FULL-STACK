@@ -4104,6 +4104,25 @@
       let liveRefreshTimer = null;
       let currentPage = "dashboard";
       let workerRefreshInFlight = false;
+      const PAGE_STALE_MS = 15000;
+      const apiCache = new Map();
+      const pageLastLoaded = {
+        dashboard: 0,
+        processed: 0,
+        master: 0,
+        binContent: 0,
+        workers: 0,
+        users: 0,
+      };
+
+      function isPageStale(page) {
+        return Date.now() - (pageLastLoaded[page] || 0) > PAGE_STALE_MS;
+      }
+
+      function markPageLoaded(page) {
+        pageLoaded[page] = true;
+        pageLastLoaded[page] = Date.now();
+      }
 
       // ─── Client-side URL Router ──────────────────────────────────────────────
       const PAGE_ROUTES = {
@@ -4161,6 +4180,8 @@
             const msg = JSON.parse(evt.data);
             console.log("[WS] Event:", msg.type, msg);
             if (msg.type === "items_updated") {
+              invalidateApiCache("/items/count");
+              invalidateApiCache("/items/version");
               // Only refresh what is currently visible
               loadStats();
               if (currentPage === "master" && pageLoaded.master) {
@@ -4184,6 +4205,8 @@
               }
             }
             if (msg.type === "transactions_updated") {
+              invalidateApiCache("/transactions/stats");
+              invalidateApiCache("/sync/worker-status");
               loadStats();
               if (currentPage === "workers" && pageLoaded.workers) {
                 refreshWorkersPage(true);
@@ -4243,6 +4266,43 @@
           }
           throw err;
         }
+      }
+
+      function invalidateApiCache(prefix) {
+        Array.from(apiCache.keys()).forEach((key) => {
+          if (key.startsWith(prefix)) {
+            apiCache.delete(key);
+          }
+        });
+      }
+
+      async function apiFetchCached(path, ttlMs = 10000, opts = {}) {
+        const method = String(opts.method || "GET").toUpperCase();
+        if (method !== "GET" || ttlMs <= 0) {
+          return apiFetch(path, opts);
+        }
+
+        const cached = apiCache.get(path);
+        const now = Date.now();
+        if (cached?.data && now - cached.time < ttlMs) {
+          return cached.data;
+        }
+        if (cached?.promise) {
+          return cached.promise;
+        }
+
+        const promise = apiFetch(path, opts)
+          .then((data) => {
+            apiCache.set(path, { data, time: Date.now() });
+            return data;
+          })
+          .catch((err) => {
+            apiCache.delete(path);
+            throw err;
+          });
+
+        apiCache.set(path, { promise, time: now });
+        return promise;
       }
 
       function showLoginMessage(message) {
@@ -4480,7 +4540,7 @@
 
       async function loadWorkerInfoMap() {
         try {
-          const data = await apiFetch("/auth/users");
+          const data = await apiFetchCached("/auth/users", 15000);
           workerInfoMap = {};
           (data.users || []).forEach((u) => {
             workerInfoMap[u.username] = {
@@ -4588,28 +4648,85 @@
         }
 
         if (page === "dashboard") {
-          // loadStats + loadDashboardPanels fire in parallel; stats covers header counts,
-          // dashboard panels only need worker-status (fast single call now)
+          if (pageLoaded.dashboard) {
+            if (isPageStale("dashboard")) {
+              Promise.allSettled([loadStats(), loadDashboardPanels(true)]).finally(
+                () => {
+                  pageLastLoaded.dashboard = Date.now();
+                },
+              );
+            }
+            return;
+          }
           await Promise.allSettled([loadStats(), loadDashboardPanels()]);
-          pageLoaded.dashboard = true;
+          markPageLoaded("dashboard");
+          return;
         }
         if (page === "processed") {
+          if (pageLoaded.processed) {
+            if (isPageStale("processed")) {
+              Promise.allSettled([
+                loadStats(),
+                loadProcessedTransactions(true),
+              ]).finally(() => {
+                pageLastLoaded.processed = Date.now();
+              });
+            }
+            return;
+          }
           await Promise.allSettled([loadStats(), loadProcessedTransactions()]);
-          pageLoaded.processed = true;
+          markPageLoaded("processed");
+          return;
         }
         if (page === "master") {
+          if (pageLoaded.master) {
+            if (isPageStale("master")) {
+              Promise.allSettled([
+                loadStats(),
+                loadItems(currentItemsPage),
+                loadPushStats(),
+              ]).finally(() => {
+                pageLastLoaded.master = Date.now();
+              });
+            }
+            return;
+          }
           await Promise.allSettled([
             loadStats(),
             loadItems(1),
             loadPushStats(),
           ]);
-          pageLoaded.master = true;
+          markPageLoaded("master");
+          return;
         }
         if (page === "workers") {
+          if (pageLoaded.workers) {
+            if (isPageStale("workers")) {
+              refreshWorkersPage(true).finally(() => {
+                pageLastLoaded.workers = Date.now();
+              });
+            }
+            return;
+          }
           await refreshWorkersPage();
-          pageLoaded.workers = true;
+          markPageLoaded("workers");
+          return;
         }
         if (page === "binContent") {
+          if (pageLoaded.binContent) {
+            if (isPageStale("binContent")) {
+              Promise.allSettled([
+                loadBinStats(),
+                loadBinContent(currentBinPage),
+                loadBinCategories(),
+                loadBinZoneCodes(),
+                loadBinMasterStats(),
+              ]).finally(() => {
+                pageLastLoaded.binContent = Date.now();
+              });
+            }
+            return;
+          }
           await Promise.allSettled([
             loadBinStats(),
             loadBinContent(1),
@@ -4618,11 +4735,20 @@
             loadBinMasterStats(),
           ]);
           binMasterListLoaded = false;
-          pageLoaded.binContent = true;
+          markPageLoaded("binContent");
+          return;
         }
         if (page === "users") {
+          if (pageLoaded.users) {
+            if (isPageStale("users")) {
+              Promise.allSettled([loadStats(), loadUsers()]).finally(() => {
+                pageLastLoaded.users = Date.now();
+              });
+            }
+            return;
+          }
           await Promise.allSettled([loadStats(), loadUsers()]);
-          pageLoaded.users = true;
+          markPageLoaded("users");
         }
       }
 
@@ -4631,16 +4757,16 @@
         // Fire all 4 stats requests in parallel for speed
         const [itemsRes, usersRes, statsRes, versionRes] =
           await Promise.allSettled([
-            apiFetch("/items/count"),
-            apiFetch("/auth/users"),
-            apiFetch("/transactions/stats"),
-            apiFetch("/items/version"),
+            apiFetchCached("/items/count", 10000),
+            apiFetchCached("/auth/users?countOnly=1", 5000),
+            apiFetchCached("/transactions/stats", 10000),
+            apiFetchCached("/items/version", 10000),
           ]);
         document.getElementById("statItems").textContent =
           itemsRes.status === "fulfilled" ? itemsRes.value.count || 0 : "?";
         document.getElementById("statUsers").textContent =
           usersRes.status === "fulfilled"
-            ? usersRes.value.users?.length || 0
+            ? usersRes.value.total || 0
             : "?";
         document.getElementById("statTx").textContent =
           statsRes.status === "fulfilled" ? statsRes.value.total || 0 : "?";
@@ -4790,8 +4916,9 @@
           let all = [];
           let page = 1;
           while (true) {
-            const data = await apiFetch(
-              "/transactions?page=" + page + "&limit=500&status=processed",
+            const data = await apiFetchCached(
+              "/transactions?page=" + page + "&limit=1000&status=processed",
+              silent ? 10000 : 3000,
             );
             all = all.concat(data.transactions || []);
             if (all.length >= (data.total || 0)) break;
@@ -5290,9 +5417,9 @@
         try {
           // Use already-fetched data where possible; only extra call is /items/version
           const [versionRes, statsRes, workersRes] = await Promise.allSettled([
-            apiFetch("/items/version"),
-            apiFetch("/transactions/stats"),
-            apiFetch("/sync/worker-status"),
+            apiFetchCached("/items/version", 10000),
+            apiFetchCached("/transactions/stats", 10000),
+            apiFetchCached("/sync/worker-status", 10000),
           ]);
           // health dot is handled by checkHealth() which already ran
           const sysApi = document.getElementById("sysApiStatus");
@@ -5347,7 +5474,7 @@
         }
         try {
           // worker-status already contains everything we need — skip extra stats/version calls
-          const workersRes = await apiFetch("/sync/worker-status");
+          const workersRes = await apiFetchCached("/sync/worker-status", 10000);
           const workers = workersRes.workers || [];
           if (workerBox) {
             workerBox.innerHTML = renderWorkerStatusMarkup(workers, true);
@@ -5694,7 +5821,7 @@
           container.innerHTML = '<div class="loading">Loading...</div>';
         }
         try {
-          const data = await apiFetch("/sync/worker-status");
+          const data = await apiFetchCached("/sync/worker-status", 10000);
           const workers = data.workers || [];
           container.innerHTML = renderWorkerStatusMarkup(workers, false);
           // Bind clear-phone buttons
@@ -6255,11 +6382,12 @@
           let all = [];
           let page = 1;
           while (true) {
-            const data = await apiFetch(
+            const data = await apiFetchCached(
               "/transactions?page=" +
                 page +
-                "&limit=500&status=" +
+                "&limit=1000&status=" +
                 encodeURIComponent(status),
+              silent ? 10000 : 3000,
             );
             all = all.concat(data.transactions || []);
             if (all.length >= (data.total || 0)) break;

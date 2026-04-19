@@ -167,7 +167,12 @@ router.get(
 
       // Fetch WorkerSync docs and live today-counts from Transaction in parallel
       const [docs, todayAgg] = await Promise.all([
-        WorkerSync.find().sort({ lastSync: -1 }).lean(),
+        WorkerSync.find(
+          {},
+          "worker lastSync totalToday lastResetDate clearBefore",
+        )
+          .sort({ lastSync: -1 })
+          .lean(),
         Transaction.aggregate([
           { $match: { lastSyncedAt: { $gte: todayStart, $lt: todayEnd } } },
           { $group: { _id: "$Worker_Name", count: { $sum: 1 } } },
@@ -438,7 +443,7 @@ router.get("/", requireDB, requireAuth, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(
-      500,
+      1000,
       Math.max(1, parseInt(req.query.limit, 10) || 50),
     );
     const skip = (page - 1) * limit;
@@ -458,7 +463,7 @@ router.get("/", requireDB, requireAuth, async (req, res) => {
     }
 
     const [transactions, total] = await Promise.all([
-      Transaction.find(query).sort(sort).skip(skip).limit(limit),
+      Transaction.find(query).sort(sort).skip(skip).limit(limit).lean(),
       Transaction.countDocuments(query),
     ]);
 

@@ -15,12 +15,17 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { getAllItems, searchItems } from "../database/db";
+import {
+  getItemBarcodes,
+  getItemSummaries,
+  searchItemSummaries,
+} from "../database/db";
 import ItemCard from "../components/ItemCard";
 import VoiceMic from "../components/VoiceMic";
 import Colors from "../theme/colors";
+
+const PAGE_SIZE = 250;
 
 const IS_WEB = Platform.OS === "web";
 let CameraView, useCameraPermissions;
@@ -39,64 +44,84 @@ if (!IS_WEB) {
 
 export default function ItemsScreen({ navigation, route }) {
   const role = route?.params?.role || "worker";
-  const [allItems, setAllItems] = useState([]);
+  const [items, setItems] = useState([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadedCount, setLoadedCount] = useState(0);
   const [showScanner, setShowScanner] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const searchTimer = useRef(null);
+  const loadTokenRef = useRef(0);
 
-  // Load default items (limited) when no query
-  const loadItems = useCallback(async () => {
-    setLoading(true);
-    const results = await getAllItems();
-    setAllItems(results);
-    setLoading(false);
-  }, []);
+  const runItemsQuery = useCallback(async ({ reset, searchText = "" }) => {
+    const normalizedSearch = String(searchText || "").trim();
+    const nextOffset = reset ? 0 : loadedCount;
+    const token = ++loadTokenRef.current;
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!query.trim()) loadItems();
-    }, [loadItems, query]),
-  );
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
 
-  // Debounced DB search when query changes
+    try {
+      const results = normalizedSearch
+        ? await searchItemSummaries(normalizedSearch, PAGE_SIZE)
+        : await getItemSummaries(PAGE_SIZE, nextOffset);
+
+      if (token !== loadTokenRef.current) {
+        return;
+      }
+
+      setItems((prev) => (reset ? results : [...prev, ...results]));
+      setLoadedCount(reset ? results.length : nextOffset + results.length);
+      setHasMore(!normalizedSearch && results.length === PAGE_SIZE);
+    } finally {
+      if (token === loadTokenRef.current) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    }
+  }, [loadedCount]);
+
+  // Debounced DB search when query changes.
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (!query.trim()) {
-      loadItems();
-      return;
+
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery) {
+      runItemsQuery({ reset: true });
+      return () => {
+        if (searchTimer.current) clearTimeout(searchTimer.current);
+      };
     }
-    searchTimer.current = setTimeout(async () => {
-      setLoading(true);
-      const results = await searchItems(query.trim());
-      setAllItems(results);
-      setLoading(false);
-    }, 300);
+
+    searchTimer.current = setTimeout(() => {
+      runItemsQuery({ reset: true, searchText: normalizedQuery });
+    }, 250);
+
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
-  }, [query]);
+  }, [query, runItemsQuery]);
 
-  // Group raw items by trimmed item_code — one card per unique product
-  const grouped = useMemo(() => {
-    const map = new Map();
-    for (const i of allItems) {
-      const key = (i.item_code || i.item_name).trim().toLowerCase();
-      if (map.has(key)) {
-        map.get(key).barcodes.push(i.barcode);
-      } else {
-        map.set(key, {
-          item_code: (i.item_code || "").trim(),
-          item_name: i.item_name,
-          barcodes: [i.barcode],
-        });
-      }
+  const totalBarcodesLoaded = useMemo(
+    () => items.reduce((sum, item) => sum + Number(item.barcodeCount || 0), 0),
+    [items],
+  );
+
+  const loadMoreItems = useCallback(() => {
+    if (loading || loadingMore || query.trim() || !hasMore) {
+      return;
     }
-    return Array.from(map.values());
-  }, [allItems]);
+    runItemsQuery({ reset: false });
+  }, [hasMore, loading, loadingMore, query, runItemsQuery]);
 
-  const items = grouped;
+  const loadBarcodesForItem = useCallback(async (item) => {
+    return await getItemBarcodes(item.item_code, item.item_name);
+  }, []);
 
   const handleBarCodeScanned = ({ data }) => {
     setShowScanner(false);
@@ -201,11 +226,13 @@ export default function ItemsScreen({ navigation, route }) {
       </View>
 
       <Text style={styles.countText}>
+        {query.trim() ? "Showing " : ""}
         {items.length} unique product{items.length !== 1 ? "s" : ""}
-        {allItems.length !== items.length
-          ? ` (${allItems.length.toLocaleString()} total barcodes)`
+        {totalBarcodesLoaded > 0
+          ? ` (${totalBarcodesLoaded.toLocaleString()} barcodes loaded)`
           : ""}
         {query.trim() ? ' matching "' + query.trim() + '"' : ""}
+        {!query.trim() && hasMore ? " • scroll for more" : ""}
       </Text>
 
       {loading ? (
@@ -239,12 +266,24 @@ export default function ItemsScreen({ navigation, route }) {
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(item) => item.item_code || item.item_name}
-          renderItem={({ item }) => <ItemCard item={item} />}
+          keyExtractor={(item) => item.item_key || item.item_code || item.item_name}
+          renderItem={({ item }) => (
+            <ItemCard item={item} onLoadBarcodes={loadBarcodesForItem} />
+          )}
           contentContainerStyle={{ paddingBottom: 24 }}
           initialNumToRender={15}
           maxToRenderPerBatch={15}
           windowSize={7}
+          onEndReached={loadMoreItems}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? (
+              <ActivityIndicator
+                color={Colors.primary}
+                style={{ marginTop: 12, marginBottom: 8 }}
+              />
+            ) : null
+          }
           removeClippedSubviews={Platform.OS !== "web"}
         />
       )}

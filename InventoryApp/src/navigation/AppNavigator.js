@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { TouchableOpacity } from "react-native";
+import { InteractionManager, TouchableOpacity } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -20,7 +20,7 @@ import ItemMasterScreen from "../screens/ItemMasterScreen";
 import Colors from "../theme/colors";
 import { isAdminRole } from "../utils/roles";
 import { loadServerUrl } from "../services/api";
-import { attemptSync } from "../services/syncService";
+import { attemptSync, startAutoSync, startClearPoller } from "../services/syncService";
 
 const Tab = createBottomTabNavigator();
 const ItemsStack = createStackNavigator();
@@ -113,13 +113,29 @@ export default function AppNavigator() {
       const token = pairs[2][1];
       if (name && (token || role)) {
         setSession({ username: name, role: role || "worker" });
-        // Kick off a background sync (pulls items + sends pending transactions)
-        attemptSync().catch(() => {});
       }
       setChecking(false);
     };
     init();
   }, []);
+
+  useEffect(() => {
+    if (!session?.username) {
+      return undefined;
+    }
+
+    const interactionTask = InteractionManager.runAfterInteractions(() => {
+      attemptSync().catch(() => {});
+    });
+    const stopSync = startAutoSync(90000);
+    const stopClearPoller = startClearPoller(15000);
+
+    return () => {
+      interactionTask?.cancel?.();
+      stopSync?.();
+      stopClearPoller?.();
+    };
+  }, [session]);
 
   // Still loading stored session
   if (checking) return null;
@@ -130,8 +146,6 @@ export default function AppNavigator() {
       <LoginScreen
         onLogin={(s) => {
           setSession(s);
-          // Pull items from backend immediately after login
-          attemptSync().catch(() => {});
         }}
       />
     );
@@ -160,6 +174,8 @@ export default function AppNavigator() {
                 />
               );
             },
+            lazy: true,
+            freezeOnBlur: true,
             tabBarActiveTintColor: Colors.primary,
             tabBarInactiveTintColor: Colors.textSecondary,
             tabBarStyle: {

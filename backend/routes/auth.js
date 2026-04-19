@@ -319,7 +319,32 @@ router.get("/me", requireDB, requireAuth, async (req, res) => {
 
 router.get("/users", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
-    const users = await User.find({});
+    const countOnly = String(req.query.countOnly || "").trim() === "1";
+    if (countOnly) {
+      const total = await User.countDocuments({});
+      return res.json({ success: true, total });
+    }
+
+    const hasLimitQuery = req.query.limit !== undefined;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = hasLimitQuery
+      ? Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50))
+      : 0;
+    const baseQuery = User.find(
+      {},
+      "username role createdAt employeeId deviceModel isBlocked",
+    )
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const [users, total] =
+      limit > 0
+        ? await Promise.all([
+            baseQuery.clone().skip((page - 1) * limit).limit(limit),
+            User.countDocuments({}),
+          ])
+        : [await baseQuery, null];
+
     const safe = users.map((u) => ({
       id: u._id,
       username: u.username,
@@ -329,7 +354,11 @@ router.get("/users", requireDB, requireAuth, requireAdmin, async (req, res) => {
       deviceModel: u.deviceModel || "",
       isBlocked: !!u.isBlocked,
     }));
-    res.json({ success: true, users: safe });
+    res.json({
+      success: true,
+      users: safe,
+      ...(limit > 0 ? { total, page, limit } : {}),
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

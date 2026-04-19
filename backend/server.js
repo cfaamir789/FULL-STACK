@@ -17,6 +17,10 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
+const setHtmlCacheHeaders = (res) => {
+  res.setHeader("Cache-Control", "private, no-cache, max-age=0, must-revalidate");
+};
+
 // ─── WebSocket Server ─────────────────────────────────────────────────────────
 const wss = new WebSocketServer({ server, path: "/ws" });
 
@@ -71,44 +75,24 @@ app.use(
     etag: true,
     setHeaders: (res, filePath) => {
       if (filePath.endsWith(".html")) {
-        res.setHeader(
-          "Cache-Control",
-          "no-store, no-cache, must-revalidate, proxy-revalidate",
-        );
-        res.setHeader("Pragma", "no-cache");
-        res.setHeader("Expires", "0");
+        setHtmlCacheHeaders(res);
       }
     },
   }),
 );
 app.get("/admin", (req, res) => {
-  res.setHeader(
-    "Cache-Control",
-    "no-store, no-cache, must-revalidate, proxy-revalidate",
-  );
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
+  setHtmlCacheHeaders(res);
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 // Sub-page catch-all — serves admin.html for /admin/bin-content/, /admin/item-master/ etc.
 // so that reloading a sub-page URL stays on the correct page instead of 404-ing
 app.get("/admin/*path", (req, res) => {
-  res.setHeader(
-    "Cache-Control",
-    "no-store, no-cache, must-revalidate, proxy-revalidate",
-  );
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
+  setHtmlCacheHeaders(res);
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 // Super Admin Console — separate page at /superadmin
 app.get("/superadmin", (req, res) => {
-  res.setHeader(
-    "Cache-Control",
-    "no-store, no-cache, must-revalidate, proxy-revalidate",
-  );
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
+  setHtmlCacheHeaders(res);
   res.sendFile(path.join(__dirname, "public", "superadmin.html"));
 });
 // Root URL → redirect to admin panel

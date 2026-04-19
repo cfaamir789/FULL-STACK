@@ -4,6 +4,9 @@ import { isAdminRole } from "../utils/roles";
 
 let db;
 
+const ITEM_GROUP_EXPR =
+  "LOWER(COALESCE(NULLIF(TRIM(item_code), ''), TRIM(item_name)))";
+
 // Get server-aligned time using stored offset from last health check
 const getServerNow = async () => {
   try {
@@ -103,6 +106,7 @@ export const initDB = async () => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_items_item_code ON items(item_code);
+    CREATE INDEX IF NOT EXISTS idx_items_item_name ON items(item_name);
 
     CREATE TABLE IF NOT EXISTS transactions (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,6 +126,8 @@ export const initDB = async () => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_transactions_synced ON transactions(synced);
+    CREATE INDEX IF NOT EXISTS idx_transactions_timestamp ON transactions(timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_transactions_worker_timestamp ON transactions(worker_name, timestamp DESC);
   `);
 
   // Migration 1: add item_code column if it doesn't exist yet (for existing DBs)
@@ -336,6 +342,73 @@ export const searchItemsByName = async (query, limit = 200) => {
   );
 };
 
+const mapItemSummary = (row) => ({
+  item_key: row.item_key,
+  item_code: String(row.item_code || "").trim(),
+  item_name: row.item_name,
+  barcodeCount: Number(row.barcode_count || 0),
+});
+
+export const getItemSummaries = async (limit = 250, offset = 0) => {
+  const rows = await db.getAllAsync(
+    `SELECT
+       ${ITEM_GROUP_EXPR} AS item_key,
+       TRIM(COALESCE(item_code, '')) AS item_code,
+       MIN(item_name) AS item_name,
+       COUNT(*) AS barcode_count
+     FROM items
+     GROUP BY ${ITEM_GROUP_EXPR}, TRIM(COALESCE(item_code, ''))
+     ORDER BY item_name COLLATE NOCASE ASC
+     LIMIT ? OFFSET ?`,
+    [limit, offset],
+  );
+  return rows.map(mapItemSummary);
+};
+
+export const searchItemSummaries = async (query, limit = 200) => {
+  const q = `%${String(query || "").trim()}%`;
+  const rows = await db.getAllAsync(
+    `SELECT
+       ${ITEM_GROUP_EXPR} AS item_key,
+       TRIM(COALESCE(item_code, '')) AS item_code,
+       MIN(item_name) AS item_name,
+       COUNT(*) AS barcode_count
+     FROM items
+     WHERE item_name LIKE ? OR barcode LIKE ? OR item_code LIKE ?
+     GROUP BY ${ITEM_GROUP_EXPR}, TRIM(COALESCE(item_code, ''))
+     ORDER BY item_name COLLATE NOCASE ASC
+     LIMIT ?`,
+    [q, q, q, limit],
+  );
+  return rows.map(mapItemSummary);
+};
+
+export const getItemBarcodes = async (itemCode, itemName, limit = 5000) => {
+  const normalizedCode = String(itemCode || "").trim();
+  if (normalizedCode) {
+    const rows = await db.getAllAsync(
+      `SELECT barcode
+       FROM items
+       WHERE TRIM(item_code) = ?
+       ORDER BY barcode ASC
+       LIMIT ?`,
+      [normalizedCode, limit],
+    );
+    return rows.map((row) => row.barcode);
+  }
+
+  const normalizedName = String(itemName || "").trim();
+  const rows = await db.getAllAsync(
+    `SELECT barcode
+     FROM items
+     WHERE TRIM(item_name) = ?
+     ORDER BY barcode ASC
+     LIMIT ?`,
+    [normalizedName, limit],
+  );
+  return rows.map((row) => row.barcode);
+};
+
 export const getAllItems = async () => {
   return await db.getAllAsync(
     "SELECT * FROM items ORDER BY item_name ASC LIMIT 50000",
@@ -392,7 +465,18 @@ export const insertTransaction = async ({
   return result.lastInsertRowId;
 };
 
-export const getPendingTransactions = async () => {
+export const getPendingTransactions = async (workerName = "") => {
+  const normalizedWorker = String(workerName || "").trim();
+  if (normalizedWorker) {
+    return await db.getAllAsync(
+      `SELECT *
+       FROM transactions
+       WHERE synced = 0 AND worker_name = ?
+       ORDER BY timestamp ASC`,
+      [normalizedWorker],
+    );
+  }
+
   return await db.getAllAsync(
     "SELECT * FROM transactions WHERE synced = 0 ORDER BY timestamp ASC",
   );
@@ -412,6 +496,51 @@ export const getRecentTransactions = async (limit = 20) => {
     "SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?",
     [limit],
   );
+};
+
+export const getTransactionsPage = async (
+  limit = 100,
+  offset = 0,
+  workerName = "",
+) => {
+  const normalizedWorker = String(workerName || "").trim();
+  if (normalizedWorker) {
+    return await db.getAllAsync(
+      `SELECT *
+       FROM transactions
+       WHERE worker_name = ?
+       ORDER BY timestamp DESC
+       LIMIT ? OFFSET ?`,
+      [normalizedWorker, limit, offset],
+    );
+  }
+
+  return await db.getAllAsync(
+    `SELECT *
+     FROM transactions
+     ORDER BY timestamp DESC
+     LIMIT ? OFFSET ?`,
+    [limit, offset],
+  );
+};
+
+export const getTransactionsCount = async (workerName = "") => {
+  const normalizedWorker = String(workerName || "").trim();
+  if (normalizedWorker) {
+    const row = await db.getFirstAsync(
+      `SELECT COUNT(*) AS count
+       FROM transactions
+       WHERE worker_name = ?`,
+      [normalizedWorker],
+    );
+    return Number(row?.count || 0);
+  }
+
+  const row = await db.getFirstAsync(
+    `SELECT COUNT(*) AS count
+     FROM transactions`,
+  );
+  return Number(row?.count || 0);
 };
 
 export const getAllTransactions = async () => {

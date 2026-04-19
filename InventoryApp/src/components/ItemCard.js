@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -10,9 +10,15 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "../theme/colors";
 
-export default function ItemCard({ item }) {
+export default React.memo(function ItemCard({ item, onLoadBarcodes }) {
   const [expanded, setExpanded] = useState(false);
-  const count = item.barcodes ? item.barcodes.length : 1;
+  const [barcodes, setBarcodes] = useState(item.barcodes || []);
+  const [loadingBarcodes, setLoadingBarcodes] = useState(false);
+  const count = item.barcodeCount || barcodes.length || 1;
+
+  useEffect(() => {
+    setBarcodes(item.barcodes || []);
+  }, [item.barcodes]);
 
   const copyValue = async (value, label) => {
     const text = String(value || "").trim();
@@ -31,6 +37,25 @@ export default function ItemCard({ item }) {
       Alert.alert("Copied", `${label} copied:\n${text}`);
     } catch {
       Alert.alert("Copy Failed", `Could not copy ${label}.`);
+    }
+  };
+
+  const toggleExpanded = async () => {
+    const nextExpanded = !expanded;
+    setExpanded(nextExpanded);
+
+    if (
+      nextExpanded &&
+      barcodes.length === 0 &&
+      typeof onLoadBarcodes === "function"
+    ) {
+      setLoadingBarcodes(true);
+      try {
+        const loadedBarcodes = await onLoadBarcodes(item);
+        setBarcodes(Array.isArray(loadedBarcodes) ? loadedBarcodes : []);
+      } finally {
+        setLoadingBarcodes(false);
+      }
     }
   };
 
@@ -67,7 +92,7 @@ export default function ItemCard({ item }) {
         </View>
         <TouchableOpacity
           style={[styles.viewBtn, expanded && styles.viewBtnActive]}
-          onPress={() => setExpanded(!expanded)}
+          onPress={toggleExpanded}
         >
           <MaterialCommunityIcons
             name={expanded ? "chevron-up" : "barcode"}
@@ -81,31 +106,42 @@ export default function ItemCard({ item }) {
       {expanded && (
         <View style={styles.barcodeList}>
           <Text style={styles.barcodeHeader}>All Barcodes ({count})</Text>
-          {item.barcodes.map((b, idx) => (
-            <View key={b} style={styles.barcodeRow}>
+          {loadingBarcodes ? (
+            <View style={styles.loadingBarcodes}>
               <MaterialCommunityIcons
-                name="barcode"
-                size={14}
+                name="loading"
+                size={16}
                 color={Colors.textLight}
               />
-              <Text style={styles.barcodeText}>{b}</Text>
-              <TouchableOpacity
-                style={styles.copyBtn}
-                onPress={() => copyValue(b, "Barcode")}
-              >
-                <MaterialCommunityIcons
-                  name="content-copy"
-                  size={14}
-                  color={Colors.primary}
-                />
-              </TouchableOpacity>
+              <Text style={styles.loadingBarcodesText}>Loading barcodes...</Text>
             </View>
-          ))}
+          ) : (
+            barcodes.map((barcode) => (
+              <View key={barcode} style={styles.barcodeRow}>
+                <MaterialCommunityIcons
+                  name="barcode"
+                  size={14}
+                  color={Colors.textLight}
+                />
+                <Text style={styles.barcodeText}>{barcode}</Text>
+                <TouchableOpacity
+                  style={styles.copyBtn}
+                  onPress={() => copyValue(barcode, "Barcode")}
+                >
+                  <MaterialCommunityIcons
+                    name="content-copy"
+                    size={14}
+                    color={Colors.primary}
+                  />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
         </View>
       )}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
@@ -181,6 +217,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     paddingVertical: 3,
+  },
+  loadingBarcodes: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 6,
+  },
+  loadingBarcodesText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
   },
   barcodeText: {
     fontSize: 13,

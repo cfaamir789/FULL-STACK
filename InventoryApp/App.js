@@ -4,7 +4,6 @@ import { StatusBar } from "expo-status-bar";
 import "react-native-gesture-handler";
 import * as Updates from "expo-updates";
 import { initDB } from "./src/database/db";
-import { startAutoSync, startClearPoller } from "./src/services/syncService";
 import AppNavigator from "./src/navigation/AppNavigator";
 import Colors from "./src/theme/colors";
 
@@ -12,9 +11,6 @@ export default function App() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    let stopSync;
-    let stopClearPoller;
-
     const applyOtaUpdateIfAvailable = async () => {
       if (Platform.OS === "web" || __DEV__ || !Updates.isEnabled) {
         return;
@@ -35,8 +31,6 @@ export default function App() {
       try {
         await applyOtaUpdateIfAvailable();
         await initDB();
-        stopSync = startAutoSync(30000);
-        stopClearPoller = startClearPoller(5000);
       } catch (e) {
         console.warn("bootstrap error:", e);
       } finally {
@@ -45,10 +39,6 @@ export default function App() {
     };
 
     bootstrap();
-    return () => {
-      if (stopSync) stopSync();
-      if (stopClearPoller) stopClearPoller();
-    };
   }, []);
 
   if (!ready) {

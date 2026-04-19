@@ -123,6 +123,8 @@ apiClient.interceptors.request.use(async (config) => {
 
 // ─── Failover: auto-switch to backup server on network errors ─────────────
 let _failoverActive = false;
+let _healthCache = { ts: 0, data: null, promise: null };
+const HEALTH_CACHE_MS = 10000;
 
 const switchToNextServer = async () => {
   // Find which cloud server we're currently NOT using
@@ -187,48 +189,60 @@ healthClient.interceptors.response.use(
 );
 
 export const checkHealth = async () => {
-  // Try current server first, then failover picks up automatically via interceptor
-  try {
-    const beforeMs = Date.now();
-    const res = await healthClient.get("/health");
-    const afterMs = Date.now();
-    // Calculate server time offset (server - local) accounting for network latency
-    if (res.data?.serverTime) {
-      const roundTrip = afterMs - beforeMs;
-      const localAtResponse = beforeMs + Math.round(roundTrip / 2);
-      const offset = res.data.serverTime - localAtResponse;
-      await AsyncStorage.setItem("serverTimeOffset", String(offset));
-    }
-    return res.data;
-  } catch (err) {
-    // If failover interceptor already switched, this will have been retried.
-    // If still failing, try all servers explicitly
-    for (const server of CLOUD_SERVERS) {
-      try {
-        const beforeMs = Date.now();
-        const res = await axios.get(`${server}/api/health`, { timeout: 5000 });
-        const afterMs = Date.now();
-        if (res.data?.status === "ok") {
-          // Switch to this working server
-          currentBaseUrl = `${server}/api`;
-          apiClient.defaults.baseURL = currentBaseUrl;
-          healthClient.defaults.baseURL = currentBaseUrl;
-          // Calculate server time offset
-          if (res.data?.serverTime) {
-            const roundTrip = afterMs - beforeMs;
-            const localAtResponse = beforeMs + Math.round(roundTrip / 2);
-            const offset = res.data.serverTime - localAtResponse;
-            await AsyncStorage.setItem("serverTimeOffset", String(offset));
-          }
-          console.log(
-            `[Failover] Health check found working server: ${server}`,
-          );
-          return res.data;
-        }
-      } catch (_) {}
-    }
-    throw err;
+  const now = Date.now();
+  if (_healthCache.data && now - _healthCache.ts < HEALTH_CACHE_MS) {
+    return _healthCache.data;
   }
+  if (_healthCache.promise) {
+    return _healthCache.promise;
+  }
+
+  _healthCache.promise = (async () => {
+    try {
+      const beforeMs = Date.now();
+      const res = await healthClient.get("/health");
+      const afterMs = Date.now();
+      if (res.data?.serverTime) {
+        const roundTrip = afterMs - beforeMs;
+        const localAtResponse = beforeMs + Math.round(roundTrip / 2);
+        const offset = res.data.serverTime - localAtResponse;
+        await AsyncStorage.setItem("serverTimeOffset", String(offset));
+      }
+      _healthCache.data = res.data;
+      _healthCache.ts = Date.now();
+      return res.data;
+    } catch (err) {
+      for (const server of CLOUD_SERVERS) {
+        try {
+          const beforeMs = Date.now();
+          const res = await axios.get(`${server}/api/health`, { timeout: 5000 });
+          const afterMs = Date.now();
+          if (res.data?.status === "ok") {
+            currentBaseUrl = `${server}/api`;
+            apiClient.defaults.baseURL = currentBaseUrl;
+            healthClient.defaults.baseURL = currentBaseUrl;
+            if (res.data?.serverTime) {
+              const roundTrip = afterMs - beforeMs;
+              const localAtResponse = beforeMs + Math.round(roundTrip / 2);
+              const offset = res.data.serverTime - localAtResponse;
+              await AsyncStorage.setItem("serverTimeOffset", String(offset));
+            }
+            console.log(
+              `[Failover] Health check found working server: ${server}`,
+            );
+            _healthCache.data = res.data;
+            _healthCache.ts = Date.now();
+            return res.data;
+          }
+        } catch (_) {}
+      }
+      throw err;
+    } finally {
+      _healthCache.promise = null;
+    }
+  })();
+
+  return _healthCache.promise;
 };
 
 // Get server-aligned timestamp (uses offset from last health check)
@@ -272,6 +286,11 @@ export const registerWorker = async (username, pin, role = "worker") => {
 export const getUsers = async () => {
   const res = await apiClient.get("/auth/users");
   return res.data.users;
+};
+
+export const getUserCount = async () => {
+  const res = await apiClient.get("/auth/users?countOnly=1");
+  return Number(res.data.total || 0);
 };
 
 export const deleteUser = async (username) => {

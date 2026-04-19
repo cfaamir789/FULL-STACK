@@ -19,6 +19,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   getAllTransactions,
   getPendingTransactions,
+  getTransactionsCount,
+  getTransactionsPage,
   updateTransaction,
   deleteTransaction,
 } from "../database/db";
@@ -45,6 +47,33 @@ if (!IS_WEB) {
   backupSvc = require("../services/backupService");
 }
 
+const PAGE_SIZE = 150;
+const ADMIN_PAGE_SIZE = 200;
+
+const filterTransactionList = (rows, workerFilter, searchText) => {
+  let result = rows;
+  if (workerFilter !== "all") {
+    result = result.filter(
+      (tx) => (tx.worker_name || "unknown") === workerFilter,
+    );
+  }
+
+  if (searchText.trim()) {
+    const query = searchText.trim().toLowerCase();
+    result = result.filter(
+      (tx) =>
+        (tx.item_code && tx.item_code.toLowerCase().includes(query)) ||
+        (tx.item_barcode && tx.item_barcode.toLowerCase().includes(query)) ||
+        (tx.item_name && tx.item_name.toLowerCase().includes(query)) ||
+        (tx.worker_name && tx.worker_name.toLowerCase().includes(query)) ||
+        (tx.erp_document && tx.erp_document.toLowerCase().includes(query)) ||
+        (tx.erp_batch && tx.erp_batch.toLowerCase().includes(query)),
+    );
+  }
+
+  return result;
+};
+
 export default function TransactionsScreen({
   username,
   role,
@@ -52,9 +81,20 @@ export default function TransactionsScreen({
 }) {
   const queryRef = useRef(null);
   const searchTimerRef = useRef(null);
+  const lastLoadedAtRef = useRef(0);
+  const paginationRef = useRef({
+    mode: "idle",
+    nextPage: 1,
+    total: 0,
+    primaryRows: [],
+    supplementRows: [],
+  });
   const canManageAll = isAdminRole(role) && scope === "all";
+  const pageSize = canManageAll ? ADMIN_PAGE_SIZE : PAGE_SIZE;
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [workerFilter, setWorkerFilter] = useState("all");
@@ -76,25 +116,7 @@ export default function TransactionsScreen({
   );
 
   const filtered = useMemo(() => {
-    let result = transactions;
-    if (workerFilter !== "all") {
-      result = result.filter(
-        (tx) => (tx.worker_name || "unknown") === workerFilter,
-      );
-    }
-    if (debouncedQuery.trim()) {
-      const q = debouncedQuery.trim().toLowerCase();
-      result = result.filter(
-        (tx) =>
-          (tx.item_code && tx.item_code.toLowerCase().includes(q)) ||
-          (tx.item_barcode && tx.item_barcode.toLowerCase().includes(q)) ||
-          (tx.item_name && tx.item_name.toLowerCase().includes(q)) ||
-          (tx.worker_name && tx.worker_name.toLowerCase().includes(q)) ||
-          (tx.erp_document && tx.erp_document.toLowerCase().includes(q)) ||
-          (tx.erp_batch && tx.erp_batch.toLowerCase().includes(q)),
-      );
-    }
-    return result;
+    return filterTransactionList(transactions, workerFilter, debouncedQuery);
   }, [transactions, workerFilter, debouncedQuery]);
 
   // Edit modal state
@@ -111,13 +133,114 @@ export default function TransactionsScreen({
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const applyPagedRows = useCallback((meta) => {
+    paginationRef.current = meta;
+    const nextRows =
+      meta.mode === "server"
+        ? mergeTransactions(meta.primaryRows, meta.supplementRows)
+        : meta.primaryRows;
+    setTransactions(nextRows);
+    setHasMore(meta.primaryRows.length < meta.total);
+  }, []);
+
+  const loadServerPage = useCallback(
+    async (page) => {
+      if (scope === "all" && canManageAll) {
+        return await getServerTransactions(page, pageSize, "pending");
+      }
+
+      return await getServerTransactions(page, pageSize, "all", {
+        mine: true,
+      });
+    },
+    [canManageAll, pageSize, scope],
+  );
+
+  const loadLocalPage = useCallback(async () => {
+    const workerName = scope === "self" ? username : "";
+    const offset = paginationRef.current.primaryRows.length;
+    const [rows, total] = await Promise.all([
+      getTransactionsPage(pageSize, offset, workerName),
+      getTransactionsCount(workerName),
+    ]);
+    return { rows, total };
+  }, [pageSize, scope, username]);
+
+  const loadAllServerRows = useCallback(
+    async (status, options = {}) => {
+      let page = 1;
+      let total = 0;
+      const rows = [];
+
+      while (page <= 100) {
+        const data = await getServerTransactions(page, 250, status, options);
+        const batch = data.transactions || [];
+        total = Number(data.total || 0);
+        rows.push(...batch);
+
+        if (batch.length === 0 || rows.length >= total) {
+          break;
+        }
+        page += 1;
+      }
+
+      return rows;
+    },
+    [],
+  );
+
+  const getTransactionsForExport = useCallback(async () => {
+    if (paginationRef.current.mode === "server") {
+      if (scope === "all" && canManageAll) {
+        const serverRows = await loadAllServerRows("pending");
+        const mappedRows = serverRows.map(mapServerTransactionToLocalShape);
+        return filterTransactionList(mappedRows, workerFilter, debouncedQuery);
+      }
+
+      const [serverRes, localPendingAll] = await Promise.all([
+        getAllServerTransactions({
+          status: "all",
+          mine: true,
+          pageSize: 250,
+          maxPages: 100,
+        }),
+        getPendingTransactions(username),
+      ]);
+      const localPending = localPendingAll.filter((tx) =>
+        isTransactionOwnedByUser(tx, username),
+      );
+      const mappedRows = (serverRes.transactions || []).map(
+        mapServerTransactionToLocalShape,
+      );
+      return filterTransactionList(
+        mergeTransactions(mappedRows, localPending),
+        workerFilter,
+        debouncedQuery,
+      );
+    }
+
+    const localRows = await getAllTransactions();
+    const scopedRows =
+      scope === "self"
+        ? localRows.filter((tx) => isTransactionOwnedByUser(tx, username))
+        : localRows;
+    return filterTransactionList(scopedRows, workerFilter, debouncedQuery);
+  }, [
+    canManageAll,
+    debouncedQuery,
+    loadAllServerRows,
+    scope,
+    username,
+    workerFilter,
+  ]);
+
   // ─── Export handler ─────────────────────────────────────────────────────────
   const handleExportByFormat = async (format = "csv") => {
     setExporting(true);
     try {
-      // Use currently displayed transactions (merged server+local) so export
-      // matches what the user sees, even when local DB has been cleared.
-      const txns = transactions.length > 0 ? transactions : await getAllTransactions();
+      // Fetch the full dataset on demand so screen pagination stays fast
+      // without changing export accuracy.
+      const txns = await getTransactionsForExport();
       if (!txns || txns.length === 0) {
         Alert.alert("No Data", "No transactions to export.");
         return;
@@ -221,53 +344,123 @@ export default function TransactionsScreen({
   const loadTransactions = useCallback(async () => {
     setLoading(true);
     try {
-      const localAll = await getAllTransactions();
-      const localData =
-        scope === "self"
-          ? localAll.filter((tx) => isTransactionOwnedByUser(tx, username))
-          : localAll;
-
       if (scope === "all" && canManageAll) {
         try {
           await checkHealth();
-          const serverRes = await getServerTransactions(1, 500, "pending");
+          const serverRes = await loadServerPage(1);
           const serverTxs = (serverRes.transactions || []).map(
             mapServerTransactionToLocalShape,
           );
-
-          setTransactions(mergeTransactions(serverTxs));
+          applyPagedRows({
+            mode: "server",
+            nextPage: 2,
+            total: Number(serverRes.total || serverTxs.length),
+            primaryRows: serverTxs,
+            supplementRows: [],
+          });
         } catch {
-          // Server unreachable, show local fallback only
-          setTransactions(localData);
+          const [rows, total] = await Promise.all([
+            getTransactionsPage(pageSize, 0),
+            getTransactionsCount(),
+          ]);
+          applyPagedRows({
+            mode: "local",
+            nextPage: 1,
+            total,
+            primaryRows: rows,
+            supplementRows: [],
+          });
         }
       } else {
+        const localPending = await getPendingTransactions(username);
+
         try {
           await checkHealth();
-          const [serverRes, localPendingAll] = await Promise.all([
-            getAllServerTransactions({ status: "all", mine: true }),
-            getPendingTransactions(),
-          ]);
-          const localPending = localPendingAll.filter((tx) =>
-            isTransactionOwnedByUser(tx, username),
-          );
+          const serverRes = await loadServerPage(1);
           const serverTxs = (serverRes.transactions || []).map(
             mapServerTransactionToLocalShape,
           );
-          setTransactions(mergeTransactions(serverTxs, localPending));
+          applyPagedRows({
+            mode: "server",
+            nextPage: 2,
+            total: Number(serverRes.total || serverTxs.length),
+            primaryRows: serverTxs,
+            supplementRows: localPending,
+          });
         } catch {
-          setTransactions(localData);
+          const [rows, total] = await Promise.all([
+            getTransactionsPage(pageSize, 0, username),
+            getTransactionsCount(username),
+          ]);
+          applyPagedRows({
+            mode: "local",
+            nextPage: 1,
+            total,
+            primaryRows: rows,
+            supplementRows: [],
+          });
         }
       }
     } catch {
       setTransactions([]);
+      setHasMore(false);
     }
+    lastLoadedAtRef.current = Date.now();
     setLoading(false);
-  }, [canManageAll, scope, username]);
+  }, [applyPagedRows, canManageAll, loadServerPage, pageSize, scope, username]);
+
+  const loadMoreTransactions = useCallback(async () => {
+    if (loading || loadingMore || !hasMore) {
+      return;
+    }
+
+    setLoadingMore(true);
+    try {
+      const meta = paginationRef.current;
+      if (meta.mode === "server") {
+        const serverRes = await loadServerPage(meta.nextPage);
+        const batch = (serverRes.transactions || []).map(
+          mapServerTransactionToLocalShape,
+        );
+        if (batch.length === 0) {
+          setHasMore(false);
+          return;
+        }
+        applyPagedRows({
+          ...meta,
+          nextPage: meta.nextPage + 1,
+          total: Number(serverRes.total || meta.total),
+          primaryRows: [...meta.primaryRows, ...batch],
+        });
+        return;
+      }
+
+      if (meta.mode === "local") {
+        const { rows, total } = await loadLocalPage();
+        if (rows.length === 0) {
+          setHasMore(false);
+          return;
+        }
+        applyPagedRows({
+          ...meta,
+          total,
+          primaryRows: [...meta.primaryRows, ...rows],
+        });
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [applyPagedRows, hasMore, loadLocalPage, loadServerPage, loading, loadingMore]);
 
   useFocusEffect(
     useCallback(() => {
-      loadTransactions();
-    }, [loadTransactions]),
+      if (
+        transactions.length === 0 ||
+        Date.now() - lastLoadedAtRef.current > 20000
+      ) {
+        loadTransactions();
+      }
+    }, [loadTransactions, transactions.length]),
   );
 
   // Reload when admin clears phone data via background sync
@@ -542,6 +735,16 @@ export default function TransactionsScreen({
               initialNumToRender={15}
               maxToRenderPerBatch={15}
               windowSize={7}
+              onEndReached={loadMoreTransactions}
+              onEndReachedThreshold={0.45}
+              ListFooterComponent={
+                loadingMore ? (
+                  <ActivityIndicator
+                    color={Colors.primary}
+                    style={{ marginTop: 10, marginBottom: 16 }}
+                  />
+                ) : null
+              }
               removeClippedSubviews={Platform.OS !== "web"}
               getItemLayout={(_, index) => ({
                 length: 120,

@@ -316,9 +316,10 @@ export const attemptSync = async () => {
   return { synced, reason: "success", lastSync };
 };
 
-export const startAutoSync = (intervalMs = 15000) => {
+export const startAutoSync = (intervalMs = 60000) => {
   // Delay the first run so the app can finish rendering before hitting the network
-  const firstRun = setTimeout(attemptSync, 2000);
+  const firstRunDelay = Math.min(12000, Math.max(4000, Math.round(intervalMs / 3)));
+  const firstRun = setTimeout(attemptSync, firstRunDelay);
   const timer = setInterval(attemptSync, intervalMs);
   return () => {
     clearTimeout(firstRun);
@@ -472,7 +473,7 @@ export const checkBinMasterStatus = async () => {
 // ─── Fast Clear-Command Poller ────────────────────────────────────────────────
 // Independently polls for admin "Clear Phone" commands every 5 seconds.
 // Does NOT do a full sync — just checks the flag and clears local data immediately.
-export const startClearPoller = (intervalMs = 5000) => {
+export const startClearPoller = (intervalMs = 15000) => {
   let running = false;
   const poll = async () => {
     if (running) return;

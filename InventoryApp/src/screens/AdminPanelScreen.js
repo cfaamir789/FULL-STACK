@@ -19,7 +19,7 @@ import {
   getExportUrl,
   checkHealth,
   clearServerItems,
-  getUsers,
+  getUserCount,
 } from "../services/api";
 import {
   getDashboardStats,
@@ -81,6 +81,7 @@ export default function AdminPanelScreen({ navigation }) {
   const [formatPickerMode, setFormatPickerMode] = useState("export"); // "export" | "backup" | "bulkWorker"
   const [bulkExporting, setBulkExporting] = useState(false);
   const autoBackupRef = useRef(null);
+  const lastLoadedAtRef = useRef(0);
   const loggedUserRef = useRef(null);
 
   // Item Master state
@@ -108,12 +109,12 @@ export default function AdminPanelScreen({ navigation }) {
     try {
       await checkHealth();
       setOnline(true);
-      const [stats, usersData] = await Promise.all([
+      const [stats, totalUsers] = await Promise.all([
         getTransactionStats(),
-        getUsers().catch(() => []),
+        getUserCount().catch(() => 0),
       ]);
       setServerStats(stats);
-      setUserCount(usersData.length || 0);
+      setUserCount(totalUsers || 0);
       // Check master/bin statuses in parallel
       const [msRes, bsRes, bmsRes] = await Promise.allSettled([
         checkItemMasterUpdate(),
@@ -126,14 +127,23 @@ export default function AdminPanelScreen({ navigation }) {
     } catch {
       setOnline(false);
     }
+    lastLoadedAtRef.current = Date.now();
     setLoading(false);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
+      if (
+        lastLoadedAtRef.current &&
+        (loading || Date.now() - lastLoadedAtRef.current <= 20000)
+      ) {
+        return;
+      }
+      if (!lastLoadedAtRef.current) {
+        setLoading(true);
+      }
       loadData();
-    }, [loadData]),
+    }, [loadData, loading]),
   );
 
   // ─── Load logged-in username ────────────────────────────────────────────────
