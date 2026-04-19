@@ -36,7 +36,5 @@ transactionSchema.index({ syncStatus: 1 });
 transactionSchema.index({ syncStatus: 1, processedAt: -1 });
 // Worker-status today count — lastSyncedAt range scan
 transactionSchema.index({ Worker_Name: 1, lastSyncedAt: 1 });
-// clientTxId uniqueness lookup
-transactionSchema.index({ clientTxId: 1 }, { sparse: true });
 
 module.exports = mongoose.model("Transaction", transactionSchema);

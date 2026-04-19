@@ -92,7 +92,7 @@ app.get("/admin", (req, res) => {
 });
 // Sub-page catch-all — serves admin.html for /admin/bin-content/, /admin/item-master/ etc.
 // so that reloading a sub-page URL stays on the correct page instead of 404-ing
-app.get("/admin/*", (req, res) => {
+app.get("/admin/*path", (req, res) => {
   res.setHeader(
     "Cache-Control",
     "no-store, no-cache, must-revalidate, proxy-revalidate",

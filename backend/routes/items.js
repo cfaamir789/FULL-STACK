@@ -80,7 +80,7 @@ async function warmBulkCache() {
     console.warn("[items-cache] warm failed:", e.message);
   }
 }
-module.exports._warmBulkCache = warmBulkCache;
+// attached below after router is exported
 
 function audit(actor, actorRole, action, target, detail, source) {
   AuditLog.create({ actor, actorRole, action, target, detail, source }).catch(
@@ -947,4 +947,5 @@ router.get(
   },
 );
 
+router._warmBulkCache = warmBulkCache;
 module.exports = router;
