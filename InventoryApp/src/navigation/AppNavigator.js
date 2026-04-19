@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { InteractionManager, TouchableOpacity } from "react-native";
+import { InteractionManager, TouchableOpacity, View, ActivityIndicator, StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -101,20 +101,24 @@ export default function AppNavigator() {
 
   useEffect(() => {
     const init = async () => {
-      // Load saved server IP before anything else
-      await loadServerUrl();
-      const pairs = await AsyncStorage.multiGet([
-        "workerName",
-        "workerRole",
-        "authToken",
-      ]);
-      const name = pairs[0][1];
-      const role = pairs[1][1];
-      const token = pairs[2][1];
-      if (name && (token || role)) {
-        setSession({ username: name, role: role || "worker" });
+      try {
+        await loadServerUrl();
+        const pairs = await AsyncStorage.multiGet([
+          "workerName",
+          "workerRole",
+          "authToken",
+        ]);
+        const name = pairs[0][1];
+        const role = pairs[1][1];
+        const token = pairs[2][1];
+        if (name && (token || role)) {
+          setSession({ username: name, role: role || "worker" });
+        }
+      } catch (e) {
+        console.warn("session restore error:", e);
+      } finally {
+        setChecking(false);
       }
-      setChecking(false);
     };
     init();
   }, []);
@@ -137,8 +141,13 @@ export default function AppNavigator() {
     };
   }, [session]);
 
-  // Still loading stored session
-  if (checking) return null;
+  if (checking) {
+    return (
+      <View style={loadingStyles.container}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   // Not logged in — show login screen
   if (!session) {
@@ -267,3 +276,12 @@ export default function AppNavigator() {
     </SafeAreaProvider>
   );
 }
+
+const loadingStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.background,
+  },
+});
