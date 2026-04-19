@@ -13,9 +13,9 @@ on:
 
 jobs:
   build:
-    name: EAS Build (expo.dev)
+    name: Build APK (local Gradle)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: write
     defaults:
@@ -29,77 +29,45 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: InventoryApp/package-lock.json
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Validate Expo token
-        run: |
-          if [ -z "$EXPO_TOKEN" ]; then
-            echo "ERROR: GitHub secret FULLSTACK2 is not set."
-            exit 1
-          fi
-          echo "Token present - proceeding."
+      - name: Prebuild native Android project
         env:
-          EXPO_TOKEN: ${{ secrets.FULLSTACK2 }}
+          NODE_ENV: production
+          CI: "1"
+        run: npx expo prebuild --platform android --clean
 
-      - name: Setup EAS CLI and authenticate
-        uses: expo/expo-github-action@v8
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build release APK locally
+        env:
+          NODE_ENV: production
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          eas-version: latest
-          eas-cache: false
-          token: ${{ secrets.FULLSTACK2 }}
-
-      - name: Trigger EAS build and wait
-        id: eas_build
-        run: |
-          set -euo pipefail
-          eas build \
-            --platform android \
-            --profile production \
-            --non-interactive \
-            --wait \
-            --json \
-            2>&1 | tee /tmp/eas_output.txt
-
-          APK_URL=$(node -e "
-            const fs = require('fs');
-            const text = fs.readFileSync('/tmp/eas_output.txt', 'utf8');
-            const arrMatch = text.match(/\[[\s\S]*\]/);
-            if (arrMatch) {
-              const arr = JSON.parse(arrMatch[0]);
-              const b = Array.isArray(arr) ? arr[0] : arr;
-              const url = b.artifacts?.buildUrl || b.artifacts?.applicationArchiveUrl;
-              if (url) { console.log(url); process.exit(0); }
-            }
-            const objMatches = [...text.matchAll(/\{[^{}]+\}/g)];
-            for (const m of objMatches.reverse()) {
-              try {
-                const d = JSON.parse(m[0]);
-                const url = d.artifacts?.buildUrl;
-                if (url) { console.log(url); process.exit(0); }
-              } catch {}
-            }
-          " 2>/dev/null || echo "")
-
-          if [ -z "$APK_URL" ]; then
-            APK_URL=$(eas build:list --platform android --status FINISHED --limit 1 --non-interactive --json 2>/dev/null \
-              | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));const b=Array.isArray(d)?d[0]:d;console.log(b?.artifacts?.buildUrl||'')" || echo "")
-          fi
-
-          echo "APK URL: $APK_URL"
-          echo "apk_url=$APK_URL" >> "$GITHUB_OUTPUT"
-
-      - name: Download APK
-        working-directory: /tmp
-        run: |
-          URL="${{ steps.eas_build.outputs.apk_url }}"
-          if [ -z "$URL" ]; then echo "No APK URL found"; exit 1; fi
-          curl -L -o app-release.apk "$URL"
-          ls -lh app-release.apk
+          name: InventoryApp-release-apk
+          path: InventoryApp/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Read version
         id: version
@@ -120,10 +88,9 @@ jobs:
             - **Version**: ${{ steps.version.outputs.version }}
             - **Version Code**: ${{ steps.version.outputs.code }}
             - **Commit**: ${{ github.sha }}
-            - **Built via**: EAS on expo.dev
-            - **EAS builds**: https://expo.dev/accounts/aamirksa/projects/newfullstack/builds
+            - **Built via**: GitHub Actions local Gradle build
 
             Download the APK below and install on any Android device.
-          files: /tmp/app-release.apk
+          files: InventoryApp/android/app/build/outputs/apk/release/app-release.apk
           draft: false
           prerelease: false
