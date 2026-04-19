@@ -18,7 +18,10 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
 const setHtmlCacheHeaders = (res) => {
-  res.setHeader("Cache-Control", "private, no-cache, max-age=0, must-revalidate");
+  res.setHeader(
+    "Cache-Control",
+    "private, no-cache, max-age=0, must-revalidate",
+  );
 };
 
 // ─── WebSocket Server ─────────────────────────────────────────────────────────

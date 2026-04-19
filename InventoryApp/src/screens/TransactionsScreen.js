@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  useEffect,
+} from "react";
 import {
   View,
   FlatList,
@@ -74,11 +80,7 @@ const filterTransactionList = (rows, workerFilter, searchText) => {
   return result;
 };
 
-export default function TransactionsScreen({
-  username,
-  role,
-  scope = "self",
-}) {
+export default function TransactionsScreen({ username, role, scope = "self" }) {
   const queryRef = useRef(null);
   const searchTimerRef = useRef(null);
   const lastLoadedAtRef = useRef(0);
@@ -166,28 +168,25 @@ export default function TransactionsScreen({
     return { rows, total };
   }, [pageSize, scope, username]);
 
-  const loadAllServerRows = useCallback(
-    async (status, options = {}) => {
-      let page = 1;
-      let total = 0;
-      const rows = [];
+  const loadAllServerRows = useCallback(async (status, options = {}) => {
+    let page = 1;
+    let total = 0;
+    const rows = [];
 
-      while (page <= 100) {
-        const data = await getServerTransactions(page, 250, status, options);
-        const batch = data.transactions || [];
-        total = Number(data.total || 0);
-        rows.push(...batch);
+    while (page <= 100) {
+      const data = await getServerTransactions(page, 250, status, options);
+      const batch = data.transactions || [];
+      total = Number(data.total || 0);
+      rows.push(...batch);
 
-        if (batch.length === 0 || rows.length >= total) {
-          break;
-        }
-        page += 1;
+      if (batch.length === 0 || rows.length >= total) {
+        break;
       }
+      page += 1;
+    }
 
-      return rows;
-    },
-    [],
-  );
+    return rows;
+  }, []);
 
   const getTransactionsForExport = useCallback(async () => {
     if (paginationRef.current.mode === "server") {
@@ -450,7 +449,14 @@ export default function TransactionsScreen({
     } finally {
       setLoadingMore(false);
     }
-  }, [applyPagedRows, hasMore, loadLocalPage, loadServerPage, loading, loadingMore]);
+  }, [
+    applyPagedRows,
+    hasMore,
+    loadLocalPage,
+    loadServerPage,
+    loading,
+    loadingMore,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -587,20 +593,31 @@ export default function TransactionsScreen({
             const upper = t.toUpperCase();
             setQuery(upper);
             if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-            searchTimerRef.current = setTimeout(() => setDebouncedQuery(upper), 250);
+            searchTimerRef.current = setTimeout(
+              () => setDebouncedQuery(upper),
+              250,
+            );
           }}
           autoCapitalize="characters"
           clearButtonMode="never"
           returnKeyType="search"
         />
         <VoiceMic
-          onResult={(t) => { setQuery(t); setDebouncedQuery(t); }}
+          onResult={(t) => {
+            setQuery(t);
+            setDebouncedQuery(t);
+          }}
           focusTargetRef={queryRef}
           size={18}
           style={{ backgroundColor: "transparent", marginRight: 2 }}
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => { setQuery(""); setDebouncedQuery(""); }}>
+          <TouchableOpacity
+            onPress={() => {
+              setQuery("");
+              setDebouncedQuery("");
+            }}
+          >
             <MaterialCommunityIcons
               name="close-circle"
               size={18}
@@ -856,7 +873,9 @@ export default function TransactionsScreen({
               <TextInput
                 style={styles.input}
                 value={editFrombin}
-                onChangeText={(t) => setEditFrombin(t.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                onChangeText={(t) =>
+                  setEditFrombin(t.toUpperCase().replace(/[^A-Z0-9]/g, ""))
+                }
                 autoCapitalize="characters"
                 placeholder="e.g. A001"
               />
@@ -865,7 +884,9 @@ export default function TransactionsScreen({
               <TextInput
                 style={styles.input}
                 value={editTobin}
-                onChangeText={(t) => setEditTobin(t.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                onChangeText={(t) =>
+                  setEditTobin(t.toUpperCase().replace(/[^A-Z0-9]/g, ""))
+                }
                 autoCapitalize="characters"
                 placeholder="e.g. B002"
               />

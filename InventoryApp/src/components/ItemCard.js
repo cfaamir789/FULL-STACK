@@ -113,7 +113,9 @@ export default React.memo(function ItemCard({ item, onLoadBarcodes }) {
                 size={16}
                 color={Colors.textLight}
               />
-              <Text style={styles.loadingBarcodesText}>Loading barcodes...</Text>
+              <Text style={styles.loadingBarcodesText}>
+                Loading barcodes...
+              </Text>
             </View>
           ) : (
             barcodes.map((barcode) => (

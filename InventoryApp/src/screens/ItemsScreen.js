@@ -55,36 +55,39 @@ export default function ItemsScreen({ navigation, route }) {
   const searchTimer = useRef(null);
   const loadTokenRef = useRef(0);
 
-  const runItemsQuery = useCallback(async ({ reset, searchText = "" }) => {
-    const normalizedSearch = String(searchText || "").trim();
-    const nextOffset = reset ? 0 : loadedCount;
-    const token = ++loadTokenRef.current;
+  const runItemsQuery = useCallback(
+    async ({ reset, searchText = "" }) => {
+      const normalizedSearch = String(searchText || "").trim();
+      const nextOffset = reset ? 0 : loadedCount;
+      const token = ++loadTokenRef.current;
 
-    if (reset) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
-
-    try {
-      const results = normalizedSearch
-        ? await searchItemSummaries(normalizedSearch, PAGE_SIZE)
-        : await getItemSummaries(PAGE_SIZE, nextOffset);
-
-      if (token !== loadTokenRef.current) {
-        return;
+      if (reset) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
       }
 
-      setItems((prev) => (reset ? results : [...prev, ...results]));
-      setLoadedCount(reset ? results.length : nextOffset + results.length);
-      setHasMore(!normalizedSearch && results.length === PAGE_SIZE);
-    } finally {
-      if (token === loadTokenRef.current) {
-        setLoading(false);
-        setLoadingMore(false);
+      try {
+        const results = normalizedSearch
+          ? await searchItemSummaries(normalizedSearch, PAGE_SIZE)
+          : await getItemSummaries(PAGE_SIZE, nextOffset);
+
+        if (token !== loadTokenRef.current) {
+          return;
+        }
+
+        setItems((prev) => (reset ? results : [...prev, ...results]));
+        setLoadedCount(reset ? results.length : nextOffset + results.length);
+        setHasMore(!normalizedSearch && results.length === PAGE_SIZE);
+      } finally {
+        if (token === loadTokenRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
-    }
-  }, [loadedCount]);
+    },
+    [loadedCount],
+  );
 
   // Debounced DB search when query changes.
   useEffect(() => {
@@ -266,7 +269,9 @@ export default function ItemsScreen({ navigation, route }) {
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(item) => item.item_key || item.item_code || item.item_name}
+          keyExtractor={(item) =>
+            item.item_key || item.item_code || item.item_name
+          }
           renderItem={({ item }) => (
             <ItemCard item={item} onLoadBarcodes={loadBarcodesForItem} />
           )}

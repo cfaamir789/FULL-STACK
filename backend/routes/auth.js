@@ -113,7 +113,11 @@ router.post("/login", requireDB, async (req, res) => {
     if (user.isBlocked) {
       return res
         .status(403)
-        .json({ success: false, error: "Your account has been blocked. Please contact your administrator." });
+        .json({
+          success: false,
+          error:
+            "Your account has been blocked. Please contact your administrator.",
+        });
     }
     const match = await bcrypt.compare(String(pin), user.pin_hash);
     if (!match) {
@@ -202,9 +206,16 @@ router.post(
       const target = await User.findOne({ username: targetUsername });
 
       if (!target)
-        return res.status(404).json({ success: false, error: "User not found." });
+        return res
+          .status(404)
+          .json({ success: false, error: "User not found." });
       if (target.role === "superadmin")
-        return res.status(403).json({ success: false, error: "Cannot impersonate a superadmin account." });
+        return res
+          .status(403)
+          .json({
+            success: false,
+            error: "Cannot impersonate a superadmin account.",
+          });
 
       audit(
         req.user.username,
@@ -340,7 +351,10 @@ router.get("/users", requireDB, requireAuth, requireAdmin, async (req, res) => {
     const [users, total] =
       limit > 0
         ? await Promise.all([
-            baseQuery.clone().skip((page - 1) * limit).limit(limit),
+            baseQuery
+              .clone()
+              .skip((page - 1) * limit)
+              .limit(limit),
             User.countDocuments({}),
           ])
         : [await baseQuery, null];
@@ -490,12 +504,10 @@ router.put(
           .json({ success: false, error: "User not found." });
       }
       if (user.role !== "worker") {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            error: "Only worker accounts support this field.",
-          });
+        return res.status(400).json({
+          success: false,
+          error: "Only worker accounts support this field.",
+        });
       }
       if (employeeId !== undefined) user.employeeId = String(employeeId).trim();
       if (deviceModel !== undefined)
@@ -563,7 +575,11 @@ router.put(
         username,
         `${blocked ? "Blocked" : "Unblocked"} user ${username}`,
       );
-      res.json({ success: true, username: user.username, isBlocked: user.isBlocked });
+      res.json({
+        success: true,
+        username: user.username,
+        isBlocked: user.isBlocked,
+      });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }

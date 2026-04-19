@@ -318,7 +318,10 @@ export const attemptSync = async () => {
 
 export const startAutoSync = (intervalMs = 60000) => {
   // Delay the first run so the app can finish rendering before hitting the network
-  const firstRunDelay = Math.min(12000, Math.max(4000, Math.round(intervalMs / 3)));
+  const firstRunDelay = Math.min(
+    12000,
+    Math.max(4000, Math.round(intervalMs / 3)),
+  );
   const firstRun = setTimeout(attemptSync, firstRunDelay);
   const timer = setInterval(attemptSync, intervalMs);
   return () => {
