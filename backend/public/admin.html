@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -3070,12 +3070,6 @@
           </button>
           <button
             class="section-chip"
-            onclick="scrollToBlock('workersExportBlock')"
-          >
-            Worker Export
-          </button>
-          <button
-            class="section-chip"
             onclick="scrollToBlock('workersQueueBlock')"
           >
             ERP Queue
@@ -3084,113 +3078,43 @@
 
         <div class="worker-top-grid">
           <div class="card status-card" id="workersStatusBlock">
-            <div class="panel-head">
-              <div
-                class="head-copy"
-                style="display: flex; align-items: center; gap: 8px"
-              >
-                <button
-                  onclick="toggleWorkerStatus()"
-                  id="workerStatusToggleBtn"
-                  title="Show/hide worker list"
-                  style="
-                    background: none;
-                    border: none;
-                    cursor: pointer;
-                    padding: 2px 4px;
-                    font-size: 18px;
-                    color: #2e7d32;
-                    line-height: 1;
-                    flex-shrink: 0;
-                  "
-                >
-                  &#9654;
-                </button>
-                <div>
-                  <h2 style="margin: 0">&#128225; Worker Sync Status</h2>
-                  <p style="margin: 4px 0 0">
-                    Refresh now updates both worker sync status and the ERP
-                    queue below.
-                  </p>
-                </div>
-              </div>
-              <button
-                class="btn btn-primary"
-                style="max-width: 240px"
-                onclick="refreshWorkersPage()"
-              >
-                &#128260; Refresh Status + Queue
-              </button>
-            </div>
-            <div id="workerStatusContainer" style="display: none">
-              <div class="loading">Loading...</div>
-            </div>
-          </div>
-
-          <div class="card" id="workersExportBlock">
-            <h2>&#128228; Worker End-of-Day Export</h2>
-            <p class="card-subtext">
-              Export one worker’s pending transactions and mark them done
-              without leaving the page.
-            </p>
             <div
               style="
                 display: flex;
-                gap: 8px;
-                flex-wrap: wrap;
+                justify-content: space-between;
                 align-items: center;
-                margin-bottom: 8px;
+                cursor: pointer;
               "
+              onclick="toggleWorkerStatus()"
             >
-              <select
-                id="eodWorkerSelect"
-                style="
-                  padding: 8px 12px;
-                  border: 1px solid #ddd;
-                  border-radius: 6px;
-                  font-size: 13px;
-                  min-width: 180px;
-                "
-              >
-                <option value="">-- Select Worker --</option>
-              </select>
-              <button
-                class="btn-sm btn-export"
-                onclick="downloadWorkerEOD('csv')"
-                title="Download CSV and mark as done"
-              >
-                &#8659; CSV + Mark Done
-              </button>
-              <button
-                class="btn-sm"
-                style="
-                  background: #217346;
-                  color: #fff;
-                  border-radius: 6px;
-                  padding: 6px 14px;
-                  font-size: 13px;
-                  font-weight: 600;
-                  border: none;
-                  cursor: pointer;
-                "
-                onclick="downloadWorkerEOD('xlsx')"
-                title="Download XLSX and mark as done"
-              >
-                &#8659; XLSX + Mark Done
-              </button>
-              <button
-                class="btn-sm btn-copy"
-                onclick="markWorkerDoneOnly()"
-                title="Mark done without downloading"
-              >
-                &#10003; Mark Done Only
-              </button>
+              <span style="font-size: 15px; font-weight: 600; color: #2e7d32">
+                &#128225; Worker Sync Status
+              </span>
+              <div style="display: flex; gap: 8px; align-items: center">
+                <button
+                  class="btn btn-primary"
+                  style="font-size: 12px; padding: 4px 12px"
+                  onclick="event.stopPropagation(); refreshWorkersPage()"
+                >
+                  &#128260; Refresh
+                </button>
+                <button
+                  id="workerStatusToggleBtn"
+                  style="
+                    background: none;
+                    border: 1px solid #a5d6a7;
+                    border-radius: 6px;
+                    padding: 3px 10px;
+                    font-size: 12px;
+                    color: #2e7d32;
+                    cursor: pointer;
+                  "
+                >&#9660; Show</button>
+              </div>
             </div>
-            <div class="soft-note">
-              Use this for daily worker closing. Processed rows remain available
-              in history for audit and KPI reports.
+            <div id="workerStatusContainer" style="display: none; margin-top: 14px">
+              <div class="loading">Loading...</div>
             </div>
-            <div id="eodResult" style="margin-top: 10px"></div>
           </div>
         </div>
 
@@ -3212,16 +3136,23 @@
             "
             onclick="toggleErpGuide()"
           >
-            <h2 style="margin: 0; color: #2e7d32">
+            <span style="font-size: 15px; font-weight: 600; color: #2e7d32">
               &#128218; ERP Queue — How to Process
-            </h2>
-            <span
-              id="erpGuideToggleIcon"
-              style="font-size: 18px; color: #2e7d32; font-weight: 700"
-              >&#9660;</span
-            >
+            </span>
+            <button
+              id="erpGuideToggleBtn"
+              style="
+                background: none;
+                border: 1px solid #a5d6a7;
+                border-radius: 6px;
+                padding: 3px 10px;
+                font-size: 12px;
+                color: #2e7d32;
+                cursor: pointer;
+              "
+            >&#9660; Show</button>
           </div>
-          <div id="erpGuideBody" style="margin-top: 14px">
+          <div id="erpGuideBody" style="display: none; margin-top: 14px">
             <div style="display: flex; flex-wrap: wrap; gap: 12px">
               <div
                 style="
@@ -4177,12 +4108,12 @@
       // ─── Client-side URL Router ──────────────────────────────────────────────
       const PAGE_ROUTES = {
         "": "dashboard",
-        "dashboard": "dashboard",
-        "processed": "processed",
-        "workers": "workers",
+        dashboard: "dashboard",
+        processed: "processed",
+        workers: "workers",
         "item-master": "master",
         "bin-content": "binContent",
-        "users": "users",
+        users: "users",
       };
       const PAGE_SLUGS = {
         dashboard: "",
@@ -5945,11 +5876,11 @@
       let colConfigOpen = false;
       function toggleErpGuide() {
         const body = document.getElementById("erpGuideBody");
-        const icon = document.getElementById("erpGuideToggleIcon");
+        const btn = document.getElementById("erpGuideToggleBtn");
         if (!body) return;
-        const open = body.style.display !== "none";
-        body.style.display = open ? "none" : "block";
-        if (icon) icon.textContent = open ? "▶" : "▼";
+        const hidden = body.style.display === "none";
+        body.style.display = hidden ? "block" : "none";
+        if (btn) btn.innerHTML = hidden ? "&#9650; Hide" : "&#9660; Show";
       }
 
       function toggleEodSection() {
@@ -5968,7 +5899,7 @@
         if (!container) return;
         const isHidden = container.style.display === "none";
         container.style.display = isHidden ? "block" : "none";
-        if (btn) btn.innerHTML = isHidden ? "&#9660;" : "&#9654;";
+        if (btn) btn.innerHTML = isHidden ? "&#9650; Hide" : "&#9660; Show";
       }
 
       function toggleEodInline() {
@@ -6181,7 +6112,7 @@
       }
 
       async function downloadWorkerEOD(format, resultId = "eodResult") {
-        const worker = document.getElementById("eodWorkerSelect")?.value;
+        const worker = document.getElementById("eodWorkerSelect")?.value || document.getElementById("eodWorkerSelectQueue")?.value;
         const resultDiv = document.getElementById(resultId);
         if (!worker) {
           resultDiv.innerHTML =
@@ -6273,7 +6204,7 @@
       }
 
       async function markWorkerDoneOnly(resultId = "eodResult") {
-        const worker = document.getElementById("eodWorkerSelect")?.value;
+        const worker = document.getElementById("eodWorkerSelect")?.value || document.getElementById("eodWorkerSelectQueue")?.value;
         const resultDiv = document.getElementById(resultId);
         if (!worker) {
           resultDiv.innerHTML =
