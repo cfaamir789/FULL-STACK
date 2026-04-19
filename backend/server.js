@@ -90,6 +90,17 @@ app.get("/admin", (req, res) => {
   res.setHeader("Expires", "0");
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
+// Sub-page catch-all — serves admin.html for /admin/bin-content/, /admin/item-master/ etc.
+// so that reloading a sub-page URL stays on the correct page instead of 404-ing
+app.get("/admin/*", (req, res) => {
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, proxy-revalidate",
+  );
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
 // Super Admin Console — separate page at /superadmin
 app.get("/superadmin", (req, res) => {
   res.setHeader(

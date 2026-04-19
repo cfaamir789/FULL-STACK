@@ -4174,6 +4174,35 @@
       let currentPage = "dashboard";
       let workerRefreshInFlight = false;
 
+      // ─── Client-side URL Router ──────────────────────────────────────────────
+      const PAGE_ROUTES = {
+        "": "dashboard",
+        "dashboard": "dashboard",
+        "processed": "processed",
+        "workers": "workers",
+        "item-master": "master",
+        "bin-content": "binContent",
+        "users": "users",
+      };
+      const PAGE_SLUGS = {
+        dashboard: "",
+        processed: "processed",
+        workers: "workers",
+        master: "item-master",
+        binContent: "bin-content",
+        users: "users",
+      };
+      function resolvePageFromPath() {
+        const slug = window.location.pathname
+          .replace(/^\/admin\/?/, "")
+          .replace(/\/$/, "");
+        return PAGE_ROUTES[slug] || "dashboard";
+      }
+      window.addEventListener("popstate", (e) => {
+        const page = (e.state && e.state.page) || resolvePageFromPath();
+        switchPage(page, true);
+      });
+
       // ─── WebSocket for real-time admin sync ──────────────────────────────────────
       let ws = null;
       let wsReconnectTimer = null;
@@ -4539,7 +4568,7 @@
         connectWebSocket();
         startLiveRefresh();
         loadWorkerInfoMap(); // pre-load worker info for table/export
-        await switchPage("dashboard");
+        await switchPage(resolvePageFromPath());
       }
 
       function scrollToBlock(id) {
@@ -4599,7 +4628,7 @@
         }, 60000);
       }
 
-      async function switchPage(page) {
+      async function switchPage(page, fromPopState = false) {
         currentPage = page;
         const pages = [
           "dashboard",
@@ -4617,6 +4646,15 @@
             .getElementById("nav" + p.charAt(0).toUpperCase() + p.slice(1))
             .classList.toggle("active", p === page);
         });
+
+        // Update browser URL so reload stays on the correct sub-page
+        if (!fromPopState) {
+          const slug = PAGE_SLUGS[page] || "";
+          const newPath = slug ? "/admin/" + slug + "/" : "/admin/";
+          if (window.location.pathname !== newPath) {
+            history.pushState({ page }, "", newPath);
+          }
+        }
 
         if (page === "dashboard") {
           // loadStats + loadDashboardPanels fire in parallel; stats covers header counts,
