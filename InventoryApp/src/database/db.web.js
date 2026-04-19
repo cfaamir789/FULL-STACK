@@ -92,8 +92,10 @@ const normalizeRestoreTx = (tx) => {
 // ─── IndexedDB for Items ──────────────────────────────────────────────────────
 
 const IDB_NAME = "inventory_db";
-const IDB_VERSION = 1;
+const IDB_VERSION = 3; // bumped to add bin_master store
 const ITEMS_STORE = "items";
+const BIN_CONTENTS_STORE = "bin_contents";
+const BIN_MASTER_STORE = "bin_master";
 let _idb = null;
 
 const openIDB = () =>
@@ -104,6 +106,15 @@ const openIDB = () =>
       const db = e.target.result;
       if (!db.objectStoreNames.contains(ITEMS_STORE)) {
         db.createObjectStore(ITEMS_STORE, { keyPath: "barcode" });
+      }
+      if (!db.objectStoreNames.contains(BIN_CONTENTS_STORE)) {
+        const binStore = db.createObjectStore(BIN_CONTENTS_STORE, {
+          keyPath: "_key",
+        });
+        binStore.createIndex("item_code", "item_code", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(BIN_MASTER_STORE)) {
+        db.createObjectStore(BIN_MASTER_STORE, { keyPath: "bin_code" });
       }
     };
     req.onsuccess = (e) => {
@@ -526,4 +537,164 @@ export const getDashboardStats = async () => {
     totalTransactions: txs.length,
     pendingSync: txs.filter((t) => t.synced === 0).length,
   };
+};
+
+// ─── Bin Contents (IndexedDB) ─────────────────────────────────────────────────
+// In-memory cache for instant lookups — same pattern as items cache.
+let _binCache = null;
+
+const getBinCache = async () => {
+  if (_binCache) return _binCache;
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const req = db
+      .transaction(BIN_CONTENTS_STORE, "readonly")
+      .objectStore(BIN_CONTENTS_STORE)
+      .getAll();
+    req.onsuccess = () => {
+      _binCache = req.result || [];
+      resolve(_binCache);
+    };
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const upsertBinContents = async (rows) => {
+  if (!rows || rows.length === 0) return;
+  _binCache = null;
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(BIN_CONTENTS_STORE, "readwrite");
+    const store = tx.objectStore(BIN_CONTENTS_STORE);
+    for (const r of rows) {
+      const bin_code = String(r.BinCode || r.bin_code || "").trim();
+      const item_code = String(r.ItemCode || r.item_code || "").trim();
+      const qty = Number(r.Qty != null ? r.Qty : r.qty) || 0;
+      store.put({ _key: `${bin_code}|${item_code}`, bin_code, item_code, qty });
+    }
+    tx.oncomplete = resolve;
+    tx.onerror = (e) => reject(e.target.error);
+  });
+};
+
+// Worker-valid bin pattern — matches A/B/C standard bins + HV + WH zones.
+// Excludes NAV ERP system bins: SHIP, Z1, IN0001, B0001, etc.
+const WORKER_BIN_RE = /^([ABC]\d{1,2}\d{4}[A-Z]|HV\d+|WH\d+)$/;
+
+export const getBinsForItem = async (itemCode) => {
+  const bins = await getBinCache();
+  const code = String(itemCode).trim();
+  return bins
+    .filter((b) => b.item_code === code && WORKER_BIN_RE.test(b.bin_code))
+    .sort((a, b) => b.qty - a.qty);
+};
+
+export const getBinQtyForItemAndBin = async (itemCode, binCode) => {
+  const bins = await getBinCache();
+  const code = String(itemCode).trim();
+  const bin = String(binCode).trim().toUpperCase();
+  const found = bins.find((b) => b.item_code === code && b.bin_code === bin);
+  return found ? found.qty : null;
+};
+
+export const clearBinContents = async () => {
+  _binCache = null;
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(BIN_CONTENTS_STORE, "readwrite");
+    tx.objectStore(BIN_CONTENTS_STORE).clear();
+    tx.oncomplete = () => {
+      try {
+        AsyncStorage.removeItem("binContentVersion");
+        AsyncStorage.removeItem("lastBinContentSyncTime");
+      } catch (_) {}
+      resolve(0);
+    };
+    tx.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const clearAndReplaceBinContents = async (rows, onProgress) => {
+  if (!rows || rows.length === 0) {
+    await clearBinContents();
+    return 0;
+  }
+  _binCache = null;
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(BIN_CONTENTS_STORE, "readwrite");
+    const store = tx.objectStore(BIN_CONTENTS_STORE);
+    store.clear();
+    const total = rows.length;
+    for (let i = 0; i < total; i++) {
+      const r = rows[i];
+      const bin_code = String(r.BinCode || r.bin_code || "").trim();
+      const item_code = String(r.ItemCode || r.item_code || "").trim();
+      const qty = Number(r.Qty != null ? r.Qty : r.qty) || 0;
+      store.put({ _key: `${bin_code}|${item_code}`, bin_code, item_code, qty });
+      if (onProgress && (i % 5000 === 0 || i === total - 1)) {
+        onProgress({ processed: i + 1, total });
+      }
+    }
+    tx.oncomplete = () => {
+      _binCache = null;
+      resolve(total);
+    };
+    tx.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const getBinContentCount = async () => {
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const req = db
+      .transaction(BIN_CONTENTS_STORE, "readonly")
+      .objectStore(BIN_CONTENTS_STORE)
+      .count();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+// ─── Bin Master (hard-block validation) ──────────────────────────────────────
+
+export const getBinMasterCount = async () => {
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const req = db
+      .transaction(BIN_MASTER_STORE, "readonly")
+      .objectStore(BIN_MASTER_STORE)
+      .count();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const checkBinExists = async (binCode) => {
+  const db = await openIDB();
+  const code = String(binCode).trim().toUpperCase();
+  return new Promise((resolve, reject) => {
+    const req = db
+      .transaction(BIN_MASTER_STORE, "readonly")
+      .objectStore(BIN_MASTER_STORE)
+      .get(code);
+    req.onsuccess = () => resolve(!!req.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+};
+
+export const clearAndReplaceBinMaster = async (codes) => {
+  if (!codes || codes.length === 0) return 0;
+  const db = await openIDB();
+  const total = codes.length;
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(BIN_MASTER_STORE, "readwrite");
+    const store = tx.objectStore(BIN_MASTER_STORE);
+    store.clear();
+    for (const c of codes) {
+      store.put({ bin_code: String(c).trim().toUpperCase() });
+    }
+    tx.oncomplete = () => resolve(total);
+    tx.onerror = (e) => reject(e.target.error);
+  });
 };

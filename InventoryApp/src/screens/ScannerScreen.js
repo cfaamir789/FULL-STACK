@@ -38,9 +38,13 @@ import {
   searchItems,
   searchItemsByName,
   insertTransaction,
+  getBinsForItem,
+  checkBinExists,
+  getBinMasterCount,
 } from "../database/db";
 import { attemptSync } from "../services/syncService";
 import CalcInput from "../components/CalcInput";
+import BinSelector from "../components/BinSelector";
 // ClearButton — shows ✕ inside the input when there is text, invisible when empty
 const ClearButton = ({ value, onClear, onClearFocus, style }) => {
   if (!value) return null;
@@ -75,6 +79,11 @@ export default function ScannerScreen({ role = "worker" }) {
   const [quickCode, setQuickCode] = useState("");
   const [frombin, setFrombin] = useState("");
   const [tobin, setTobin] = useState("");
+  const [itemBins, setItemBins] = useState([]);
+  const [fromBinMode, setFromBinMode] = useState("suggest");
+  const [toBinMode, setToBinMode] = useState("suggest");
+  const [selectedFromBin, setSelectedFromBin] = useState(null);
+  const [selectedToBin, setSelectedToBin] = useState(null);
   const [qty, setQty] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -107,10 +116,14 @@ export default function ScannerScreen({ role = "worker" }) {
     return /^[A-Z0-9]+$/.test(bin);
   };
 
-  const focusFromBin = () => setTimeout(() => {
-    if (skipFocusFromBin.current) { skipFocusFromBin.current = false; return; }
-    fromBinRef.current?.focus();
-  }, 120);
+  const focusFromBin = () =>
+    setTimeout(() => {
+      if (skipFocusFromBin.current) {
+        skipFocusFromBin.current = false;
+        return;
+      }
+      fromBinRef.current?.focus();
+    }, 120);
 
   // Live search as user types in Item Name mode
   useEffect(() => {
@@ -170,7 +183,9 @@ export default function ScannerScreen({ role = "worker" }) {
 
   const resetForm = () => {
     isResetting.current = true;
-    setTimeout(() => { isResetting.current = false; }, 300);
+    setTimeout(() => {
+      isResetting.current = false;
+    }, 300);
     setScanned(false);
     setFoundItem(null);
     setBarcode("");
@@ -181,6 +196,11 @@ export default function ScannerScreen({ role = "worker" }) {
     setQuickCodeResults([]);
     setFrombin("");
     setTobin("");
+    setItemBins([]);
+    setFromBinMode("suggest");
+    setToBinMode("suggest");
+    setSelectedFromBin(null);
+    setSelectedToBin(null);
     setQty("");
     setNotes("");
     setShowCamera(false);
@@ -207,6 +227,11 @@ export default function ScannerScreen({ role = "worker" }) {
     setQuickCodeResults([]);
     setFrombin("");
     setTobin("");
+    setItemBins([]);
+    setFromBinMode("suggest");
+    setToBinMode("suggest");
+    setSelectedFromBin(null);
+    setSelectedToBin(null);
     setQty("");
     setNotes("");
     setShowCamera(false);
@@ -221,10 +246,15 @@ export default function ScannerScreen({ role = "worker" }) {
     }, 120);
   };
 
-  const applySelectedItem = (item) => {
+  const applySelectedItem = async (item) => {
     if (!item) {
       setFoundItem(null);
       setScanned(true);
+      setItemBins([]);
+      setFromBinMode("suggest");
+      setToBinMode("suggest");
+      setSelectedFromBin(null);
+      setSelectedToBin(null);
       focusFromBin();
       return;
     }
@@ -237,6 +267,28 @@ export default function ScannerScreen({ role = "worker" }) {
     setScanned(true);
     setNameResults([]);
     setQuickCodeResults([]);
+    // Load bins for this item from local DB
+    try {
+      const bins = await getBinsForItem(item.item_code || "");
+      setItemBins(bins);
+      setSelectedFromBin(null);
+      setSelectedToBin(null);
+      if (bins.length === 0) {
+        setFromBinMode("custom");
+        setToBinMode("custom");
+      } else {
+        setFromBinMode("suggest");
+        setToBinMode("suggest");
+        if (bins.length === 1) {
+          setSelectedFromBin(bins[0]);
+          setFrombin(bins[0].bin_code);
+        }
+      }
+    } catch {
+      setItemBins([]);
+      setFromBinMode("custom");
+      setToBinMode("custom");
+    }
     focusFromBin();
   };
 
@@ -347,23 +399,68 @@ export default function ScannerScreen({ role = "worker" }) {
       return;
     }
     if (!frombin.trim() || !tobin.trim()) {
+      // Derive effective bin codes from suggest or custom mode
+      const effectiveFrom =
+        fromBinMode === "suggest" ? selectedFromBin?.bin_code || "" : frombin;
+      const effectiveTo =
+        toBinMode === "suggest" ? selectedToBin?.bin_code || "" : tobin;
+      if (!effectiveFrom.trim() || !effectiveTo.trim()) {
+        Alert.alert("Missing Bins", "From Bin and To Bin are required.");
+        return;
+      }
+    }
+    // Derive effective bin codes
+    const effectiveFromBin =
+      fromBinMode === "suggest"
+        ? selectedFromBin?.bin_code || frombin
+        : frombin;
+    const effectiveToBin =
+      toBinMode === "suggest" ? selectedToBin?.bin_code || tobin : tobin;
+    if (!effectiveFromBin.trim() || !effectiveToBin.trim()) {
       Alert.alert("Missing Bins", "From Bin and To Bin are required.");
       return;
     }
-    // Validate bin format (capital letters and numbers only, no spaces)
-    if (!validateBinFormat(frombin.trim())) {
+    if (!validateBinFormat(effectiveFromBin.trim())) {
       Alert.alert(
         "Invalid From Bin Format",
         "Use only capital letters and numbers (e.g., A10101A, B192506B)",
       );
       return;
     }
-    if (!validateBinFormat(tobin.trim())) {
+    if (!validateBinFormat(effectiveToBin.trim())) {
       Alert.alert(
         "Invalid To Bin Format",
         "Use only capital letters and numbers (e.g., A10101A, B192506B)",
       );
       return;
+    }
+    // Hard block: check both bins exist in the bin master (if master has been downloaded)
+    const masterCount = await getBinMasterCount();
+    if (masterCount > 0) {
+      const [fromExists, toExists] = await Promise.all([
+        checkBinExists(effectiveFromBin.trim()),
+        checkBinExists(effectiveToBin.trim()),
+      ]);
+      if (!fromExists) {
+        Alert.alert(
+          "Invalid From Bin",
+          `❌ "${effectiveFromBin.trim().toUpperCase()}" does not exist in the bin master.\nPlease check the bin code and try again.`,
+        );
+        setFrombin("");
+        setSelectedFromBin(null);
+        setTimeout(() => fromBinRef.current?.focus(), 100);
+        return;
+      }
+      if (!toExists) {
+        Alert.alert(
+          "Invalid To Bin",
+          `❌ "${effectiveToBin.trim().toUpperCase()}" does not exist in the bin master.\nPlease check the bin code and try again.`,
+        );
+        setTobin("");
+        setSelectedToBin(null);
+        setTimeout(() => toBinRef.current?.focus(), 100);
+        return;
+      }
     }
     // Use directQty if it's a valid numeric string (from CalcInput), else fall back to state
     const qtyStr =
@@ -378,6 +475,18 @@ export default function ScannerScreen({ role = "worker" }) {
       );
       return;
     }
+    // Hard block: qty cannot exceed available stock in the selected From Bin
+    if (
+      fromBinMode === "suggest" &&
+      selectedFromBin &&
+      qtyNum > selectedFromBin.qty
+    ) {
+      Alert.alert(
+        "Quantity Exceeds Stock",
+        `Cannot move ${qtyNum} pcs. Only ${selectedFromBin.qty} pcs available in bin ${selectedFromBin.bin_code}.`,
+      );
+      return;
+    }
     setSaving(true);
     try {
       const workerName =
@@ -386,8 +495,8 @@ export default function ScannerScreen({ role = "worker" }) {
         item_barcode: barcodeVal,
         item_code: foundItem?.item_code || "",
         item_name: foundItem?.item_name || "Unknown Item",
-        frombin: frombin.trim().toUpperCase(),
-        tobin: tobin.trim().toUpperCase(),
+        frombin: effectiveFromBin.trim().toUpperCase(),
+        tobin: effectiveToBin.trim().toUpperCase(),
         qty: qtyNum,
         worker_name: workerName,
         notes: notes.trim().toUpperCase(),
@@ -395,8 +504,8 @@ export default function ScannerScreen({ role = "worker" }) {
       setLastSaved({
         name: foundItem?.item_name || "Unknown Item",
         qty: qtyNum,
-        from: frombin.trim().toUpperCase(),
-        to: tobin.trim().toUpperCase(),
+        from: effectiveFromBin.trim().toUpperCase(),
+        to: effectiveToBin.trim().toUpperCase(),
       });
       skipFocusFromBin.current = true;
       resetForm();
@@ -416,7 +525,8 @@ export default function ScannerScreen({ role = "worker" }) {
 
   const uc = (setter) => (text) => setter(text.toUpperCase());
   // Bin fields: uppercase + strip everything except A-Z and 0-9 (no spaces, no special chars)
-  const binInput = (setter) => (text) => setter(text.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+  const binInput = (setter) => (text) =>
+    setter(text.toUpperCase().replace(/[^A-Z0-9]/g, ""));
 
   // ─── Reusable UI pieces ─────────────────────────────────────────────────────
 
@@ -473,7 +583,19 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton value={barcode} onClear={() => { setBarcode(""); setFoundItem(null); setScanned(false); setFrombin(""); setTobin(""); setQty(""); setNotes(""); setTimeout(() => barcodeRef.current?.focus(), 50); }} />
+              <ClearButton
+                value={barcode}
+                onClear={() => {
+                  setBarcode("");
+                  setFoundItem(null);
+                  setScanned(false);
+                  setFrombin("");
+                  setTobin("");
+                  setQty("");
+                  setNotes("");
+                  setTimeout(() => barcodeRef.current?.focus(), 50);
+                }}
+              />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -518,7 +640,19 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton value={itemCode} onClear={() => { setItemCode(""); setFoundItem(null); setScanned(false); setFrombin(""); setTobin(""); setQty(""); setNotes(""); setTimeout(() => itemCodeRef.current?.focus(), 50); }} />
+              <ClearButton
+                value={itemCode}
+                onClear={() => {
+                  setItemCode("");
+                  setFoundItem(null);
+                  setScanned(false);
+                  setFrombin("");
+                  setTobin("");
+                  setQty("");
+                  setNotes("");
+                  setTimeout(() => itemCodeRef.current?.focus(), 50);
+                }}
+              />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -570,7 +704,20 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton value={quickCode} onClear={() => { setQuickCode(""); setFoundItem(null); setScanned(false); setQuickCodeResults([]); setFrombin(""); setTobin(""); setQty(""); setNotes(""); setTimeout(() => quickCodeRef.current?.focus(), 50); }} />
+              <ClearButton
+                value={quickCode}
+                onClear={() => {
+                  setQuickCode("");
+                  setFoundItem(null);
+                  setScanned(false);
+                  setQuickCodeResults([]);
+                  setFrombin("");
+                  setTobin("");
+                  setQty("");
+                  setNotes("");
+                  setTimeout(() => quickCodeRef.current?.focus(), 50);
+                }}
+              />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -642,7 +789,20 @@ export default function ScannerScreen({ role = "worker" }) {
               }}
               blurOnSubmit={false}
             />
-            <ClearButton value={itemName} onClear={() => { setItemName(""); setFoundItem(null); setScanned(false); setNameResults([]); setFrombin(""); setTobin(""); setQty(""); setNotes(""); setTimeout(() => itemNameRef.current?.focus(), 50); }} />
+            <ClearButton
+              value={itemName}
+              onClear={() => {
+                setItemName("");
+                setFoundItem(null);
+                setScanned(false);
+                setNameResults([]);
+                setFrombin("");
+                setTobin("");
+                setQty("");
+                setNotes("");
+                setTimeout(() => itemNameRef.current?.focus(), 50);
+              }}
+            />
           </View>
           <TouchableOpacity
             style={styles.searchBtn}
@@ -746,55 +906,85 @@ export default function ScannerScreen({ role = "worker" }) {
           </Text>
         </View>
       )}
-      <Text style={[styles.label, !scanned && { opacity: 0.5 }]}>
-        From Bin
-      </Text>
-      <View style={styles.inputWithMic}>
-        <TextInput
-          ref={fromBinRef}
-          style={[styles.inputInner, !scanned && { opacity: 0.5 }]}
-          value={frombin}
-          onChangeText={binInput(setFrombin)}
-          placeholder="e.g. A10101A"
-          autoCapitalize="characters"
-          returnKeyType="next"
-          onSubmitEditing={() => toBinRef.current?.focus()}
-          onKeyPress={(e) => {
-            if (e.nativeEvent.key === "Enter") toBinRef.current?.focus();
-          }}
-          blurOnSubmit={false}
-          editable={scanned}
-        />
-        <ClearButton
-          value={frombin}
-          onClear={() => setFrombin("")}
-          onClearFocus={() => fromBinRef.current?.focus()}
-        />
-      </View>
 
-      <Text style={[styles.label, !scanned && { opacity: 0.5 }]}>To Bin</Text>
-      <View style={styles.inputWithMic}>
-        <TextInput
-          ref={toBinRef}
-          style={[styles.inputInner, !scanned && { opacity: 0.5 }]}
-          value={tobin}
-          onChangeText={binInput(setTobin)}
-          placeholder="e.g. B192506B"
-          autoCapitalize="characters"
-          returnKeyType="next"
-          onSubmitEditing={() => qtyRef.current?.focus()}
-          onKeyPress={(e) => {
-            if (e.nativeEvent.key === "Enter") qtyRef.current?.focus();
+      <BinSelector
+        label="From Bin"
+        placeholder="e.g. A10101A"
+        bins={itemBins}
+        mode={fromBinMode}
+        onModeChange={setFromBinMode}
+        selectedBin={selectedFromBin}
+        onSelectBin={(bin) => {
+          setSelectedFromBin(bin);
+          if (bin) setFrombin(bin.bin_code);
+          else setFrombin("");
+        }}
+        customValue={frombin}
+        onCustomChange={setFrombin}
+        inputRef={fromBinRef}
+        onSubmitEditing={() => toBinRef.current?.focus()}
+        editable={scanned}
+        onBinValidate={checkBinExists}
+      />
+
+      {/* Qty warning if user types more than available in selected From Bin */}
+      {selectedFromBin && qty && parseInt(qty, 10) > selectedFromBin.qty && (
+        <Text
+          style={{
+            color: Colors.error || "#D32F2F",
+            fontSize: 12,
+            fontWeight: "600",
+            marginTop: 4,
           }}
-          blurOnSubmit={false}
-          editable={scanned}
-        />
-        <ClearButton
-          value={tobin}
-          onClear={() => setTobin("")}
-          onClearFocus={() => toBinRef.current?.focus()}
-        />
-      </View>
+        >
+          ⚠️ Exceeds available stock ({selectedFromBin.qty.toLocaleString()} pcs
+          in {selectedFromBin.bin_code})
+        </Text>
+      )}
+
+      <BinSelector
+        label="To Bin"
+        placeholder="e.g. B192506B"
+        bins={itemBins}
+        mode={toBinMode}
+        onModeChange={setToBinMode}
+        selectedBin={selectedToBin}
+        onSelectBin={(bin) => {
+          setSelectedToBin(bin);
+          if (bin) setTobin(bin.bin_code);
+          else setTobin("");
+        }}
+        customValue={tobin}
+        onCustomChange={setTobin}
+        inputRef={toBinRef}
+        onSubmitEditing={() => qtyRef.current?.focus()}
+        editable={scanned}
+        onBinValidate={checkBinExists}
+      />
+
+      {/* Info if To Bin already has stock */}
+      {selectedToBin && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 4,
+          }}
+        >
+          <MaterialCommunityIcons
+            name="information"
+            size={14}
+            color={Colors.primary}
+          />
+          <Text
+            style={{ fontSize: 12, color: Colors.primary, fontWeight: "600" }}
+          >
+            This bin already has {selectedToBin.qty.toLocaleString()} pcs of
+            this item
+          </Text>
+        </View>
+      )}
 
       <Text style={styles.label}>
         Quantity{" "}

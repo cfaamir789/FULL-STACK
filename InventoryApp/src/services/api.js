@@ -3,8 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 export const CLOUD_SERVER_URL = "https://fullstck-production.up.railway.app";
-export const CLOUD_SERVER_FAILOVER =
-  "https://fullstck.onrender.com";
+export const CLOUD_SERVER_FAILOVER = "https://fullstck.onrender.com";
 export const CLOUD_SERVERS = [CLOUD_SERVER_URL, CLOUD_SERVER_FAILOVER];
 export const DEFAULT_SERVER_IP = CLOUD_SERVER_URL;
 
@@ -319,13 +318,21 @@ export const fetchItemsDelta = async (since, lastFullSync) => {
 export const syncTransactions = async (transactions) => {
   // 60-second timeout: budget phones on slow networks + Render free tier can be slow.
   // The server saves data before responding, so if 10s fires the phone never gets the ack.
-  const res = await apiClient.post("/sync", { transactions }, { timeout: 60000 });
+  const res = await apiClient.post(
+    "/sync",
+    { transactions },
+    { timeout: 60000 },
+  );
   return res.data;
 };
 
 // Ask server which of these clientTxIds it already has (fallback after timeout)
 export const verifySyncedTxIds = async (clientTxIds) => {
-  const res = await apiClient.post("/sync/verify", { clientTxIds }, { timeout: 30000 });
+  const res = await apiClient.post(
+    "/sync/verify",
+    { clientTxIds },
+    { timeout: 30000 },
+  );
   return res.data; // { success, found: [clientTxId, ...] }
 };
 
@@ -437,4 +444,50 @@ export const clearServerItems = async () => {
 export const replaceServerItems = async (itemsArray) => {
   const res = await apiClient.post("/items/replace", { items: itemsArray });
   return res.data;
+};
+
+// ─── Bin Content ──────────────────────────────────────────────────────────────
+
+// Lightweight version check — used to see if phone needs to re-download
+export const fetchBinContentVersion = async () => {
+  const res = await healthClient.get("/bin-content/version");
+  return res.data; // { version, total }
+};
+
+// Full bulk download — gzip compressed, returns { version, total, items: [{BinCode,ItemCode,Qty}] }
+export const fetchBinContentBulk = async (etag) => {
+  const headers = etag ? { "If-None-Match": etag } : {};
+  const res = await apiClient.get("/bin-content/bulk", {
+    timeout: 120000,
+    headers,
+    validateStatus: (s) => s === 200 || s === 304,
+  });
+  if (res.status === 304) return { notModified: true };
+  return res.data; // { version, total, items }
+};
+
+// Delta — only records updated since `since` (ISO string)
+export const fetchBinContentDelta = async (since) => {
+  const res = await apiClient.get(
+    `/bin-content/delta?since=${encodeURIComponent(since)}`,
+    { timeout: 30000 },
+  );
+  return res.data; // { version, serverTime, total, items }
+};
+
+// Fetch all bins for a specific item (live from server — fallback when local data may be stale)
+export const fetchBinsForItem = async (itemCode) => {
+  const res = await apiClient.get(
+    `/bin-content/by-item/${encodeURIComponent(itemCode)}`,
+    { timeout: 10000 },
+  );
+  return res.data.bins || []; // [{ BinCode, Qty, BinRanking, ZoneCode }]
+};
+
+// ─── Bin Master ───────────────────────────────────────────────────────────────
+
+// Returns flat list of all valid worker bin codes (excludes SHIP/NAV ERP bins)
+export const fetchBinMasterCodes = async () => {
+  const res = await apiClient.get("/bin-master/codes", { timeout: 60000 });
+  return res.data; // { success, codes: [...], total }
 };

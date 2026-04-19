@@ -34,6 +34,11 @@ import {
   downloadItemMaster,
   downloadItemDelta,
   checkItemMasterUpdate,
+  downloadBinContent,
+  downloadBinContentDelta,
+  checkBinContentUpdate,
+  downloadBinMaster,
+  checkBinMasterStatus,
 } from "../services/syncService";
 import Colors from "../theme/colors";
 
@@ -83,6 +88,18 @@ export default function AdminPanelScreen({ navigation }) {
   const [masterProgress, setMasterProgress] = useState(null); // { phase, percent }
   const [masterResult, setMasterResult] = useState(null); // { success, count, error }
 
+  // Bin Content sync state
+  const [binStatus, setBinStatus] = useState(null); // { serverVersion, serverTotal, localVersion, localCount, updateAvailable }
+  const [binDownloading, setBinDownloading] = useState(false);
+  const [binProgress, setBinProgress] = useState(null); // { phase, percent }
+  const [binResult, setBinResult] = useState(null); // { success, count, error }
+
+  // Bin Master (hard-block validation) state
+  const [binMasterStatus, setBinMasterStatus] = useState(null); // { localCount, lastSync }
+  const [binMasterDownloading, setBinMasterDownloading] = useState(false);
+  const [binMasterProgress, setBinMasterProgress] = useState(null);
+  const [binMasterResult, setBinMasterResult] = useState(null);
+
   const loadData = useCallback(async () => {
     const local = await getDashboardStats();
     setLocalStats(local);
@@ -100,6 +117,16 @@ export default function AdminPanelScreen({ navigation }) {
       try {
         const ms = await checkItemMasterUpdate();
         setMasterStatus(ms);
+      } catch {}
+      // Check bin content version
+      try {
+        const bs = await checkBinContentUpdate();
+        setBinStatus(bs);
+      } catch {}
+      // Check local bin master count
+      try {
+        const bms = await checkBinMasterStatus();
+        setBinMasterStatus(bms);
       } catch {}
     } catch {
       setOnline(false);
@@ -227,6 +254,133 @@ export default function AdminPanelScreen({ navigation }) {
     } finally {
       setMasterDownloading(false);
       setMasterProgress(null);
+    }
+  };
+
+  // ─── Bin Content Download ─────────────────────────────────────────────────
+  const handleCheckBinUpdate = async () => {
+    try {
+      const bs = await checkBinContentUpdate();
+      setBinStatus(bs);
+      setBinResult(null);
+      if (!bs.updateAvailable) {
+        Alert.alert(
+          "Up to Date",
+          `Bin content is current (v${bs.serverVersion}, ${bs.serverTotal.toLocaleString()} records).`,
+        );
+      }
+    } catch (err) {
+      Alert.alert("Error", "Could not check server: " + err.message);
+    }
+  };
+
+  const handleDownloadBinContent = async () => {
+    setBinDownloading(true);
+    setBinResult(null);
+    setBinProgress({ phase: "downloading", percent: 0 });
+    try {
+      const result = await downloadBinContent((progress) => {
+        setBinProgress(progress);
+      });
+      setBinResult(result);
+      if (result.success) {
+        setBinStatus((prev) =>
+          prev
+            ? {
+                ...prev,
+                localVersion: result.version,
+                localCount: result.count,
+                updateAvailable: false,
+              }
+            : prev,
+        );
+        Alert.alert(
+          "Success",
+          `Downloaded ${result.count.toLocaleString()} bin records (v${result.version}).`,
+        );
+      }
+    } catch (err) {
+      setBinResult({ success: false, error: err.message });
+      Alert.alert("Download Failed", err.message);
+    } finally {
+      setBinDownloading(false);
+      setBinProgress(null);
+    }
+  };
+
+  const handleSmartBinSync = async () => {
+    setBinDownloading(true);
+    setBinResult(null);
+    setBinProgress({ phase: "checking", percent: 0 });
+    try {
+      const result = await downloadBinContentDelta((progress) => {
+        setBinProgress(progress);
+      });
+      setBinResult(result);
+      if (result.success) {
+        setBinStatus((prev) =>
+          prev
+            ? {
+                ...prev,
+                localVersion: result.version,
+                localCount: result.count,
+                updateAvailable: false,
+              }
+            : prev,
+        );
+        if (result.unchanged) {
+          Alert.alert("Already Up to Date", "No new or updated bin records.");
+        } else if (result.delta) {
+          Alert.alert(
+            "Smart Sync Done",
+            `Updated ${result.count.toLocaleString()} bin record(s) — only changes downloaded!`,
+          );
+        } else {
+          Alert.alert(
+            "Full Download Done",
+            `Downloaded ${result.count.toLocaleString()} bin records (v${result.version}).`,
+          );
+        }
+      }
+    } catch (err) {
+      setBinResult({ success: false, error: err.message });
+      Alert.alert("Sync Failed", err.message);
+    } finally {
+      setBinDownloading(false);
+      setBinProgress(null);
+    }
+  };
+
+  const handleDownloadBinMaster = async () => {
+    setBinMasterDownloading(true);
+    setBinMasterResult(null);
+    setBinMasterProgress({ phase: "downloading", percent: 0 });
+    try {
+      const result = await downloadBinMaster((progress) => {
+        setBinMasterProgress(progress);
+      });
+      setBinMasterResult(result);
+      if (result.success) {
+        setBinMasterStatus({
+          localCount: result.count,
+          lastSync: new Date().toISOString(),
+        });
+        Alert.alert(
+          "Bin Master Downloaded",
+          `${result.count.toLocaleString()} valid bin codes saved to phone.\nWrong bin codes will now be blocked.`,
+        );
+      } else {
+        Alert.alert(
+          "Download Failed",
+          result.error || "No bins returned from server.",
+        );
+      }
+    } catch (err) {
+      setBinMasterResult({ success: false, error: err.message });
+      Alert.alert("Download Failed", err.message);
+    } finally {
+      setBinMasterDownloading(false);
+      setBinMasterProgress(null);
     }
   };
 
@@ -503,7 +657,12 @@ export default function AdminPanelScreen({ navigation }) {
       Alert.alert(
         "Shift Closed",
         `Removed ${localCleared} synced transaction(s) from this phone.\n\nServer records were kept safe.`,
-        [{ text: "OK", onPress: () => navigation.getParent()?.navigate("Dashboard") }],
+        [
+          {
+            text: "OK",
+            onPress: () => navigation.getParent()?.navigate("Dashboard"),
+          },
+        ],
       );
     } catch (err) {
       Alert.alert("Error", err.message);
@@ -530,7 +689,13 @@ export default function AdminPanelScreen({ navigation }) {
               Alert.alert(
                 "Done",
                 "Phone data cleared. Items will re-download on next sync.",
-                [{ text: "OK", onPress: () => navigation.getParent()?.navigate("Dashboard") }],
+                [
+                  {
+                    text: "OK",
+                    onPress: () =>
+                      navigation.getParent()?.navigate("Dashboard"),
+                  },
+                ],
               );
             } catch (err) {
               Alert.alert("Error", err.message);
@@ -711,14 +876,12 @@ export default function AdminPanelScreen({ navigation }) {
               {masterDownloading ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
-                <MaterialCommunityIcons
-                  name="sync"
-                  size={18}
-                  color="#fff"
-                />
+                <MaterialCommunityIcons name="sync" size={18} color="#fff" />
               )}
               <Text style={styles.masterBtnText}>
-                {masterDownloading ? "Syncing..." : "Smart Sync (New/Updated Only)"}
+                {masterDownloading
+                  ? "Syncing..."
+                  : "Smart Sync (New/Updated Only)"}
               </Text>
             </TouchableOpacity>
 
@@ -737,7 +900,9 @@ export default function AdminPanelScreen({ navigation }) {
                 />
               )}
               <Text style={styles.masterBtnText}>
-                {masterDownloading ? "Downloading..." : "Full Download (All Items)"}
+                {masterDownloading
+                  ? "Downloading..."
+                  : "Full Download (All Items)"}
               </Text>
             </TouchableOpacity>
 
@@ -751,6 +916,247 @@ export default function AdminPanelScreen({ navigation }) {
                 color="#fff"
               />
               <Text style={styles.masterBtnText}>Import from File</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Bin Content Download ─────────────────────────────────────── */}
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
+          Bin Content Data
+        </Text>
+        <View style={styles.masterCard}>
+          <View style={styles.masterCardHeader}>
+            <MaterialCommunityIcons
+              name="warehouse"
+              size={22}
+              color={Colors.primary}
+            />
+            <Text style={styles.masterCardTitle}>Bin Stock Sync</Text>
+          </View>
+          <Text style={styles.masterCardSub}>
+            Download bin stock data to phone for offline bin suggestions in the
+            scanner.
+          </Text>
+
+          <View style={styles.masterStats}>
+            <View style={styles.masterStat}>
+              <Text style={styles.masterStatLabel}>Local Count</Text>
+              <Text style={styles.masterStatValue}>
+                {binStatus?.localCount != null
+                  ? binStatus.localCount.toLocaleString()
+                  : "-"}
+              </Text>
+            </View>
+            <View style={styles.masterStat}>
+              <Text style={styles.masterStatLabel}>Local Version</Text>
+              <Text style={styles.masterStatValue}>
+                {binStatus?.localVersion != null
+                  ? "v" + binStatus.localVersion
+                  : "-"}
+              </Text>
+            </View>
+            <View style={styles.masterStat}>
+              <Text style={styles.masterStatLabel}>Server</Text>
+              <Text style={styles.masterStatValue}>
+                {binStatus
+                  ? binStatus.serverTotal.toLocaleString() +
+                    " (v" +
+                    binStatus.serverVersion +
+                    ")"
+                  : "-"}
+              </Text>
+            </View>
+          </View>
+
+          {binStatus?.updateAvailable && (
+            <View style={styles.masterUpdateBanner}>
+              <MaterialCommunityIcons
+                name="alert-circle"
+                size={16}
+                color="#e65100"
+              />
+              <Text style={styles.masterUpdateText}>
+                Update available! Server v{binStatus.serverVersion} vs local v
+                {binStatus.localVersion ?? "none"}
+              </Text>
+            </View>
+          )}
+
+          {binDownloading && binProgress && (
+            <View style={styles.masterProgressBar}>
+              <View
+                style={[
+                  styles.masterProgressFill,
+                  { width: binProgress.percent + "%" },
+                ]}
+              />
+              <Text style={styles.masterProgressText}>
+                {binProgress.phase === "downloading"
+                  ? "Downloading..."
+                  : "Saving to phone..."}{" "}
+                {binProgress.percent}%
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.masterButtons}>
+            <TouchableOpacity
+              style={[styles.masterBtn, { backgroundColor: Colors.primary }]}
+              onPress={handleCheckBinUpdate}
+              disabled={binDownloading || !online}
+            >
+              <MaterialCommunityIcons
+                name="cloud-search"
+                size={18}
+                color="#fff"
+              />
+              <Text style={styles.masterBtnText}>Check Updates</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.masterBtn, { backgroundColor: "#1565c0" }]}
+              onPress={handleSmartBinSync}
+              disabled={binDownloading || !online}
+            >
+              {binDownloading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialCommunityIcons name="sync" size={18} color="#fff" />
+              )}
+              <Text style={styles.masterBtnText}>
+                {binDownloading ? "Syncing..." : "Smart Sync (Changes Only)"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.masterBtn, { backgroundColor: "#2e7d32" }]}
+              onPress={handleDownloadBinContent}
+              disabled={binDownloading || !online}
+            >
+              {binDownloading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialCommunityIcons
+                  name="cloud-download"
+                  size={18}
+                  color="#fff"
+                />
+              )}
+              <Text style={styles.masterBtnText}>
+                {binDownloading ? "Downloading..." : "Full Download (All Bins)"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Bin Master Validation Download ────────────────────────────── */}
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>
+          Bin Master Validation
+        </Text>
+        <View style={styles.masterCard}>
+          <View style={styles.masterCardHeader}>
+            <MaterialCommunityIcons
+              name="shield-check"
+              size={22}
+              color="#6a1b9a"
+            />
+            <Text style={styles.masterCardTitle}>Bin Existence Check</Text>
+          </View>
+          <Text style={styles.masterCardSub}>
+            Download all valid bin codes to the phone. Workers will be
+            hard-blocked from entering wrong bin codes in the scanner.
+          </Text>
+
+          <View style={styles.masterStats}>
+            <View style={styles.masterStat}>
+              <Text style={styles.masterStatLabel}>Valid Bins on Phone</Text>
+              <Text
+                style={[
+                  styles.masterStatValue,
+                  binMasterStatus?.localCount > 0
+                    ? { color: "#2e7d32" }
+                    : { color: "#c62828" },
+                ]}
+              >
+                {binMasterStatus?.localCount != null
+                  ? binMasterStatus.localCount.toLocaleString()
+                  : "0"}
+              </Text>
+            </View>
+            <View style={styles.masterStat}>
+              <Text style={styles.masterStatLabel}>Status</Text>
+              <Text style={[styles.masterStatValue, { fontSize: 12 }]}>
+                {binMasterStatus?.localCount > 0
+                  ? "✓ Active"
+                  : "⚠ Not downloaded"}
+              </Text>
+            </View>
+            <View style={styles.masterStat}>
+              <Text style={styles.masterStatLabel}>Last Sync</Text>
+              <Text style={[styles.masterStatValue, { fontSize: 11 }]}>
+                {binMasterStatus?.lastSync
+                  ? new Date(binMasterStatus.lastSync).toLocaleDateString()
+                  : "Never"}
+              </Text>
+            </View>
+          </View>
+
+          {(!binMasterStatus || binMasterStatus.localCount === 0) && (
+            <View
+              style={[
+                styles.masterUpdateBanner,
+                { backgroundColor: "#fce4ec" },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name="alert-circle"
+                size={16}
+                color="#c62828"
+              />
+              <Text style={[styles.masterUpdateText, { color: "#c62828" }]}>
+                No bin master on phone — wrong bins will NOT be caught! Download
+                now.
+              </Text>
+            </View>
+          )}
+
+          {binMasterDownloading && binMasterProgress && (
+            <View style={styles.masterProgressBar}>
+              <View
+                style={[
+                  styles.masterProgressFill,
+                  { width: (binMasterProgress.percent || 0) + "%" },
+                ]}
+              />
+              <Text style={styles.masterProgressText}>
+                {binMasterProgress.phase === "downloading"
+                  ? "Downloading bins..."
+                  : "Saving to phone..."}{" "}
+                {binMasterProgress.percent}%
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.masterButtons}>
+            <TouchableOpacity
+              style={[styles.masterBtn, { backgroundColor: "#6a1b9a" }]}
+              onPress={handleDownloadBinMaster}
+              disabled={binMasterDownloading || !online}
+            >
+              {binMasterDownloading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <MaterialCommunityIcons
+                  name="shield-download"
+                  size={18}
+                  color="#fff"
+                />
+              )}
+              <Text style={styles.masterBtnText}>
+                {binMasterDownloading
+                  ? "Downloading..."
+                  : "Download Bin Master"}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -10,6 +10,10 @@ import {
   getServerTimeISO,
   checkClearCommand,
   ackClear,
+  fetchBinContentVersion,
+  fetchBinContentBulk,
+  fetchBinContentDelta,
+  fetchBinMasterCodes,
 } from "./api";
 import {
   getPendingTransactions,
@@ -17,6 +21,11 @@ import {
   clearAndReplaceAllItems,
   upsertItems,
   clearSyncedTransactions,
+  clearAndReplaceBinContents,
+  upsertBinContents,
+  getBinContentCount,
+  clearAndReplaceBinMaster,
+  getBinMasterCount,
 } from "../database/db";
 
 let _onStatusChange = null;
@@ -315,6 +324,149 @@ export const startAutoSync = (intervalMs = 15000) => {
     clearTimeout(firstRun);
     clearInterval(timer);
   };
+};
+
+// ─── Bin Content Sync ─────────────────────────────────────────────────────────
+
+// Full bulk download of ALL bin content records. Atomic replace of local data.
+// onProgress: ({ phase, percent })
+export const downloadBinContent = async (onProgress) => {
+  onProgress?.({ phase: "downloading", percent: 0 });
+
+  const storedEtag = await AsyncStorage.getItem("binContentEtag");
+  const data = await fetchBinContentBulk(storedEtag);
+
+  if (data.notModified) {
+    onProgress?.({ phase: "done", percent: 100 });
+    return { success: true, count: 0, notModified: true };
+  }
+
+  const items = data.items || [];
+  const serverVersion = data.version;
+
+  if (items.length === 0) {
+    return {
+      success: false,
+      count: 0,
+      version: serverVersion,
+      error: "Server has no bin content",
+    };
+  }
+
+  onProgress?.({ phase: "downloading", percent: 100 });
+  onProgress?.({ phase: "saving", percent: 0 });
+
+  await clearAndReplaceBinContents(items, ({ processed, total }) => {
+    onProgress?.({
+      phase: "saving",
+      percent: Math.round((processed / total) * 100),
+    });
+  });
+
+  const syncNow = new Date().toISOString();
+  await Promise.all([
+    AsyncStorage.setItem("binContentVersion", String(serverVersion)),
+    AsyncStorage.setItem("lastBinContentSyncTime", syncNow),
+    AsyncStorage.setItem("binContentEtag", `"binv${serverVersion}"`),
+  ]);
+
+  onProgress?.({ phase: "done", percent: 100 });
+  return { success: true, count: items.length, version: serverVersion };
+};
+
+// Delta sync — download only records updated since last sync.
+// Falls back to full download if no local version exists.
+export const downloadBinContentDelta = async (onProgress) => {
+  const [lastSyncTime, localVerStr] = await Promise.all([
+    AsyncStorage.getItem("lastBinContentSyncTime"),
+    AsyncStorage.getItem("binContentVersion"),
+  ]);
+
+  if (!lastSyncTime || !localVerStr) {
+    return downloadBinContent(onProgress);
+  }
+
+  onProgress?.({ phase: "checking", percent: 0 });
+
+  let deltaData;
+  try {
+    deltaData = await fetchBinContentDelta(lastSyncTime);
+  } catch {
+    return downloadBinContent(onProgress);
+  }
+
+  const { items, total, version, serverTime } = deltaData;
+
+  if (total === 0) {
+    onProgress?.({ phase: "done", percent: 100 });
+    return { success: true, count: 0, version, delta: true, unchanged: true };
+  }
+
+  onProgress?.({ phase: "saving", percent: 0 });
+  await upsertBinContents(items);
+
+  await Promise.all([
+    AsyncStorage.setItem("binContentVersion", String(version)),
+    AsyncStorage.setItem("lastBinContentSyncTime", serverTime),
+  ]);
+
+  onProgress?.({ phase: "done", percent: 100 });
+  return { success: true, count: total, version, delta: true };
+};
+
+// Check if a newer bin content version is available on the server.
+// Returns { serverVersion, serverTotal, localVersion, localCount, updateAvailable }
+export const checkBinContentUpdate = async () => {
+  const serverData = await fetchBinContentVersion();
+  const [localVer, localCount] = await Promise.all([
+    AsyncStorage.getItem("binContentVersion"),
+    getBinContentCount(),
+  ]);
+  return {
+    serverVersion: serverData.version,
+    serverTotal: serverData.total ?? 0,
+    localVersion: localVer ? Number(localVer) : null,
+    localCount,
+    updateAvailable:
+      localVer !== String(serverData.version) || localCount === 0,
+  };
+};
+
+// ─── Bin Master Download ─────────────────────────────────────────────────────
+// Downloads all valid worker bin codes and saves to local bin_master table.
+// Used by the hard-block bin existence check in ScannerScreen.
+export const downloadBinMaster = async (onProgress) => {
+  onProgress?.({ phase: "downloading", percent: 0 });
+  const data = await fetchBinMasterCodes();
+  const codes = data.codes || [];
+  if (codes.length === 0) {
+    return {
+      success: false,
+      count: 0,
+      error: "Server has no bin master records",
+    };
+  }
+  onProgress?.({ phase: "saving", percent: 50 });
+  await clearAndReplaceBinMaster(codes);
+  const syncNow = new Date().toISOString();
+  await Promise.all([
+    AsyncStorage.setItem(
+      "binMasterVersion",
+      String(data.total || codes.length),
+    ),
+    AsyncStorage.setItem("lastBinMasterSyncTime", syncNow),
+  ]);
+  onProgress?.({ phase: "done", percent: 100 });
+  return { success: true, count: codes.length };
+};
+
+// Returns local bin master count + last sync time for display in admin panel.
+export const checkBinMasterStatus = async () => {
+  const [localCount, lastSync] = await Promise.all([
+    getBinMasterCount(),
+    AsyncStorage.getItem("lastBinMasterSyncTime"),
+  ]);
+  return { localCount, lastSync };
 };
 
 // ─── Fast Clear-Command Poller ────────────────────────────────────────────────

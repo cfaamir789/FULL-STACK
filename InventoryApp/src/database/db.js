@@ -230,6 +230,25 @@ export const initDB = async () => {
        WHERE updated_at IS NULL OR updated_at = ''`,
     );
   });
+
+  // ─── Bin Contents table ─────────────────────────────────────────────────────
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS bin_contents (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      bin_code  TEXT NOT NULL,
+      item_code TEXT NOT NULL,
+      qty       INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(bin_code, item_code)
+    );
+    CREATE INDEX IF NOT EXISTS idx_bin_contents_item_code ON bin_contents(item_code);
+  `);
+
+  // ─── Bin Master table (for hard-block bin validation) ───────────────────────
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS bin_master (
+      bin_code TEXT PRIMARY KEY
+    );
+  `);
 };
 
 // ─── Items ────────────────────────────────────────────────────────────────────
@@ -630,4 +649,129 @@ export const getPendingCount = async () => {
     "SELECT COUNT(*) as count FROM transactions WHERE synced = 0",
   );
   return row?.count ?? 0;
+};
+
+// ─── Bin Contents ─────────────────────────────────────────────────────────────
+
+export const upsertBinContents = async (rows) => {
+  if (!rows || rows.length === 0) return;
+  // 3 params per row, chunk at 300 rows (900 params < 999 SQLite limit)
+  const CHUNK_SIZE = 300;
+  await db.withTransactionAsync(async () => {
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "(?,?,?)").join(",");
+      const params = chunk.flatMap((r) => [
+        String(r.BinCode || r.bin_code || "").trim(),
+        String(r.ItemCode || r.item_code || "").trim(),
+        Number(r.Qty != null ? r.Qty : r.qty) || 0,
+      ]);
+      await db.runAsync(
+        `INSERT INTO bin_contents (bin_code, item_code, qty) VALUES ${placeholders}
+         ON CONFLICT(bin_code, item_code) DO UPDATE SET qty = excluded.qty`,
+        params,
+      );
+    }
+  });
+};
+
+// Worker-valid bin pattern — matches A/B/C standard bins + HV + WH zones.
+// Excludes NAV ERP system bins: SHIP, Z1, IN0001, B0001, etc.
+const WORKER_BIN_RE = /^([ABC]\d{1,2}\d{4}[A-Z]|HV\d+|WH\d+)$/;
+
+export const getBinsForItem = async (itemCode) => {
+  const rows = await db.getAllAsync(
+    `SELECT bin_code, qty FROM bin_contents
+     WHERE item_code = ?
+     ORDER BY qty DESC`,
+    [String(itemCode).trim()],
+  );
+  return rows.filter((r) => WORKER_BIN_RE.test(r.bin_code));
+};
+
+export const getBinQtyForItemAndBin = async (itemCode, binCode) => {
+  const row = await db.getFirstAsync(
+    `SELECT qty FROM bin_contents WHERE item_code = ? AND bin_code = ? LIMIT 1`,
+    [String(itemCode).trim(), String(binCode).trim().toUpperCase()],
+  );
+  return row ? row.qty : null;
+};
+
+export const clearBinContents = async () => {
+  const result = await db.runAsync("DELETE FROM bin_contents");
+  try {
+    await AsyncStorage.removeItem("binContentVersion");
+    await AsyncStorage.removeItem("lastBinContentSyncTime");
+  } catch (_) {}
+  return result.changes;
+};
+
+export const clearAndReplaceBinContents = async (rows, onProgress) => {
+  if (!rows || rows.length === 0) {
+    await db.runAsync("DELETE FROM bin_contents");
+    return 0;
+  }
+  const CHUNK_SIZE = 300;
+  const total = rows.length;
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM bin_contents");
+    for (let i = 0; i < total; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "(?,?,?)").join(",");
+      const params = chunk.flatMap((r) => [
+        String(r.BinCode || r.bin_code || "").trim(),
+        String(r.ItemCode || r.item_code || "").trim(),
+        Number(r.Qty != null ? r.Qty : r.qty) || 0,
+      ]);
+      await db.runAsync(
+        `INSERT INTO bin_contents (bin_code, item_code, qty) VALUES ${placeholders}`,
+        params,
+      );
+      if (onProgress)
+        onProgress({ processed: Math.min(i + CHUNK_SIZE, total), total });
+    }
+  });
+  return total;
+};
+
+export const getBinContentCount = async () => {
+  const row = await db.getFirstAsync(
+    "SELECT COUNT(*) as count FROM bin_contents",
+  );
+  return row?.count ?? 0;
+};
+
+// ─── Bin Master (hard-block validation) ──────────────────────────────────────
+
+export const getBinMasterCount = async () => {
+  const row = await db.getFirstAsync(
+    "SELECT COUNT(*) as count FROM bin_master",
+  );
+  return row?.count ?? 0;
+};
+
+export const checkBinExists = async (binCode) => {
+  const row = await db.getFirstAsync(
+    "SELECT 1 FROM bin_master WHERE bin_code = ? LIMIT 1",
+    [String(binCode).trim().toUpperCase()],
+  );
+  return !!row;
+};
+
+export const clearAndReplaceBinMaster = async (codes) => {
+  if (!codes || codes.length === 0) return 0;
+  const CHUNK_SIZE = 500;
+  const total = codes.length;
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM bin_master");
+    for (let i = 0; i < total; i += CHUNK_SIZE) {
+      const chunk = codes.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "(?)").join(",");
+      await db.runAsync(
+        `INSERT OR IGNORE INTO bin_master (bin_code) VALUES ${placeholders}`,
+        chunk.map((c) => String(c).trim().toUpperCase()),
+      );
+    }
+  });
+  return total;
 };

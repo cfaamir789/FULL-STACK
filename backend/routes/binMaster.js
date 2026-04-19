@@ -35,6 +35,36 @@ function rankingToZone(ranking) {
   return "Floor";
 }
 
+// Derive Aisle and Chamber from a BinCode.
+// Chamber A: A1–A12, Chamber B: B13–B24, Chamber C: C25–C36
+// High Value: HV01, HV02, ...
+// Bulk Warehouse: WH01, WH02, ...
+// All other codes (SHIP, Z1, IN0001, etc.) → { aisle: null, chamber: null }
+function deriveAisleAndChamber(binCode) {
+  if (!binCode) return { aisle: null, chamber: null };
+  const code = String(binCode).trim().toUpperCase();
+  if (/^HV\d+$/.test(code)) return { aisle: null, chamber: "High Value" };
+  if (/^WH\d+$/.test(code)) return { aisle: null, chamber: "Bulk Warehouse" };
+  // Standard bin format: [A-C][1-2 digit number][4 digit location][trailing letter]
+  // e.g. A100101A, B141402B, C250101A
+  const m = code.match(/^([ABC])(\d{1,2})\d{4}[A-Z]$/);
+  if (!m) return { aisle: null, chamber: null };
+  const letter = m[1];
+  const num = parseInt(m[2], 10);
+  const aisle = letter + num;
+  if (letter === "A" && num >= 1 && num <= 12)
+    return { aisle, chamber: "Chamber A" };
+  if (letter === "B" && num >= 13 && num <= 24)
+    return { aisle, chamber: "Chamber B" };
+  if (letter === "C" && num >= 25 && num <= 36)
+    return { aisle, chamber: "Chamber C" };
+  return { aisle, chamber: null };
+}
+
+// Pattern for bins that are valid for workers to use.
+// Excludes NAV ERP system bins (SHIP, Z1, IN0001, B0001, etc.)
+const WORKER_BIN_PATTERN = /^([ABC]\d{1,2}\d{4}[A-Z]|HV\d+|WH\d+)$/;
+
 // ─── CSV Parser ───────────────────────────────────────────────────────────────
 // Expected columns: Code, Bin Ranking, Zone Code
 // normHeader strips all non-alphanumerics so "Bin Ranking" → "binranking" etc.
@@ -127,7 +157,7 @@ router.get("/", async (req, res) => {
           ? conditions[0]
           : { $and: conditions };
 
-    const [bins, total] = await Promise.all([
+    const [rawBins, total] = await Promise.all([
       BinMaster.find(query, { _id: 0, BinCode: 1, BinRanking: 1, ZoneCode: 1 })
         .sort({ BinCode: 1 })
         .skip(skip)
@@ -135,6 +165,10 @@ router.get("/", async (req, res) => {
         .lean(),
       BinMaster.countDocuments(query),
     ]);
+    const bins = rawBins.map((b) => {
+      const { aisle, chamber } = deriveAisleAndChamber(b.BinCode);
+      return { ...b, Aisle: aisle, Chamber: chamber };
+    });
     res.json({ success: true, bins, total, page, limit });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -317,6 +351,21 @@ router.post("/sync-zones", requireAuth, requireAdmin, async (req, res) => {
         `${masterPatchOps.length} BinMaster rows derived from ranking. ` +
         `${cascaded} Bin Content records updated.`,
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/bin-master/codes
+// Returns a flat list of all valid worker bin codes (no auth required — needed for offline sync).
+// Filters out NAV ERP system bins (SHIP, Z1, IN0001, B0001, etc.) using WORKER_BIN_PATTERN.
+router.get("/codes", async (req, res) => {
+  try {
+    const allBins = await BinMaster.find({}, { _id: 0, BinCode: 1 }).lean();
+    const codes = allBins
+      .map((b) => b.BinCode)
+      .filter((c) => WORKER_BIN_PATTERN.test(String(c).trim()));
+    res.json({ success: true, codes, total: codes.length });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

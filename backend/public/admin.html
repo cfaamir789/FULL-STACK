@@ -8313,7 +8313,8 @@
             return;
           }
 
-          let zoneColor = function (z) {
+          // Zone badge color
+          var zoneColor = function (z) {
             if (!z) return "#888";
             var l = z.toLowerCase();
             if (l === "display") return "#2e7d32";
@@ -8322,7 +8323,29 @@
             return "#1565c0";
           };
 
-          let html =
+          // Chamber badge color
+          var chamberColor = function (ch) {
+            if (!ch) return "#888";
+            var l = ch.toLowerCase();
+            if (l === "chamber a") return "#1b5e20";
+            if (l === "chamber b") return "#0d47a1";
+            if (l === "chamber c") return "#4a148c";
+            if (l === "high value") return "#e65100";
+            if (l === "bulk warehouse") return "#00695c";
+            return "#546e7a";
+          };
+
+          var badge = function (text, color) {
+            return (
+              '<span style="background:' +
+              color +
+              ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">' +
+              esc(text) +
+              "</span>"
+            );
+          };
+
+          var html =
             '<p style="font-size:12px;color:#666;margin-bottom:6px;">Showing ' +
             ((page - 1) * 50 + 1) +
             "–" +
@@ -8332,7 +8355,7 @@
             " bins</p>";
           html +=
             '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
-            "<th>#</th><th>Bin Code</th><th>Bin Ranking</th><th>Zone Code</th><th>Zone</th>" +
+            "<th>#</th><th>Bin Code</th><th>Aisle</th><th>Chamber</th><th>Bin Ranking</th><th>Zone Code</th><th>Zone</th>" +
             "</tr></thead><tbody>";
 
           bins.forEach(function (b, i) {
@@ -8340,13 +8363,12 @@
             var zone =
               ranking > 0 ? "Display" : ranking < 0 ? "Upper" : "Floor";
             var zc = esc(b.ZoneCode || "");
-            var color = zoneColor(zone);
-            var badge =
-              '<span style="background:' +
-              color +
-              ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' +
-              zone +
-              "</span>";
+            var aisleText = b.Aisle
+              ? b.Aisle
+              : '<span style="color:#bbb;">—</span>';
+            var chamberBadge = b.Chamber
+              ? badge(b.Chamber, chamberColor(b.Chamber))
+              : '<span style="color:#bbb;">—</span>';
             html +=
               "<tr>" +
               "<td>" +
@@ -8355,6 +8377,12 @@
               "<td><strong>" +
               esc(b.BinCode) +
               "</strong></td>" +
+              "<td style='font-weight:700;color:#1565c0;'>" +
+              aisleText +
+              "</td>" +
+              "<td>" +
+              chamberBadge +
+              "</td>" +
               "<td>" +
               ranking +
               "</td>" +
@@ -8362,7 +8390,7 @@
               zc +
               "</span></td>" +
               "<td>" +
-              badge +
+              badge(zone, zoneColor(zone)) +
               "</td>" +
               "</tr>";
           });

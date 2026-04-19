@@ -4,6 +4,9 @@ const mongoose = require("mongoose");
 const multer = require("multer");
 const Papa = require("papaparse");
 const { randomUUID } = require("crypto");
+const zlib = require("zlib");
+const { promisify } = require("util");
+const gzip = promisify(zlib.gzip);
 const BinContent = require("../models/BinContent");
 const Item = require("../models/Item");
 const BinMaster = require("../models/BinMaster");
@@ -26,6 +29,8 @@ async function bumpBinVersion(req, totalHint) {
     { $inc: { version: 1 } },
     { upsert: true, new: true },
   );
+  // Invalidate pre-gzipped bulk cache so next download gets fresh data
+  invalidateBinBulkCache();
   // Broadcast to all connected admin dashboards
   const broadcast = req?.app?.get("broadcast");
   if (broadcast) {
@@ -307,6 +312,145 @@ async function applyBinCsv(rows, mode, onProgress, req) {
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
+
+// ─── Bulk Download Cache ──────────────────────────────────────────────────────
+// Pre-gzipped buffer built once per bin-content version. Serves many phones from RAM.
+let _binBulkCache = { version: null, gzBuf: null, etag: null };
+let _binBuildPromise = null;
+
+async function _buildBinBulkCache() {
+  const [bins, version] = await Promise.all([
+    BinContent.find({}, { _id: 0, BinCode: 1, ItemCode: 1, Qty: 1 })
+      .sort({ BinCode: 1, ItemCode: 1 })
+      .lean(),
+    getBinVersion(),
+  ]);
+  const payload = JSON.stringify({
+    success: true,
+    version,
+    total: bins.length,
+    items: bins,
+  });
+  const gzBuf = await gzip(Buffer.from(payload, "utf8"), { level: 6 });
+  _binBulkCache = { version, gzBuf, etag: `"binv${version}"` };
+  console.log(
+    `[bin-cache] built v${version} — ${bins.length} records, ${(gzBuf.length / 1024).toFixed(0)} KB gzipped`,
+  );
+  return _binBulkCache;
+}
+
+async function getBinBulkCache() {
+  const currentVersion = await getBinVersion();
+  if (_binBulkCache.version === currentVersion && _binBulkCache.gzBuf)
+    return _binBulkCache;
+  if (!_binBuildPromise) {
+    _binBuildPromise = _buildBinBulkCache().finally(() => {
+      _binBuildPromise = null;
+    });
+  }
+  return _binBuildPromise;
+}
+
+function invalidateBinBulkCache() {
+  _binBulkCache = { version: null, gzBuf: null, etag: null };
+  _binBuildPromise = null;
+}
+
+// GET /api/bin-content/version — lightweight version check for phones
+router.get("/version", async (req, res) => {
+  try {
+    const [version, total] = await Promise.all([
+      getBinVersion(),
+      BinContent.countDocuments({}),
+    ]);
+    res.json({ success: true, version, total });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/bin-content/bulk — pre-gzipped full dump for phone sync
+router.get("/bulk", async (req, res) => {
+  try {
+    const cache = await getBinBulkCache();
+
+    // 304 Not Modified — phone already has this version
+    if (req.headers["if-none-match"] === cache.etag) {
+      return res.status(304).end();
+    }
+
+    res.locals.noCompress = true;
+    res.set({
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Encoding": "gzip",
+      ETag: cache.etag,
+      "Cache-Control": "no-cache",
+      "Content-Length": cache.gzBuf.length,
+    });
+    return res.end(cache.gzBuf);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/bin-content/delta?since=<ISO> — incremental sync
+router.get("/delta", async (req, res) => {
+  try {
+    const sinceRaw = req.query.since;
+    if (!sinceRaw) {
+      return res
+        .status(400)
+        .json({ success: false, error: "since param required" });
+    }
+    const since = new Date(sinceRaw);
+    if (isNaN(since.getTime())) {
+      return res
+        .status(400)
+        .json({ success: false, error: "invalid since date" });
+    }
+
+    const [version, items] = await Promise.all([
+      getBinVersion(),
+      BinContent.find(
+        { updatedAt: { $gt: since } },
+        { _id: 0, BinCode: 1, ItemCode: 1, Qty: 1 },
+      )
+        .sort({ BinCode: 1 })
+        .lean(),
+    ]);
+
+    res.json({
+      success: true,
+      version,
+      serverTime: new Date().toISOString(),
+      total: items.length,
+      items,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/bin-content/by-item/:itemCode — all bins for a specific item
+router.get("/by-item/:itemCode", async (req, res) => {
+  try {
+    const itemCode = String(req.params.itemCode).trim();
+    if (!itemCode) {
+      return res
+        .status(400)
+        .json({ success: false, error: "itemCode is required" });
+    }
+    const bins = await BinContent.find(
+      { ItemCode: itemCode },
+      { _id: 0, BinCode: 1, Qty: 1, BinRanking: 1, ZoneCode: 1 },
+    )
+      .sort({ Qty: -1 })
+      .lean();
+    res.json({ success: true, bins });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // GET /api/bin-content/stats — single $facet aggregation, one DB round-trip
 router.get("/stats", async (req, res) => {
