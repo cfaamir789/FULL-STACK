@@ -92,6 +92,9 @@ export default function ItemMasterScreen() {
     } finally {
       setDownloading(false);
       setProgress(null);
+    }
+  };
+
   // ── Bin Content handlers ──────────────────────────────────────────────────
 
   const handleBinCheckUpdates = async () => {
