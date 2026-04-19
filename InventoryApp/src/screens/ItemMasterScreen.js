@@ -17,6 +17,9 @@ import { checkHealth } from "../services/api";
 import {
   checkItemMasterUpdate,
   downloadItemMaster,
+  checkBinContentUpdate,
+  downloadBinContent,
+  downloadBinContentDelta,
 } from "../services/syncService";
 import Colors from "../theme/colors";
 
@@ -36,6 +39,13 @@ export default function ItemMasterScreen() {
   const [importing, setImporting] = useState(false);
   const [online, setOnline] = useState(false);
 
+  // Bin Content state
+  const [binInfo, setBinInfo] = useState(null);
+  const [binDownloading, setBinDownloading] = useState(false);
+  const [binDeltaLoading, setBinDeltaLoading] = useState(false);
+  const [binCheckLoading, setBinCheckLoading] = useState(false);
+  const [binProgress, setBinProgress] = useState(null);
+
   const loadInfo = useCallback(async () => {
     try {
       const stats = await getDashboardStats();
@@ -46,6 +56,10 @@ export default function ItemMasterScreen() {
       setOnline(true);
       const info = await checkItemMasterUpdate();
       setServerInfo(info);
+      try {
+        const binData = await checkBinContentUpdate();
+        setBinInfo(binData);
+      } catch {}
     } catch {
       setOnline(false);
     }
@@ -78,6 +92,67 @@ export default function ItemMasterScreen() {
     } finally {
       setDownloading(false);
       setProgress(null);
+  // ── Bin Content handlers ──────────────────────────────────────────────────
+
+  const handleBinCheckUpdates = async () => {
+    setBinCheckLoading(true);
+    try {
+      const data = await checkBinContentUpdate();
+      setBinInfo(data);
+      if (data.updateAvailable) {
+        Alert.alert(
+          "Update Available",
+          `Server has v${data.serverVersion} (${data.serverTotal.toLocaleString()} bins). You have v${data.localVersion ?? "–"} (${(data.localCount ?? 0).toLocaleString()} bins).`,
+        );
+      } else {
+        Alert.alert("Up to Date", `Bin content is current (v${data.serverVersion}).`);
+      }
+    } catch (err) {
+      Alert.alert("Check Failed", err.message);
+    } finally {
+      setBinCheckLoading(false);
+    }
+  };
+
+  const handleBinSmartSync = async () => {
+    setBinDeltaLoading(true);
+    setBinProgress({ phase: "checking", percent: 0 });
+    try {
+      const result = await downloadBinContentDelta((p) => setBinProgress(p));
+      const data = await checkBinContentUpdate();
+      setBinInfo(data);
+      if (result.unchanged) {
+        Alert.alert("Already Synced", "No changes since last sync.");
+      } else {
+        Alert.alert(
+          "Smart Sync Done",
+          `${result.count.toLocaleString()} bin(s) updated (v${result.version}).`,
+        );
+      }
+    } catch (err) {
+      Alert.alert("Sync Failed", err.message);
+    } finally {
+      setBinDeltaLoading(false);
+      setBinProgress(null);
+    }
+  };
+
+  const handleBinFullDownload = async () => {
+    setBinDownloading(true);
+    setBinProgress({ phase: "downloading", percent: 0 });
+    try {
+      const result = await downloadBinContent((p) => setBinProgress(p));
+      const data = await checkBinContentUpdate();
+      setBinInfo(data);
+      Alert.alert(
+        "Downloaded",
+        `${result.count.toLocaleString()} bin records downloaded (v${result.version}).`,
+      );
+    } catch (err) {
+      Alert.alert("Download Failed", err.message);
+    } finally {
+      setBinDownloading(false);
+      setBinProgress(null);
     }
   };
 
@@ -189,6 +264,7 @@ export default function ItemMasterScreen() {
     serverInfo.localVersion != null &&
     String(serverInfo.localVersion) === String(serverInfo.serverVersion);
   const updateAvailable = serverInfo?.updateAvailable;
+  const binBusy = binDownloading || binDeltaLoading || binCheckLoading;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scroll}>
@@ -285,6 +361,113 @@ export default function ItemMasterScreen() {
           )}
           <Text style={styles.primaryBtnText}>
             {downloading ? "Downloading…" : "Download Item Master"}
+          </Text>
+        </TouchableOpacity>
+        {!online && (
+          <Text style={[styles.hint, { marginTop: 6 }]}>
+            ⚠ Not connected to server
+          </Text>
+        )}
+      </View>
+
+      {/* ── Bin Content Data ─────────────────────────────────────────── */}
+      <View style={styles.binSection}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <MaterialCommunityIcons name="warehouse" size={22} color="#2e7d32" />
+          <Text style={[styles.sectionTitle, { marginBottom: 0, color: "#2e7d32" }]}>
+            Bin Content Data
+          </Text>
+        </View>
+        <Text style={styles.hint}>
+          Download bin stock data to phone for offline bin suggestions in the
+          scanner.
+        </Text>
+        <View style={styles.binStatRow}>
+          <View style={styles.binStat}>
+            <Text style={styles.binStatLabel}>Local Count</Text>
+            <Text style={styles.binStatNum}>
+              {binInfo ? (binInfo.localCount ?? 0).toLocaleString() : "–"}
+            </Text>
+          </View>
+          <View style={styles.binStat}>
+            <Text style={styles.binStatLabel}>Local Version</Text>
+            <Text style={styles.binStatNum}>
+              {binInfo ? `v${binInfo.localVersion ?? "–"}` : "–"}
+            </Text>
+          </View>
+          <View style={styles.binStat}>
+            <Text style={styles.binStatLabel}>Server</Text>
+            <Text style={styles.binStatNum}>
+              {binInfo
+                ? `${binInfo.serverTotal.toLocaleString()} (v${binInfo.serverVersion})`
+                : "–"}
+            </Text>
+          </View>
+        </View>
+        {binProgress && (
+          <>
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${binProgress.percent}%`, backgroundColor: "#2e7d32" },
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>
+              {binProgress.phase === "saving"
+                ? "Saving to phone…"
+                : binProgress.phase === "checking"
+                  ? "Checking changes…"
+                  : "Downloading…"}{" "}
+              {binProgress.percent}%
+            </Text>
+          </>
+        )}
+        <TouchableOpacity
+          style={[
+            styles.secondaryBtn,
+            { marginBottom: 8 },
+            (!online || binBusy) && styles.btnDisabled,
+          ]}
+          onPress={handleBinCheckUpdates}
+          disabled={!online || binBusy}
+        >
+          {binCheckLoading ? (
+            <ActivityIndicator color={Colors.primary} size="small" />
+          ) : (
+            <MaterialCommunityIcons name="cloud-sync" size={18} color={Colors.primary} />
+          )}
+          <Text style={styles.secondaryBtnText}>Check Updates</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.secondaryBtn,
+            { marginBottom: 8 },
+            (!online || binBusy) && styles.btnDisabled,
+          ]}
+          onPress={handleBinSmartSync}
+          disabled={!online || binBusy}
+        >
+          {binDeltaLoading ? (
+            <ActivityIndicator color={Colors.primary} size="small" />
+          ) : (
+            <MaterialCommunityIcons name="sync" size={18} color={Colors.primary} />
+          )}
+          <Text style={styles.secondaryBtnText}>Smart Sync (Changes Only)</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.greenBtn, (!online || binBusy) && styles.btnDisabled]}
+          onPress={handleBinFullDownload}
+          disabled={!online || binBusy}
+        >
+          {binDownloading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <MaterialCommunityIcons name="cloud-download" size={18} color="#fff" />
+          )}
+          <Text style={styles.greenBtnText}>
+            {binDownloading ? "Downloading…" : "Full Download (All Bins)"}
           </Text>
         </TouchableOpacity>
         {!online && (
@@ -427,6 +610,49 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: { color: Colors.primary, fontWeight: "800", fontSize: 15 },
   btnDisabled: { opacity: 0.6 },
+  binSection: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#2e7d3240",
+  },
+  greenBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2e7d32",
+    borderRadius: 12,
+    paddingVertical: 14,
+    gap: 8,
+  },
+  greenBtnText: { color: "#fff", fontWeight: "800", fontSize: 15 },
+  binStatRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  binStat: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    padding: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2e7d3230",
+  },
+  binStatLabel: {
+    fontSize: 10,
+    color: Colors.textSecondary,
+    marginBottom: 2,
+  },
+  binStatNum: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#2e7d32",
+    textAlign: "center",
+  },
   dangerBtn: {
     flexDirection: "row",
     alignItems: "center",
