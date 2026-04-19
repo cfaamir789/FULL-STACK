@@ -487,13 +487,11 @@ export default function ScannerScreen({ role = "worker" }) {
       );
       return;
     }
-    // Hard block: check both bins exist in the bin master (if master has been downloaded)
+    // Hard block: check From Bin exists in the bin master (if master has been downloaded)
+    // To Bin is free — goods can be moved to any valid bin code
     const masterCount = await getBinMasterCount();
     if (masterCount > 0) {
-      const [fromExists, toExists] = await Promise.all([
-        checkBinExists(effectiveFromBin.trim()),
-        checkBinExists(effectiveToBin.trim()),
-      ]);
+      const fromExists = await checkBinExists(effectiveFromBin.trim());
       if (!fromExists) {
         Alert.alert(
           "Invalid From Bin",
@@ -502,16 +500,6 @@ export default function ScannerScreen({ role = "worker" }) {
         setFrombin("");
         setSelectedFromBin(null);
         setTimeout(() => fromBinRef.current?.focus(), 100);
-        return;
-      }
-      if (!toExists) {
-        Alert.alert(
-          "Invalid To Bin",
-          `❌ "${effectiveToBin.trim().toUpperCase()}" does not exist in the bin master.\nPlease check the bin code and try again.`,
-        );
-        setTobin("");
-        setSelectedToBin(null);
-        setTimeout(() => toBinRef.current?.focus(), 100);
         return;
       }
     }
@@ -1081,7 +1069,6 @@ export default function ScannerScreen({ role = "worker" }) {
         inputRef={toBinRef}
         onSubmitEditing={() => qtyRef.current?.focus()}
         editable={scanned}
-        onBinValidate={checkBinExists}
       />
 
       {/* Info if To Bin already has stock */}
