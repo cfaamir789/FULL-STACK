@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   ScrollView,
   Vibration,
+  Animated,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
@@ -105,8 +107,48 @@ export default function ScannerScreen({ role = "worker" }) {
   const quickCodeRef = useRef(null);
   const itemNameRef = useRef(null);
   const nameSearchTimer = useRef(null);
+  const itemCodeFetchTimer = useRef(null);
   const skipFocusFromBin = useRef(false);
   const isResetting = useRef(false);
+
+  // ─── Toast (not-found feedback) ─────────────────────────────────────────
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const toastAnim = useRef(new Animated.Value(0)).current;
+  const toastTimer = useRef(null);
+
+  const showToast = (msg) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToastMessage(msg);
+    setToastVisible(true);
+    Animated.timing(toastAnim, {
+      toValue: 1,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+    toastTimer.current = setTimeout(() => dismissToast(), 1800);
+  };
+
+  const dismissToast = () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = null;
+    Animated.timing(toastAnim, {
+      toValue: 0,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(() => {
+      setToastVisible(false);
+      setToastMessage("");
+      // Clear input & refocus based on mode
+      if (mode === "barcode") {
+        setBarcode("");
+        setTimeout(() => barcodeRef.current?.focus(), 50);
+      } else if (mode === "itemcode") {
+        setItemCode("");
+        setTimeout(() => itemCodeRef.current?.focus(), 50);
+      }
+    });
+  };
 
   const digitsOnly = (text) => String(text || "").replace(/\D+/g, "");
 
@@ -151,18 +193,21 @@ export default function ScannerScreen({ role = "worker" }) {
     };
   }, [itemName, mode]);
 
-  // Auto-fetch item when item code reaches 10 digits
+  // Auto-fetch item when item code reaches 10 digits (debounced 200ms to avoid mid-type triggers)
   useEffect(() => {
     if (isResetting.current) return;
     if (mode !== "itemcode" || !itemCode || itemCode.length !== 10 || scanned)
       return;
-    const fetchItem = async () => {
+    if (itemCodeFetchTimer.current) clearTimeout(itemCodeFetchTimer.current);
+    itemCodeFetchTimer.current = setTimeout(async () => {
       setSearching(true);
       const item = await getItemByItemCode(itemCode);
       applySelectedItem(item);
       setSearching(false);
+    }, 200);
+    return () => {
+      if (itemCodeFetchTimer.current) clearTimeout(itemCodeFetchTimer.current);
     };
-    fetchItem();
   }, [itemCode, mode, scanned]);
 
   useFocusEffect(
@@ -181,11 +226,18 @@ export default function ScannerScreen({ role = "worker" }) {
     }, [mode, showCamera]),
   );
 
-  const resetForm = () => {
-    isResetting.current = true;
-    setTimeout(() => {
-      isResetting.current = false;
-    }, 300);
+  // Shared state wipe used by both resetForm and switchMode
+  const clearFormState = () => {
+    if (toastTimer.current) {
+      clearTimeout(toastTimer.current);
+      toastTimer.current = null;
+    }
+    if (itemCodeFetchTimer.current) {
+      clearTimeout(itemCodeFetchTimer.current);
+      itemCodeFetchTimer.current = null;
+    }
+    setToastVisible(false);
+    toastAnim.setValue(0);
     setScanned(false);
     setFoundItem(null);
     setBarcode("");
@@ -206,6 +258,12 @@ export default function ScannerScreen({ role = "worker" }) {
     setShowCamera(false);
     setCameraActive(false);
     setTorchOn(false);
+  };
+
+  const resetForm = () => {
+    isResetting.current = true;
+    setTimeout(() => { isResetting.current = false; }, 300);
+    clearFormState();
   };
 
   const openScanner = () => {
@@ -217,26 +275,7 @@ export default function ScannerScreen({ role = "worker" }) {
 
   const switchMode = (m) => {
     setMode(m);
-    setScanned(false);
-    setFoundItem(null);
-    setBarcode("");
-    setItemCode("");
-    setQuickCode("");
-    setItemName("");
-    setNameResults([]);
-    setQuickCodeResults([]);
-    setFrombin("");
-    setTobin("");
-    setItemBins([]);
-    setFromBinMode("suggest");
-    setToBinMode("suggest");
-    setSelectedFromBin(null);
-    setSelectedToBin(null);
-    setQty("");
-    setNotes("");
-    setShowCamera(false);
-    setCameraActive(false);
-    setTorchOn(false);
+    clearFormState();
     // Auto-focus the primary input of the selected tab
     setTimeout(() => {
       if (m === "barcode") barcodeRef.current?.focus();
@@ -248,6 +287,20 @@ export default function ScannerScreen({ role = "worker" }) {
 
   const applySelectedItem = async (item) => {
     if (!item) {
+      // Barcode & Item Code: show toast, keep form in pre-scan state, auto-clear
+      if (mode === "barcode" || mode === "itemcode") {
+        setFoundItem(null);
+        setScanned(false);
+        setItemBins([]);
+        setSelectedFromBin(null);
+        setSelectedToBin(null);
+        if (!IS_WEB) Vibration.vibrate([0, 80, 60, 80]);
+        showToast(
+          mode === "barcode" ? "Barcode not found!" : "Item code not found!",
+        );
+        return;
+      }
+      // Other modes: keep existing behavior
       setFoundItem(null);
       setScanned(true);
       setItemBins([]);
@@ -299,8 +352,8 @@ export default function ScannerScreen({ role = "worker" }) {
     setCameraActive(false);
     const code = digitsOnly(data.trim());
     setBarcode(code);
-    if (!IS_WEB) Vibration.vibrate(100);
     const item = await getItemByBarcode(code);
+    if (item && !IS_WEB) Vibration.vibrate(100);
     applySelectedItem(item);
   };
 
@@ -329,8 +382,8 @@ export default function ScannerScreen({ role = "worker" }) {
     setCameraActive(false);
     const code = digitsOnly(data.trim());
     setItemCode(code);
-    if (!IS_WEB) Vibration.vibrate(100);
     const item = await getItemByItemCode(code);
+    if (item && !IS_WEB) Vibration.vibrate(100);
     applySelectedItem(item);
   };
 
@@ -845,8 +898,77 @@ export default function ScannerScreen({ role = "worker" }) {
     );
   };
 
+  // ─── Toast Overlay (not-found feedback) ─────────────────────────────────
+  const renderToast = () => {
+    if (!toastVisible) return null;
+    return (
+      <>
+        {/* Tap-anywhere dismiss overlay */}
+        <Pressable
+          onPress={dismissToast}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 9998,
+          }}
+        />
+        {/* Toast snackbar */}
+        <Animated.View
+          style={{
+            position: "absolute",
+            bottom: 40,
+            left: 20,
+            right: 20,
+            zIndex: 9999,
+            backgroundColor: "#D32F2F",
+            borderRadius: 12,
+            paddingVertical: 14,
+            paddingHorizontal: 18,
+            flexDirection: "row",
+            alignItems: "center",
+            elevation: 8,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 6,
+            opacity: toastAnim,
+            transform: [
+              {
+                translateY: toastAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [60, 0],
+                }),
+              },
+            ],
+          }}
+        >
+          <MaterialCommunityIcons name="alert-circle" size={22} color="#fff" />
+          <Text
+            style={{
+              color: "#fff",
+              fontWeight: "700",
+              fontSize: 14,
+              marginLeft: 10,
+              flex: 1,
+            }}
+          >
+            {toastMessage}
+          </Text>
+          <Text style={{ color: "#ffffff99", fontSize: 12, marginLeft: 8 }}>
+            Tap to dismiss
+          </Text>
+        </Animated.View>
+      </>
+    );
+  };
+
   const renderItemBanner = () => {
     if (!scanned) return null;
+    // For barcode/itemcode modes, not-found is handled by toast — don't show banner
+    if (!foundItem && (mode === "barcode" || mode === "itemcode")) return null;
     const found = !!foundItem;
     return (
       <View
@@ -1063,19 +1185,22 @@ export default function ScannerScreen({ role = "worker" }) {
   // ─── Web version ──────────────────────────────────────────────────────────
   if (IS_WEB) {
     return (
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={{ paddingBottom: 32 }}
-        >
-          {renderTabs()}
-          <View style={{ paddingHorizontal: 16 }}>
-            {renderSearchInput()}
-            {renderItemBanner()}
-            {renderBinQtyFields()}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      <View style={{ flex: 1 }}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+          <ScrollView
+            style={styles.container}
+            contentContainerStyle={{ paddingBottom: 32 }}
+          >
+            {renderTabs()}
+            <View style={{ paddingHorizontal: 16 }}>
+              {renderSearchInput()}
+              {renderItemBanner()}
+              {renderBinQtyFields()}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+        {renderToast()}
+      </View>
     );
   }
 
@@ -1220,6 +1345,7 @@ export default function ScannerScreen({ role = "worker" }) {
             {renderBinQtyFields()}
           </ScrollView>
         </View>
+        {renderToast()}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

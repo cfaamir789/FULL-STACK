@@ -14,6 +14,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "../theme/colors";
+import { APP_VERSION, BUILD_BY } from "../utils/version";
 import {
   checkSetup,
   getDisplayUrl,
@@ -306,6 +307,11 @@ export default function LoginScreen({ onLogin }) {
             <MaterialCommunityIcons name="login" size={20} color="#fff" />
             <Text style={styles.buttonText}>Continue Offline</Text>
           </TouchableOpacity>
+
+          <View style={styles.buildInfo}>
+            <Text style={styles.buildVersion}>v{APP_VERSION}</Text>
+            <Text style={styles.buildCredit}>Build by {BUILD_BY}</Text>
+          </View>
         </View>
       </KeyboardAvoidingView>
     );
@@ -395,6 +401,11 @@ export default function LoginScreen({ onLogin }) {
             />
             <Text style={styles.settingsText}>Server: {currentIp}</Text>
           </TouchableOpacity>
+
+          <View style={styles.buildInfo}>
+            <Text style={styles.buildVersion}>v{APP_VERSION}</Text>
+            <Text style={styles.buildCredit}>Build by {BUILD_BY}</Text>
+          </View>
         </View>
       </KeyboardAvoidingView>
     );
@@ -467,6 +478,11 @@ export default function LoginScreen({ onLogin }) {
           />
           <Text style={styles.settingsText}>Server: {currentIp}</Text>
         </TouchableOpacity>
+
+        <View style={styles.buildInfo}>
+          <Text style={styles.buildVersion}>v{APP_VERSION}</Text>
+          <Text style={styles.buildCredit}>Build by {BUILD_BY}</Text>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -583,6 +599,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     marginHorizontal: 8,
+  },
+  buildInfo: {
+    alignItems: "center",
+    marginTop: 18,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  buildVersion: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.primary,
+    letterSpacing: 0.5,
+  },
+  buildCredit: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
   cancelBtn: {
     alignItems: "center",

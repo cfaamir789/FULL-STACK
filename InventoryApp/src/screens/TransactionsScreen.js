@@ -51,10 +51,12 @@ export default function TransactionsScreen({
   scope = "self",
 }) {
   const queryRef = useRef(null);
+  const searchTimerRef = useRef(null);
   const canManageAll = isAdminRole(role) && scope === "all";
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [workerFilter, setWorkerFilter] = useState("all");
   const [exporting, setExporting] = useState(false);
 
@@ -75,15 +77,13 @@ export default function TransactionsScreen({
 
   const filtered = useMemo(() => {
     let result = transactions;
-    // Worker filter (admin only)
     if (workerFilter !== "all") {
       result = result.filter(
         (tx) => (tx.worker_name || "unknown") === workerFilter,
       );
     }
-    // Text search
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
+    if (debouncedQuery.trim()) {
+      const q = debouncedQuery.trim().toLowerCase();
       result = result.filter(
         (tx) =>
           (tx.item_code && tx.item_code.toLowerCase().includes(q)) ||
@@ -95,7 +95,7 @@ export default function TransactionsScreen({
       );
     }
     return result;
-  }, [transactions, workerFilter, query]);
+  }, [transactions, workerFilter, debouncedQuery]);
 
   // Edit modal state
   const [editItem, setEditItem] = useState(null);
@@ -191,7 +191,7 @@ export default function TransactionsScreen({
           `${txns.length} transactions downloaded as ${format.toUpperCase()}.`,
         );
       } else {
-        const { filename, location } = await backupSvc.saveAndShareBackup(
+        const { filename, location } = await backupSvc.saveBackup(
           txns,
           worker,
           format,
@@ -199,7 +199,7 @@ export default function TransactionsScreen({
         );
         Alert.alert(
           "Exported",
-          `${txns.length} transactions saved as ${format.toUpperCase()}.\n\nFile: ${filename}\nLocation: ${location}`,
+          `${txns.length} transactions saved as ${format.toUpperCase()}.\n\nFile: ${filename}\nSaved to: ${location}`,
         );
       }
     } catch (err) {
@@ -301,11 +301,14 @@ export default function TransactionsScreen({
 
   const handleSave = async () => {
     if (saving) return;
-    if (!editFrombin.trim() || !editTobin.trim() || !editQty.trim()) {
+    const trimmedFrom = editFrombin.trim();
+    const trimmedTo = editTobin.trim();
+    const trimmedQty = editQty.trim();
+    if (!trimmedFrom || !trimmedTo || !trimmedQty) {
       setValidationMsg("All fields are required.");
       return;
     }
-    const qty = parseInt(editQty, 10);
+    const qty = parseInt(trimmedQty, 10);
     if (isNaN(qty) || qty <= 0) {
       setValidationMsg("Qty must be a positive number.");
       return;
@@ -316,8 +319,8 @@ export default function TransactionsScreen({
       await updateTransaction(
         editItem.id,
         {
-          frombin: editFrombin,
-          tobin: editTobin,
+          frombin: trimmedFrom,
+          tobin: trimmedTo,
           qty,
           notes: editNotes.trim(),
         },
@@ -387,19 +390,24 @@ export default function TransactionsScreen({
           style={styles.searchInput}
           placeholder="Search by item code, barcode or name..."
           value={query}
-          onChangeText={(t) => setQuery(t.toUpperCase())}
+          onChangeText={(t) => {
+            const upper = t.toUpperCase();
+            setQuery(upper);
+            if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+            searchTimerRef.current = setTimeout(() => setDebouncedQuery(upper), 250);
+          }}
           autoCapitalize="characters"
-          clearButtonMode="while-editing"
+          clearButtonMode="never"
           returnKeyType="search"
         />
         <VoiceMic
-          onResult={(t) => setQuery(t)}
+          onResult={(t) => { setQuery(t); setDebouncedQuery(t); }}
           focusTargetRef={queryRef}
           size={18}
           style={{ backgroundColor: "transparent", marginRight: 2 }}
         />
         {query.length > 0 && (
-          <TouchableOpacity onPress={() => setQuery("")}>
+          <TouchableOpacity onPress={() => { setQuery(""); setDebouncedQuery(""); }}>
             <MaterialCommunityIcons
               name="close-circle"
               size={18}

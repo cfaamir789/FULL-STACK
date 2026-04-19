@@ -131,7 +131,7 @@ export default function BackupRestoreScreen() {
         Alert.alert("No Data", "This phone has no transactions to back up.");
         return;
       }
-      const { filename, location } = await backupSvc.saveAndShareBackup(
+      const { filename, location } = await backupSvc.saveBackup(
         transactions,
         username,
         format,
@@ -140,7 +140,7 @@ export default function BackupRestoreScreen() {
       await loadBackups();
       Alert.alert(
         "Backup Saved",
-        `${transactions.length} transaction(s) saved as:\n${filename}\n\nLocation: ${location}`,
+        `${transactions.length} transaction(s) saved.\n\nFile: ${filename}\nSaved to: ${location}`,
       );
     } catch (err) {
       Alert.alert("Backup Failed", err.message || "Could not create backup.");

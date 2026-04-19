@@ -13,7 +13,7 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
 import Papa from "papaparse";
 import { restoreTransactions } from "../database/db";
 
@@ -35,6 +35,19 @@ async function getAndroidDownloadsUri() {
 
   const cached = await AsyncStorage.getItem(DOWNLOAD_URI_KEY);
   if (cached) return cached;
+
+  // First-time only: explain what's about to happen before showing folder picker
+  await new Promise((resolve) => {
+    Alert.alert(
+      "Select Save Folder (Once)",
+      "You'll be asked to choose where files are saved.\n\n" +
+        "1. Tap 'Downloads' in the folder picker\n" +
+        "2. Create a folder named InventoryManagement (or select it if it exists)\n" +
+        "3. Tap 'Use this folder'\n\n" +
+        "All future exports will save there silently.",
+      [{ text: "OK, Select Folder", onPress: resolve }],
+    );
+  });
 
   const perm = await SAF.requestDirectoryPermissionsAsync();
   if (!perm.granted || !perm.directoryUri) {
@@ -283,6 +296,50 @@ export async function saveAndShareBackup(
 }
 
 /**
+ * Export transactions for a single worker to the downloads folder.
+ * Works offline — pass all local transactions and this filters by worker.
+ */
+export async function exportWorkerData(allTransactions, workerName, format = "csv") {
+  const filtered = (allTransactions || []).filter(
+    (tx) => (tx.worker_name || "").toLowerCase() === workerName.toLowerCase(),
+  );
+  const safeWorker = workerName.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const date = todayString();
+  const filename = `${safeWorker}_${date}.${format === "xlsx" ? "xlsx" : "csv"}`;
+  const fileUri = BACKUP_DIR + filename;
+
+  await ensureBackupDir();
+
+  let content;
+  let encoding;
+  if (format === "xlsx") {
+    content = await transactionsToXLSX(filtered);
+    encoding = FileSystem.EncodingType.Base64;
+  } else {
+    content = transactionsToCSV(filtered);
+    encoding = FileSystem.EncodingType.UTF8;
+  }
+
+  const downloadWrite = await tryWriteToAndroidDownloads(filename, format, content);
+  if (downloadWrite) {
+    return {
+      uri: downloadWrite.uri,
+      filename,
+      location: downloadWrite.location,
+      count: filtered.length,
+    };
+  }
+
+  await FileSystem.writeAsStringAsync(fileUri, content, { encoding });
+  return {
+    uri: fileUri,
+    filename,
+    location: `InventoryManagement/${filename}`,
+    count: filtered.length,
+  };
+}
+
+/**
  * Silent auto-backup — saves to InventoryManager folder without user prompt.
  * Call this on a 30-minute interval.
  */
@@ -318,7 +375,7 @@ export async function listBackups() {
 
 export async function listBackupsDetailed() {
   const files = await listBackups();
-  const rows = await Promise.all(
+  const settled = await Promise.allSettled(
     files.map(async (name) => {
       const uri = BACKUP_DIR + name;
       const info = await FileSystem.getInfoAsync(uri);
@@ -332,6 +389,9 @@ export async function listBackupsDetailed() {
       };
     }),
   );
+  const rows = settled
+    .filter((r) => r.status === "fulfilled")
+    .map((r) => r.value);
 
   return rows.sort((a, b) => {
     const aTime = a.modifiedAt ? new Date(a.modifiedAt).getTime() : 0;
@@ -420,27 +480,31 @@ const normalizeBackupRow = (row) => {
 async function readBackupRows(fileUri, fileName = "") {
   const lowerName = String(fileName || fileUri || "").toLowerCase();
 
-  if (lowerName.endsWith(".xlsx")) {
-    const XLSX = await getXLSX();
-    const base64 = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-    const workbook = XLSX.read(base64, { type: "base64" });
-    const firstSheet = workbook.SheetNames[0];
-    if (!firstSheet) return [];
-    return XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], {
-      defval: "",
-    });
-  }
+  try {
+    if (lowerName.endsWith(".xlsx")) {
+      const XLSX = await getXLSX();
+      const base64 = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const workbook = XLSX.read(base64, { type: "base64" });
+      const firstSheet = workbook.SheetNames[0];
+      if (!firstSheet) return [];
+      return XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], {
+        defval: "",
+      });
+    }
 
-  const csv = await FileSystem.readAsStringAsync(fileUri, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-  const parsed = Papa.parse(csv, {
-    header: true,
-    skipEmptyLines: true,
-  });
-  return parsed.data || [];
+    const csv = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    const parsed = Papa.parse(csv, {
+      header: true,
+      skipEmptyLines: true,
+    });
+    return parsed.data || [];
+  } catch (err) {
+    throw new Error(`Could not read backup file: ${err.message}`);
+  }
 }
 
 export async function restoreBackupFromFile(

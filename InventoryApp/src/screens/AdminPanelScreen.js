@@ -78,7 +78,8 @@ export default function AdminPanelScreen({ navigation }) {
   const [backingUp, setBackingUp] = useState(false);
   const [lastAutoBackup, setLastAutoBackup] = useState(null);
   const [formatPickerVisible, setFormatPickerVisible] = useState(false);
-  const [formatPickerMode, setFormatPickerMode] = useState("export"); // "export" | "backup"
+  const [formatPickerMode, setFormatPickerMode] = useState("export"); // "export" | "backup" | "bulkWorker"
+  const [bulkExporting, setBulkExporting] = useState(false);
   const autoBackupRef = useRef(null);
   const loggedUserRef = useRef(null);
 
@@ -113,21 +114,15 @@ export default function AdminPanelScreen({ navigation }) {
       ]);
       setServerStats(stats);
       setUserCount(usersData.length || 0);
-      // Check item master version
-      try {
-        const ms = await checkItemMasterUpdate();
-        setMasterStatus(ms);
-      } catch {}
-      // Check bin content version
-      try {
-        const bs = await checkBinContentUpdate();
-        setBinStatus(bs);
-      } catch {}
-      // Check local bin master count
-      try {
-        const bms = await checkBinMasterStatus();
-        setBinMasterStatus(bms);
-      } catch {}
+      // Check master/bin statuses in parallel
+      const [msRes, bsRes, bmsRes] = await Promise.allSettled([
+        checkItemMasterUpdate(),
+        checkBinContentUpdate(),
+        checkBinMasterStatus(),
+      ]);
+      if (msRes.status === "fulfilled") setMasterStatus(msRes.value);
+      if (bsRes.status === "fulfilled") setBinStatus(bsRes.value);
+      if (bmsRes.status === "fulfilled") setBinMasterStatus(bmsRes.value);
     } catch {
       setOnline(false);
     }
@@ -463,7 +458,7 @@ export default function AdminPanelScreen({ navigation }) {
         Alert.alert("No Data", "No transactions found to export.");
         return;
       }
-      const { filename } = await backupSvc.saveAndShareBackup(
+      const { filename, location } = await backupSvc.saveBackup(
         txns,
         username,
         format,
@@ -471,7 +466,7 @@ export default function AdminPanelScreen({ navigation }) {
       );
       Alert.alert(
         "Export Saved",
-        `${txns.length} transactions saved as:\n${filename}\n\nIn InventoryManagement folder.`,
+        `${txns.length} transactions saved.\n\nFile: ${filename}\nSaved to: ${location}`,
       );
     } catch (err) {
       Alert.alert("Export Failed", err.message);
@@ -546,7 +541,7 @@ export default function AdminPanelScreen({ navigation }) {
         Alert.alert("No Data", "No transactions found to back up.");
         return;
       }
-      const { filename } = await backupSvc.saveAndShareBackup(
+      const { filename, location } = await backupSvc.saveBackup(
         txns,
         username,
         format,
@@ -554,7 +549,7 @@ export default function AdminPanelScreen({ navigation }) {
       );
       Alert.alert(
         "Entire Day Backup Saved",
-        `${txns.length} transactions backed up as:\n${filename}\n\nIn InventoryManagement folder on this phone.`,
+        `${txns.length} transactions backed up.\n\nFile: ${filename}\nSaved to: ${location}`,
       );
     } catch (err) {
       Alert.alert("Backup Failed", err.message);
@@ -564,37 +559,61 @@ export default function AdminPanelScreen({ navigation }) {
   };
 
   const handleExportWorker = async (workerName) => {
-    if (!online) {
-      Alert.alert("Offline", "Connect to server to export per-worker data.");
-      return;
-    }
     try {
-      const token = await AsyncStorage.getItem("authToken");
       if (IS_WEB) {
+        const token = await AsyncStorage.getItem("authToken");
         const url = `${getExportUrl()}?worker=${encodeURIComponent(workerName)}&token=${encodeURIComponent(token)}`;
         window.open(url, "_blank");
         return;
       }
-      const safeWorker = workerName.replace(/[^a-zA-Z0-9]/g, "_");
-      const datePart = new Date().toISOString().slice(0, 10);
-      const filename = `${safeWorker}_${datePart}.csv`;
-      const fileUri = FileSystem.documentDirectory + filename;
-      const download = await FileSystem.downloadAsync(
-        `${getExportUrl()}?worker=${encodeURIComponent(workerName)}`,
-        fileUri,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const allTxns = await getAllTransactions();
+      const { filename, location, count } = await backupSvc.exportWorkerData(
+        allTxns,
+        workerName,
+        "csv",
       );
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(download.uri, {
-          mimeType: "text/csv",
-          dialogTitle: `Save ${filename} — choose Gmail or Drive`,
-          UTI: "public.comma-separated-values-text",
-        });
-      } else {
-        Alert.alert("Saved", `File saved to app folder:\n${filename}`);
-      }
+      Alert.alert(
+        "Worker Export Saved",
+        `${count} transaction${count !== 1 ? "s" : ""} for ${workerName}.\n\nFile: ${filename}\nSaved to: ${location}`,
+      );
     } catch (err) {
       Alert.alert("Export Failed", err.message);
+    }
+  };
+
+  // ─── Bulk Worker Export ───────────────────────────────────────────────────
+  const handleBulkWorkerExport = () => {
+    if (IS_WEB) {
+      Alert.alert("Not Available", "Bulk worker export is only available on mobile.");
+      return;
+    }
+    setFormatPickerMode("bulkWorker");
+    setFormatPickerVisible(true);
+  };
+
+  const doBulkWorkerExport = async (format) => {
+    setFormatPickerVisible(false);
+    setBulkExporting(true);
+    try {
+      const allTxns = await getAllTransactions();
+      if (!allTxns || allTxns.length === 0) {
+        Alert.alert("No Data", "No transactions found to export.");
+        return;
+      }
+      const { filename, location } = await backupSvc.saveBackup(
+        allTxns,
+        "ALL_WORKERS",
+        format,
+        false,
+      );
+      Alert.alert(
+        "All Workers Exported",
+        `${allTxns.length} total transactions from all workers saved.\n\nFile: ${filename}\nSaved to: ${location}`,
+      );
+    } catch (err) {
+      Alert.alert("Export Failed", err.message);
+    } finally {
+      setBulkExporting(false);
     }
   };
 
@@ -1382,6 +1401,24 @@ export default function AdminPanelScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
             ))}
+
+            {/* Bulk download — all workers in one file */}
+            {!IS_WEB && (
+              <TouchableOpacity
+                style={styles.bulkWorkerBtn}
+                onPress={handleBulkWorkerExport}
+                disabled={bulkExporting}
+              >
+                <MaterialCommunityIcons
+                  name="download-multiple"
+                  size={18}
+                  color="#fff"
+                />
+                <Text style={styles.bulkWorkerBtnText}>
+                  {bulkExporting ? "Exporting…" : "Download All Workers"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
 
@@ -1430,6 +1467,8 @@ export default function AdminPanelScreen({ navigation }) {
             <Text style={styles.modalTitle}>
               {formatPickerMode === "backup"
                 ? "Entire Day Backup"
+                : formatPickerMode === "bulkWorker"
+                ? "Download All Workers"
                 : "Export Transactions"}
             </Text>
             <Text style={styles.modalSub}>Choose file format</Text>
@@ -1438,6 +1477,8 @@ export default function AdminPanelScreen({ navigation }) {
               onPress={() =>
                 formatPickerMode === "backup"
                   ? doEntireDayBackup("csv")
+                  : formatPickerMode === "bulkWorker"
+                  ? doBulkWorkerExport("csv")
                   : doMobileExport("csv")
               }
             >
@@ -1453,6 +1494,8 @@ export default function AdminPanelScreen({ navigation }) {
               onPress={() =>
                 formatPickerMode === "backup"
                   ? doEntireDayBackup("xlsx")
+                  : formatPickerMode === "bulkWorker"
+                  ? doBulkWorkerExport("xlsx")
                   : doMobileExport("xlsx")
               }
             >
@@ -1582,6 +1625,22 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary + "10",
     justifyContent: "center",
     alignItems: "center",
+  },
+  bulkWorkerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+  },
+  bulkWorkerBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
   },
   offlineHint: {
     flexDirection: "row",
