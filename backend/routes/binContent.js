@@ -79,6 +79,37 @@ function rankingToZone(ranking) {
   return "Floor";
 }
 
+// Derive Aisle and Chamber from a BinCode.
+// Chamber A: A1–A12, Chamber B: B13–B24, Chamber C: C25–C36
+// High Value: HV01, HV02, ...   Bulk Warehouse: WH01, WH02, ...
+function deriveAisleAndChamber(binCode) {
+  if (!binCode) return { aisle: null, chamber: null };
+  const code = String(binCode).trim().toUpperCase();
+  if (/^HV\d+$/.test(code)) return { aisle: null, chamber: "High Value" };
+  if (/^WH\d+$/.test(code)) return { aisle: null, chamber: "Bulk Warehouse" };
+  const m = code.match(/^([ABC])(\d{1,2})\d{4}[A-Z]$/);
+  if (!m) return { aisle: null, chamber: null };
+  const letter = m[1];
+  const num = parseInt(m[2], 10);
+  const aisle = letter + num;
+  if (letter === "A" && num >= 1 && num <= 12)
+    return { aisle, chamber: "Chamber A" };
+  if (letter === "B" && num >= 13 && num <= 24)
+    return { aisle, chamber: "Chamber B" };
+  if (letter === "C" && num >= 25 && num <= 36)
+    return { aisle, chamber: "Chamber C" };
+  return { aisle, chamber: null };
+}
+
+// Chamber → BinCode prefix regex mapping (for query filter)
+const CHAMBER_REGEX_MAP = {
+  "Chamber A": /^A/,
+  "Chamber B": /^B/,
+  "Chamber C": /^C/,
+  "High Value": /^HV/,
+  "Bulk Warehouse": /^WH/,
+};
+
 // ─── CSV Parser ───────────────────────────────────────────────────────────────
 // Accepts 4 user columns: item code, bin code, available qty, bin ranking
 // normHeader strips ALL non-alphanumeric chars so headers like
@@ -515,6 +546,20 @@ router.get("/zone-codes", async (req, res) => {
   }
 });
 
+// GET /api/bin-content/chambers — fixed list of chamber labels
+router.get("/chambers", (req, res) => {
+  res.json({
+    success: true,
+    chambers: [
+      "Chamber A",
+      "Chamber B",
+      "Chamber C",
+      "High Value",
+      "Bulk Warehouse",
+    ],
+  });
+});
+
 // GET /api/bin-content — paginated list with optional search + multi-filters + sort
 router.get("/", async (req, res) => {
   try {
@@ -538,6 +583,8 @@ router.get("/", async (req, res) => {
     const zoneCodes = parseList(req.query.zoneCodes || req.query.zoneCode);
     // zones = Display | Floor | Upper — maps to BinRanking comparison
     const zones = parseList(req.query.zones || req.query.zone);
+    // chambers = Chamber A | Chamber B | Chamber C | High Value | Bulk Warehouse
+    const chambers = parseList(req.query.chambers || req.query.chamber);
 
     // Sort: field_direction, e.g. BinCode_asc, Qty_desc
     const SORT_MAP = {
@@ -589,6 +636,19 @@ router.get("/", async (req, res) => {
           : { $or: zoneConditions },
       );
     }
+    if (chambers.length > 0) {
+      const chamberConditions = chambers
+        .map((c) => CHAMBER_REGEX_MAP[c])
+        .filter(Boolean)
+        .map((rx) => ({ BinCode: rx }));
+      if (chamberConditions.length > 0) {
+        conditions.push(
+          chamberConditions.length === 1
+            ? chamberConditions[0]
+            : { $or: chamberConditions },
+        );
+      }
+    }
 
     let query = {};
     if (conditions.length === 1) query = conditions[0];
@@ -618,7 +678,12 @@ router.get("/", async (req, res) => {
       ]),
     ]);
     const totalQty = qtyAgg[0]?.totalQty ?? 0;
-    res.json({ success: true, bins, total, page, limit, totalQty });
+    // Enrich each bin with derived Aisle and Chamber
+    const enriched = bins.map((b) => {
+      const { aisle, chamber } = deriveAisleAndChamber(b.BinCode);
+      return { ...b, Aisle: aisle, Chamber: chamber };
+    });
+    res.json({ success: true, bins: enriched, total, page, limit, totalQty });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

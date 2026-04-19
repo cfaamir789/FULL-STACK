@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { InteractionManager, TouchableOpacity, View, ActivityIndicator, StyleSheet } from "react-native";
+import {
+  InteractionManager,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
+  StyleSheet,
+} from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -17,10 +23,15 @@ import AdminScreen from "../screens/AdminScreen";
 import AdminPanelScreen from "../screens/AdminPanelScreen";
 import BackupRestoreScreen from "../screens/BackupRestoreScreen";
 import ItemMasterScreen from "../screens/ItemMasterScreen";
+import BinContentScreen from "../screens/BinContentScreen";
 import Colors from "../theme/colors";
 import { isAdminRole } from "../utils/roles";
 import { loadServerUrl } from "../services/api";
-import { attemptSync, startAutoSync, startClearPoller } from "../services/syncService";
+import {
+  attemptSync,
+  startAutoSync,
+  startClearPoller,
+} from "../services/syncService";
 
 const Tab = createBottomTabNavigator();
 const ItemsStack = createStackNavigator();
@@ -85,12 +96,15 @@ const AdminStackNavigator = ({ username, role }) => (
       options={{ title: "Item Master" }}
     />
     <AdminStack.Screen
+      name="BinContent"
+      component={BinContentScreen}
+      options={{ title: "Bin Content" }}
+    />
+    <AdminStack.Screen
       name="AdminTransactions"
       options={{ title: "All Transactions" }}
     >
-      {() => (
-        <TransactionsScreen username={username} role={role} scope="all" />
-      )}
+      {() => <TransactionsScreen username={username} role={role} scope="all" />}
     </AdminStack.Screen>
   </AdminStack.Navigator>
 );

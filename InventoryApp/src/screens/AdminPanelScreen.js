@@ -594,7 +594,10 @@ export default function AdminPanelScreen({ navigation }) {
   // ─── Bulk Worker Export ───────────────────────────────────────────────────
   const handleBulkWorkerExport = () => {
     if (IS_WEB) {
-      Alert.alert("Not Available", "Bulk worker export is only available on mobile.");
+      Alert.alert(
+        "Not Available",
+        "Bulk worker export is only available on mobile.",
+      );
       return;
     }
     setFormatPickerMode("bulkWorker");
@@ -1329,6 +1332,23 @@ export default function AdminPanelScreen({ navigation }) {
             <Text style={styles.actionTitle}>Item Master</Text>
             <Text style={styles.actionSub}>Check, download, import items</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate("BinContent")}
+          >
+            <View
+              style={[styles.actionIcon, { backgroundColor: "#00897B" + "15" }]}
+            >
+              <MaterialCommunityIcons
+                name="warehouse"
+                size={24}
+                color="#00897B"
+              />
+            </View>
+            <Text style={styles.actionTitle}>Bin Content</Text>
+            <Text style={styles.actionSub}>Browse, search & filter bins</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Safe Shift Close Section */}
@@ -1478,8 +1498,8 @@ export default function AdminPanelScreen({ navigation }) {
               {formatPickerMode === "backup"
                 ? "Entire Day Backup"
                 : formatPickerMode === "bulkWorker"
-                ? "Download All Workers"
-                : "Export Transactions"}
+                  ? "Download All Workers"
+                  : "Export Transactions"}
             </Text>
             <Text style={styles.modalSub}>Choose file format</Text>
             <TouchableOpacity
@@ -1488,8 +1508,8 @@ export default function AdminPanelScreen({ navigation }) {
                 formatPickerMode === "backup"
                   ? doEntireDayBackup("csv")
                   : formatPickerMode === "bulkWorker"
-                  ? doBulkWorkerExport("csv")
-                  : doMobileExport("csv")
+                    ? doBulkWorkerExport("csv")
+                    : doMobileExport("csv")
               }
             >
               <MaterialCommunityIcons
@@ -1505,8 +1525,8 @@ export default function AdminPanelScreen({ navigation }) {
                 formatPickerMode === "backup"
                   ? doEntireDayBackup("xlsx")
                   : formatPickerMode === "bulkWorker"
-                  ? doBulkWorkerExport("xlsx")
-                  : doMobileExport("xlsx")
+                    ? doBulkWorkerExport("xlsx")
+                    : doMobileExport("xlsx")
               }
             >
               <MaterialCommunityIcons

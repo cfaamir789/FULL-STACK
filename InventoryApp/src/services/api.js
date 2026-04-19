@@ -215,7 +215,9 @@ export const checkHealth = async () => {
       for (const server of CLOUD_SERVERS) {
         try {
           const beforeMs = Date.now();
-          const res = await axios.get(`${server}/api/health`, { timeout: 5000 });
+          const res = await axios.get(`${server}/api/health`, {
+            timeout: 5000,
+          });
           const afterMs = Date.now();
           if (res.data?.status === "ok") {
             currentBaseUrl = `${server}/api`;
@@ -501,6 +503,52 @@ export const fetchBinsForItem = async (itemCode) => {
     { timeout: 10000 },
   );
   return res.data.bins || []; // [{ BinCode, Qty, BinRanking, ZoneCode }]
+};
+
+// ─── Bin Content Browse (admin) ───────────────────────────────────────────────
+
+// Paginated list with search, filters, sort
+export const fetchBinContentList = async ({
+  q,
+  page = 1,
+  limit = 50,
+  categories,
+  zoneCodes,
+  chambers,
+  sort,
+} = {}) => {
+  const params = { page, limit };
+  if (q) params.q = q;
+  if (categories) params.categories = categories;
+  if (zoneCodes) params.zoneCodes = zoneCodes;
+  if (chambers) params.chambers = chambers;
+  if (sort) params.sort = sort;
+  const res = await apiClient.get("/bin-content", { params, timeout: 15000 });
+  return res.data; // { success, bins, total, page, limit, totalQty }
+};
+
+// Distinct category codes for filter chips
+export const fetchBinContentCategories = async () => {
+  const res = await apiClient.get("/bin-content/categories", { timeout: 10000 });
+  return res.data.categories || [];
+};
+
+// Distinct zone codes for filter chips
+export const fetchBinContentZones = async () => {
+  const res = await apiClient.get("/bin-content/zone-codes", { timeout: 10000 });
+  return res.data.zoneCodes || [];
+};
+
+// Chamber labels (static list)
+export const fetchBinContentChambers = async () => {
+  const res = await apiClient.get("/bin-content/chambers", { timeout: 5000 });
+  return res.data.chambers || [];
+};
+
+// Aggregated stats
+export const fetchBinContentStats = async () => {
+  const res = await apiClient.get("/bin-content/stats", { timeout: 10000 });
+  return res.data; // { total, upper, floor, display, uniqueBins, uniqueItems, totalQty, ... }
 };
 
 // ─── Bin Master ───────────────────────────────────────────────────────────────
