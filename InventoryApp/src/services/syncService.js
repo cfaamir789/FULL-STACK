@@ -5,6 +5,7 @@ import {
   syncTransactions,
   verifySyncedTxIds,
   fetchItemsBulk,
+  fetchItemsBulkPage,
   fetchItemsDelta,
   fetchItemsVersion,
   getServerTimeISO,
@@ -14,6 +15,7 @@ import {
   fetchBinContentBulk,
   fetchBinContentDelta,
   fetchBinMasterCodes,
+  fetchBinMasterVersion,
 } from "./api";
 import {
   getPendingTransactions,
@@ -26,6 +28,8 @@ import {
   getBinContentCount,
   clearAndReplaceBinMaster,
   getBinMasterCount,
+  deleteAllItemRows,
+  insertItemsPage,
 } from "../database/db";
 
 let _onStatusChange = null;
@@ -63,17 +67,20 @@ export const checkConnectivity = async () => {
 };
 
 // ─── Item Master Download (standalone, admin-triggered only) ─────────────────
-// Downloads ALL items in one bulk request, then atomically replaces local DB.
-// If download fails, local items are UNTOUCHED (no clearing).
+// Downloads items PAGE BY PAGE from the server to avoid OOM on low-RAM devices.
+// Each page (~5000 items) is fetched, saved to DB, then discarded before next page.
+// Peak memory: ~1-2 MB per page instead of ~50-80 MB for all 157K items.
+const PAGE_SIZE = 5000;
 export const downloadItemMaster = async (onProgress) => {
   onProgress?.({ phase: "downloading", percent: 0 });
 
-  // 1. Download all items into memory (single compressed JSON response)
-  const data = await fetchItemsBulk();
-  const items = data.items || [];
-  const serverVersion = data.version;
+  // 1. Fetch page 1 to learn total pages and version
+  let firstPage = await fetchItemsBulkPage(1, PAGE_SIZE);
+  const serverVersion = firstPage.version;
+  const totalPages = firstPage.totalPages;
+  const totalItems = firstPage.totalItems;
 
-  if (items.length === 0) {
+  if (totalItems === 0 || firstPage.items.length === 0) {
     return {
       success: false,
       count: 0,
@@ -82,19 +89,31 @@ export const downloadItemMaster = async (onProgress) => {
     };
   }
 
-  onProgress?.({ phase: "downloading", percent: 100 });
-  onProgress?.({ phase: "saving", percent: 0 });
+  // 2. Clear local items before inserting (once, before first page)
+  await deleteAllItemRows();
 
-  // 2. Atomically replace local DB (clear + insert in one transaction)
-  // If this fails mid-way, SQLite rolls back — previous data stays intact
-  await clearAndReplaceAllItems(items, ({ processed, total }) => {
-    onProgress?.({
-      phase: "saving",
-      percent: Math.round((processed / total) * 100),
-    });
+  // 3. Save page 1 items to DB, then release
+  let totalInserted = await insertItemsPage(firstPage.items);
+  firstPage = null; // release memory
+
+  onProgress?.({
+    phase: "downloading",
+    percent: Math.round((1 / totalPages) * 100),
   });
 
-  // 3. Save version and sync timestamps ONLY after successful write
+  // 4. Fetch remaining pages one by one
+  for (let page = 2; page <= totalPages; page++) {
+    let pageData = await fetchItemsBulkPage(page, PAGE_SIZE);
+    totalInserted += await insertItemsPage(pageData.items);
+    pageData = null; // release memory immediately
+
+    onProgress?.({
+      phase: "downloading",
+      percent: Math.round((page / totalPages) * 100),
+    });
+  }
+
+  // 5. Save version and sync timestamps ONLY after all pages saved
   const syncNow = new Date().toISOString();
   await Promise.all([
     AsyncStorage.setItem("itemsVersion", String(serverVersion)),
@@ -105,7 +124,7 @@ export const downloadItemMaster = async (onProgress) => {
   onProgress?.({ phase: "done", percent: 100 });
   return {
     success: true,
-    count: items.length,
+    count: totalInserted,
     version: serverVersion,
     delta: false,
   };
@@ -333,8 +352,19 @@ export const startAutoSync = (intervalMs = 60000) => {
 // ─── Bin Content Sync ─────────────────────────────────────────────────────────
 
 // Full bulk download of ALL bin content records. Atomic replace of local data.
+// Automatically ensures bin master is synced first.
 // onProgress: ({ phase, percent })
 export const downloadBinContent = async (onProgress) => {
+  // Step 0: Ensure bin master is up to date (auto-download if needed)
+  onProgress?.({ phase: "bin_master", percent: 0 });
+  await ensureBinMasterSynced((p) => {
+    if (p.phase === "downloading")
+      onProgress?.({ phase: "bin_master", percent: 30 });
+    if (p.phase === "saving")
+      onProgress?.({ phase: "bin_master", percent: 60 });
+    if (p.phase === "done") onProgress?.({ phase: "bin_master", percent: 100 });
+  });
+
   onProgress?.({ phase: "downloading", percent: 0 });
 
   const storedEtag = await AsyncStorage.getItem("binContentEtag");
@@ -380,7 +410,11 @@ export const downloadBinContent = async (onProgress) => {
 
 // Delta sync — download only records updated since last sync.
 // Falls back to full download if no local version exists.
+// Automatically ensures bin master is synced first.
 export const downloadBinContentDelta = async (onProgress) => {
+  // Step 0: Ensure bin master is up to date
+  await ensureBinMasterSynced();
+
   const [lastSyncTime, localVerStr] = await Promise.all([
     AsyncStorage.getItem("lastBinContentSyncTime"),
     AsyncStorage.getItem("binContentVersion"),
@@ -437,12 +471,13 @@ export const checkBinContentUpdate = async () => {
 };
 
 // ─── Bin Master Download ─────────────────────────────────────────────────────
-// Downloads all valid worker bin codes and saves to local bin_master table.
+// Downloads ALL bin codes from the server and saves to local bin_master table.
 // Used by the hard-block bin existence check in ScannerScreen.
 export const downloadBinMaster = async (onProgress) => {
   onProgress?.({ phase: "downloading", percent: 0 });
   const data = await fetchBinMasterCodes();
   const codes = data.codes || [];
+  const serverVersion = data.version ?? data.total ?? codes.length;
   if (codes.length === 0) {
     return {
       success: false,
@@ -454,14 +489,46 @@ export const downloadBinMaster = async (onProgress) => {
   await clearAndReplaceBinMaster(codes);
   const syncNow = new Date().toISOString();
   await Promise.all([
-    AsyncStorage.setItem(
-      "binMasterVersion",
-      String(data.total || codes.length),
-    ),
+    AsyncStorage.setItem("binMasterVersion", String(serverVersion)),
     AsyncStorage.setItem("lastBinMasterSyncTime", syncNow),
   ]);
   onProgress?.({ phase: "done", percent: 100 });
-  return { success: true, count: codes.length };
+  return { success: true, count: codes.length, version: serverVersion };
+};
+
+// Check if bin master has a newer version on the server.
+// Returns { serverVersion, serverTotal, localVersion, localCount, updateAvailable }
+export const checkBinMasterUpdate = async () => {
+  const serverData = await fetchBinMasterVersion();
+  const [localVer, localCount] = await Promise.all([
+    AsyncStorage.getItem("binMasterVersion"),
+    getBinMasterCount(),
+  ]);
+  return {
+    serverVersion: serverData.version,
+    serverTotal: serverData.total ?? 0,
+    localVersion: localVer ? Number(localVer) : null,
+    localCount,
+    updateAvailable:
+      localVer !== String(serverData.version) || localCount === 0,
+  };
+};
+
+// Ensures the local bin master is up to date. Skips download if version matches.
+// Called automatically before bin content download.
+export const ensureBinMasterSynced = async (onProgress) => {
+  try {
+    const status = await checkBinMasterUpdate();
+    if (!status.updateAvailable && status.localCount > 0) {
+      return { skipped: true, count: status.localCount };
+    }
+    return await downloadBinMaster(onProgress);
+  } catch (err) {
+    // If bin master check fails but we already have local data, continue silently
+    const localCount = await getBinMasterCount();
+    if (localCount > 0) return { skipped: true, count: localCount };
+    throw err;
+  }
 };
 
 // Returns local bin master count + last sync time for display in admin panel.

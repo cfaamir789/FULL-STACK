@@ -4,6 +4,7 @@ const multer = require("multer");
 const Papa = require("papaparse");
 const BinMaster = require("../models/BinMaster");
 const BinContent = require("../models/BinContent");
+const Meta = require("../models/Meta");
 const {
   requireAuth,
   requireAdmin,
@@ -26,6 +27,21 @@ function chunkArray(arr, size) {
   const out = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
+}
+
+// ─── Bin Master Version Tracking ──────────────────────────────────────────────
+async function getBinMasterVersion() {
+  const doc = await Meta.findOne({ key: "binMasterVersion" }).lean();
+  return doc ? doc.version : 0;
+}
+
+async function bumpBinMasterVersion() {
+  const doc = await Meta.findOneAndUpdate(
+    { key: "binMasterVersion" },
+    { $inc: { version: 1 } },
+    { upsert: true, returnDocument: "after" },
+  );
+  return doc.version;
 }
 
 // Derive a human-readable zone label from BinRanking when CSV ZoneCode is absent.
@@ -259,6 +275,9 @@ router.post(
         cascaded += result.modifiedCount || 0;
       }
 
+      // Bump bin master version so phones know to re-download
+      const newVersion = await bumpBinMasterVersion();
+
       // Broadcast to admin dashboards
       const broadcast = req.app.get("broadcast");
       if (broadcast)
@@ -267,6 +286,7 @@ router.post(
           upserted,
           modified,
           cascaded,
+          version: newVersion,
         });
 
       res.json({
@@ -357,15 +377,30 @@ router.post("/sync-zones", requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GET /api/bin-master/codes
-// Returns a flat list of all valid worker bin codes (no auth required — needed for offline sync).
-// Filters out NAV ERP system bins (SHIP, Z1, IN0001, B0001, etc.) using WORKER_BIN_PATTERN.
+// Returns a flat list of ALL bin codes in the bin master (no filtering).
+// Includes a version number so phones can skip re-download when unchanged.
 router.get("/codes", async (req, res) => {
   try {
-    const allBins = await BinMaster.find({}, { _id: 0, BinCode: 1 }).lean();
-    const codes = allBins
-      .map((b) => b.BinCode)
-      .filter((c) => WORKER_BIN_PATTERN.test(String(c).trim()));
-    res.json({ success: true, codes, total: codes.length });
+    const [allBins, version] = await Promise.all([
+      BinMaster.find({}, { _id: 0, BinCode: 1 }).lean(),
+      getBinMasterVersion(),
+    ]);
+    const codes = allBins.map((b) => String(b.BinCode).trim()).filter(Boolean);
+    res.json({ success: true, codes, total: codes.length, version });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/bin-master/version
+// Quick version check — phones call this to decide if they need to re-download.
+router.get("/version", async (req, res) => {
+  try {
+    const [total, version] = await Promise.all([
+      BinMaster.countDocuments(),
+      getBinMasterVersion(),
+    ]);
+    res.json({ success: true, total, version });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

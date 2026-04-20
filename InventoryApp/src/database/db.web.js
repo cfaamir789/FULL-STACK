@@ -577,16 +577,26 @@ export const upsertBinContents = async (rows) => {
   });
 };
 
-// Worker-valid bin pattern — matches A/B/C standard bins + HV + WH zones.
-// Excludes NAV ERP system bins: SHIP, Z1, IN0001, B0001, etc.
-const WORKER_BIN_RE = /^([ABC]\d{1,2}\d{4}[A-Z]|HV\d+|WH\d+)$/;
-
 export const getBinsForItem = async (itemCode) => {
   const bins = await getBinCache();
+  const masterCodes = await _getBinMasterCodes();
   const code = String(itemCode).trim();
   return bins
-    .filter((b) => b.item_code === code && WORKER_BIN_RE.test(b.bin_code))
+    .filter((b) => b.item_code === code && masterCodes.has(b.bin_code))
     .sort((a, b) => b.qty - a.qty);
+};
+
+// Helper: load all bin master codes as a Set for fast lookup
+const _getBinMasterCodes = async () => {
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const req = db
+      .transaction(BIN_MASTER_STORE, "readonly")
+      .objectStore(BIN_MASTER_STORE)
+      .getAll();
+    req.onsuccess = () => resolve(new Set(req.result.map((r) => r.bin_code)));
+    req.onerror = (e) => reject(e.target.error);
+  });
 };
 
 export const getBinQtyForItemAndBin = async (itemCode, binCode) => {
@@ -673,7 +683,8 @@ export const getBinMasterCount = async () => {
 export const checkBinExists = async (binCode) => {
   const db = await openIDB();
   const code = String(binCode).trim().toUpperCase();
-  return new Promise((resolve, reject) => {
+  // Check bin_master first
+  const masterExists = await new Promise((resolve, reject) => {
     const req = db
       .transaction(BIN_MASTER_STORE, "readonly")
       .objectStore(BIN_MASTER_STORE)
@@ -681,6 +692,10 @@ export const checkBinExists = async (binCode) => {
     req.onsuccess = () => resolve(!!req.result);
     req.onerror = (e) => reject(e.target.error);
   });
+  if (masterExists) return true;
+  // Fallback: check bin_contents
+  const bins = await getBinCache();
+  return bins.some((b) => b.bin_code === code);
 };
 
 export const clearAndReplaceBinMaster = async (codes) => {

@@ -3,11 +3,11 @@
     "name": "Inventory Manager",
     "slug": "newfullstack",
     "owner": "aamirksa",
-    "version": "0.0.2",
+    "version": "0.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -18,13 +18,13 @@
       "bundleIdentifier": "com.inventory.manager"
     },
     "android": {
-      "versionCode": 11,
+      "versionCode": 16,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#D9D9D9"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.inventory.manager",
+      "edgeToEdgeEnabled": false,
+      "package": "com.inventorymanager",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -55,8 +55,9 @@
     ],
     "updates": {
       "url": "https://u.expo.dev/cff8e8a6-b732-42e2-ae2c-068893f7296c",
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 5000
+      "checkAutomatically": "NEVER",
+      "fallbackToCacheTimeout": 0,
+      "enabled": true
     },
     "runtimeVersion": "inventory-launch-v1",
     "extra": {

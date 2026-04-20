@@ -4,6 +4,9 @@ import { isAdminRole } from "../utils/roles";
 
 let db;
 
+// Yield to event loop — lets GC run between heavy batches, avoids ANR on low-RAM devices
+const _yield = () => new Promise((r) => setTimeout(r, 0));
+
 const ITEM_GROUP_EXPR =
   "LOWER(COALESCE(NULLIF(TRIM(item_code), ''), TRIM(item_name)))";
 
@@ -261,26 +264,35 @@ export const initDB = async () => {
 
 export const upsertItems = async (itemsArray) => {
   if (!itemsArray || itemsArray.length === 0) return;
-  // 300 rows × 3 params = 900, safely under SQLite's 999 param limit
-  const CHUNK_SIZE = 300;
-  await db.withTransactionAsync(async () => {
-    for (let i = 0; i < itemsArray.length; i += CHUNK_SIZE) {
-      const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
-      const placeholders = chunk.map(() => "(?,?,?)").join(",");
-      const params = chunk.flatMap((item) => [
-        item.ItemCode,
-        item.Barcode,
-        item.Item_Name,
-      ]);
-      await db.runAsync(
-        `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
-         ON CONFLICT(barcode) DO UPDATE SET
-           item_code = excluded.item_code,
-           item_name = excluded.item_name`,
-        params,
-      );
-    }
-  });
+  const ROWS_PER_INSERT = 200;
+  const ROWS_PER_TX = 2000;
+  const total = itemsArray.length;
+  for (let bStart = 0; bStart < total; bStart += ROWS_PER_TX) {
+    const bEnd = Math.min(bStart + ROWS_PER_TX, total);
+    await db.withTransactionAsync(async () => {
+      for (let i = bStart; i < bEnd; i += ROWS_PER_INSERT) {
+        const chunk = itemsArray.slice(i, Math.min(i + ROWS_PER_INSERT, bEnd));
+        const valid = chunk.filter(
+          (item) => item.Barcode && String(item.Barcode).trim(),
+        );
+        if (valid.length === 0) continue;
+        const placeholders = valid.map(() => "(?,?,?)").join(",");
+        const params = valid.flatMap((item) => [
+          item.ItemCode || "",
+          String(item.Barcode).trim(),
+          item.Item_Name || "",
+        ]);
+        await db.runAsync(
+          `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
+           ON CONFLICT(barcode) DO UPDATE SET
+             item_code = excluded.item_code,
+             item_name = excluded.item_name`,
+          params,
+        );
+      }
+    });
+    await _yield();
+  }
 };
 
 export const getItemByBarcode = async (barcode) => {
@@ -743,21 +755,29 @@ export const clearAllItems = async () => {
   return result.changes;
 };
 
-// Atomic clear + replace: downloads all items to memory first, then replaces in one transaction.
-// If ANY chunk fails, the entire operation rolls back — local data stays untouched.
-export const clearAndReplaceAllItems = async (itemsArray, onProgress) => {
-  if (!itemsArray || itemsArray.length === 0) return 0;
-  const CHUNK_SIZE = 300;
-  const total = itemsArray.length;
+// Delete all items (DB only, no AsyncStorage). Used as step 1 of paginated download.
+export const deleteAllItemRows = async () => {
+  await db.runAsync("DELETE FROM items");
+};
+
+// Insert one page of items. Called repeatedly during paginated download.
+// Each call is a single small transaction — memory-safe on low-RAM devices.
+export const insertItemsPage = async (items) => {
+  if (!items || items.length === 0) return 0;
+  const ROWS_PER_INSERT = 200;
+  let inserted = 0;
   await db.withTransactionAsync(async () => {
-    await db.runAsync("DELETE FROM items");
-    for (let i = 0; i < total; i += CHUNK_SIZE) {
-      const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
-      const placeholders = chunk.map(() => "(?,?,?)").join(",");
-      const params = chunk.flatMap((item) => [
-        item.ItemCode,
-        item.Barcode,
-        item.Item_Name,
+    for (let i = 0; i < items.length; i += ROWS_PER_INSERT) {
+      const chunk = items.slice(i, i + ROWS_PER_INSERT);
+      const valid = chunk.filter(
+        (item) => item.Barcode && String(item.Barcode).trim(),
+      );
+      if (valid.length === 0) continue;
+      const placeholders = valid.map(() => "(?,?,?)").join(",");
+      const params = valid.flatMap((item) => [
+        item.ItemCode || "",
+        String(item.Barcode).trim(),
+        item.Item_Name || "",
       ]);
       await db.runAsync(
         `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
@@ -766,11 +786,58 @@ export const clearAndReplaceAllItems = async (itemsArray, onProgress) => {
            item_name = excluded.item_name`,
         params,
       );
-      if (onProgress)
-        onProgress({ processed: Math.min(i + CHUNK_SIZE, total), total });
+      inserted += valid.length;
     }
   });
-  return total;
+  await _yield();
+  return inserted;
+};
+
+// Clear + replace in small batched transactions to avoid OOM on low-RAM devices.
+// Each batch commits independently — keeps WAL journal small and lets GC reclaim memory.
+// If the app crashes mid-way, a re-download will complete the replacement.
+export const clearAndReplaceAllItems = async (itemsArray, onProgress) => {
+  if (!itemsArray || itemsArray.length === 0) return 0;
+  const ROWS_PER_INSERT = 200; // params per INSERT (200×3 = 600, well under 999)
+  const ROWS_PER_TX = 2000; // rows per transaction — keeps WAL journal small
+  const total = itemsArray.length;
+
+  // 1. Delete all items (fast, separate transaction)
+  await db.runAsync("DELETE FROM items");
+
+  // 2. Insert in small batched transactions
+  let inserted = 0;
+  for (let bStart = 0; bStart < total; bStart += ROWS_PER_TX) {
+    const bEnd = Math.min(bStart + ROWS_PER_TX, total);
+    await db.withTransactionAsync(async () => {
+      for (let i = bStart; i < bEnd; i += ROWS_PER_INSERT) {
+        const chunk = itemsArray.slice(i, Math.min(i + ROWS_PER_INSERT, bEnd));
+        // Skip items with missing barcode (NOT NULL constraint)
+        const valid = chunk.filter(
+          (item) => item.Barcode && String(item.Barcode).trim(),
+        );
+        if (valid.length === 0) continue;
+        const placeholders = valid.map(() => "(?,?,?)").join(",");
+        const params = valid.flatMap((item) => [
+          item.ItemCode || "",
+          String(item.Barcode).trim(),
+          item.Item_Name || "",
+        ]);
+        await db.runAsync(
+          `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
+           ON CONFLICT(barcode) DO UPDATE SET
+             item_code = excluded.item_code,
+             item_name = excluded.item_name`,
+          params,
+        );
+        inserted += valid.length;
+      }
+    });
+    // Yield to event loop between batches — lets GC reclaim + avoids ANR
+    await _yield();
+    if (onProgress) onProgress({ processed: bEnd, total });
+  }
+  return inserted;
 };
 
 export const getPendingCount = async () => {
@@ -804,18 +871,15 @@ export const upsertBinContents = async (rows) => {
   });
 };
 
-// Worker-valid bin pattern — matches A/B/C standard bins + HV + WH zones.
-// Excludes NAV ERP system bins: SHIP, Z1, IN0001, B0001, etc.
-const WORKER_BIN_RE = /^([ABC]\d{1,2}\d{4}[A-Z]|HV\d+|WH\d+)$/;
-
 export const getBinsForItem = async (itemCode) => {
   const rows = await db.getAllAsync(
-    `SELECT bin_code, qty FROM bin_contents
-     WHERE item_code = ?
-     ORDER BY qty DESC`,
+    `SELECT bc.bin_code, bc.qty FROM bin_contents bc
+     INNER JOIN bin_master bm ON bm.bin_code = bc.bin_code
+     WHERE bc.item_code = ?
+     ORDER BY bc.qty DESC`,
     [String(itemCode).trim()],
   );
-  return rows.filter((r) => WORKER_BIN_RE.test(r.bin_code));
+  return rows;
 };
 
 export const getBinQtyForItemAndBin = async (itemCode, binCode) => {
@@ -880,9 +944,13 @@ export const getBinMasterCount = async () => {
 };
 
 export const checkBinExists = async (binCode) => {
+  const code = String(binCode).trim().toUpperCase();
   const row = await db.getFirstAsync(
-    "SELECT 1 FROM bin_master WHERE bin_code = ? LIMIT 1",
-    [String(binCode).trim().toUpperCase()],
+    `SELECT 1 FROM bin_master WHERE bin_code = ?
+     UNION
+     SELECT 1 FROM bin_contents WHERE bin_code = ?
+     LIMIT 1`,
+    [code, code],
   );
   return !!row;
 };

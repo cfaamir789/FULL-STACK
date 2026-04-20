@@ -108,7 +108,10 @@ export default function ItemMasterScreen() {
           `Server has v${data.serverVersion} (${data.serverTotal.toLocaleString()} bins). You have v${data.localVersion ?? "–"} (${(data.localCount ?? 0).toLocaleString()} bins).`,
         );
       } else {
-        Alert.alert("Up to Date", `Bin content is current (v${data.serverVersion}).`);
+        Alert.alert(
+          "Up to Date",
+          `Bin content is current (v${data.serverVersion}).`,
+        );
       }
     } catch (err) {
       Alert.alert("Check Failed", err.message);
@@ -375,9 +378,18 @@ export default function ItemMasterScreen() {
 
       {/* ── Bin Content Data ─────────────────────────────────────────── */}
       <View style={styles.binSection}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 6,
+          }}
+        >
           <MaterialCommunityIcons name="warehouse" size={22} color="#2e7d32" />
-          <Text style={[styles.sectionTitle, { marginBottom: 0, color: "#2e7d32" }]}>
+          <Text
+            style={[styles.sectionTitle, { marginBottom: 0, color: "#2e7d32" }]}
+          >
             Bin Content Data
           </Text>
         </View>
@@ -413,7 +425,10 @@ export default function ItemMasterScreen() {
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${binProgress.percent}%`, backgroundColor: "#2e7d32" },
+                  {
+                    width: `${binProgress.percent}%`,
+                    backgroundColor: "#2e7d32",
+                  },
                 ]}
               />
             </View>
@@ -422,7 +437,9 @@ export default function ItemMasterScreen() {
                 ? "Saving to phone…"
                 : binProgress.phase === "checking"
                   ? "Checking changes…"
-                  : "Downloading…"}{" "}
+                  : binProgress.phase === "bin_master"
+                    ? "Syncing bin master…"
+                    : "Downloading…"}{" "}
               {binProgress.percent}%
             </Text>
           </>
@@ -439,7 +456,11 @@ export default function ItemMasterScreen() {
           {binCheckLoading ? (
             <ActivityIndicator color={Colors.primary} size="small" />
           ) : (
-            <MaterialCommunityIcons name="cloud-sync" size={18} color={Colors.primary} />
+            <MaterialCommunityIcons
+              name="cloud-sync"
+              size={18}
+              color={Colors.primary}
+            />
           )}
           <Text style={styles.secondaryBtnText}>Check Updates</Text>
         </TouchableOpacity>
@@ -455,7 +476,11 @@ export default function ItemMasterScreen() {
           {binDeltaLoading ? (
             <ActivityIndicator color={Colors.primary} size="small" />
           ) : (
-            <MaterialCommunityIcons name="sync" size={18} color={Colors.primary} />
+            <MaterialCommunityIcons
+              name="sync"
+              size={18}
+              color={Colors.primary}
+            />
           )}
           <Text style={styles.secondaryBtnText}>Smart Sync (Changes Only)</Text>
         </TouchableOpacity>
@@ -467,7 +492,11 @@ export default function ItemMasterScreen() {
           {binDownloading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <MaterialCommunityIcons name="cloud-download" size={18} color="#fff" />
+            <MaterialCommunityIcons
+              name="cloud-download"
+              size={18}
+              color="#fff"
+            />
           )}
           <Text style={styles.greenBtnText}>
             {binDownloading ? "Downloading…" : "Full Download (All Bins)"}

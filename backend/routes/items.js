@@ -498,6 +498,42 @@ router.get("/version", async (req, res) => {
   res.json({ success: true, version, totalItems: count });
 });
 
+// GET /api/items/bulk-page?page=1&limit=5000
+// Paginated bulk download for low-RAM devices. Returns one page at a time.
+// Phone downloads page 1, saves to DB, discards, fetches page 2, etc.
+// Only 3 fields per item (ItemCode, Barcode, Item_Name) to minimize payload.
+router.get("/bulk-page", async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(10000, Math.max(100, parseInt(req.query.limit) || 5000));
+    const skip = (page - 1) * limit;
+
+    const [items, totalItems, version] = await Promise.all([
+      Item.find({}, { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1 })
+        .sort({ _id: 1 }) // stable sort for consistent pagination
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Item.countDocuments({}),
+      getItemsVersion(),
+    ]);
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    res.json({
+      success: true,
+      version,
+      page,
+      totalPages,
+      totalItems,
+      count: items.length,
+      items,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/items/bulk — ultra-fast cached bulk download for phones
 // First request after a version change builds the cache (~2s), all others serve from RAM (<50ms).
 // Phones sending If-None-Match with current ETag get 304 instantly (skip the download entirely).

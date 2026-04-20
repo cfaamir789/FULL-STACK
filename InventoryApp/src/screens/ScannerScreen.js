@@ -262,7 +262,9 @@ export default function ScannerScreen({ role = "worker" }) {
 
   const resetForm = () => {
     isResetting.current = true;
-    setTimeout(() => { isResetting.current = false; }, 300);
+    setTimeout(() => {
+      isResetting.current = false;
+    }, 300);
     clearFormState();
   };
 
@@ -488,7 +490,6 @@ export default function ScannerScreen({ role = "worker" }) {
       return;
     }
     // Hard block: check From Bin exists in the bin master (if master has been downloaded)
-    // To Bin is free — goods can be moved to any valid bin code
     const masterCount = await getBinMasterCount();
     if (masterCount > 0) {
       const fromExists = await checkBinExists(effectiveFromBin.trim());
@@ -500,6 +501,17 @@ export default function ScannerScreen({ role = "worker" }) {
         setFrombin("");
         setSelectedFromBin(null);
         setTimeout(() => fromBinRef.current?.focus(), 100);
+        return;
+      }
+      const toExists = await checkBinExists(effectiveToBin.trim());
+      if (!toExists) {
+        Alert.alert(
+          "Invalid To Bin",
+          `❌ "${effectiveToBin.trim().toUpperCase()}" does not exist in the bin master.\nPlease check the bin code and try again.`,
+        );
+        setTobin("");
+        setSelectedToBin(null);
+        setTimeout(() => toBinRef.current?.focus(), 100);
         return;
       }
     }
@@ -1035,22 +1047,26 @@ export default function ScannerScreen({ role = "worker" }) {
         onSubmitEditing={() => toBinRef.current?.focus()}
         editable={scanned}
         onBinValidate={checkBinExists}
+        showQty={isAdminRole(role)}
       />
 
       {/* Qty warning if user types more than available in selected From Bin */}
-      {selectedFromBin && qty && parseInt(qty, 10) > selectedFromBin.qty && (
-        <Text
-          style={{
-            color: Colors.error || "#D32F2F",
-            fontSize: 12,
-            fontWeight: "600",
-            marginTop: 4,
-          }}
-        >
-          ⚠️ Exceeds available stock ({selectedFromBin.qty.toLocaleString()} pcs
-          in {selectedFromBin.bin_code})
-        </Text>
-      )}
+      {isAdminRole(role) &&
+        selectedFromBin &&
+        qty &&
+        parseInt(qty, 10) > selectedFromBin.qty && (
+          <Text
+            style={{
+              color: Colors.error || "#D32F2F",
+              fontSize: 12,
+              fontWeight: "600",
+              marginTop: 4,
+            }}
+          >
+            ⚠️ Exceeds available stock ({selectedFromBin.qty.toLocaleString()}{" "}
+            pcs in {selectedFromBin.bin_code})
+          </Text>
+        )}
 
       <BinSelector
         label="To Bin"
@@ -1069,10 +1085,12 @@ export default function ScannerScreen({ role = "worker" }) {
         inputRef={toBinRef}
         onSubmitEditing={() => qtyRef.current?.focus()}
         editable={scanned}
+        onBinValidate={checkBinExists}
+        showQty={isAdminRole(role)}
       />
 
       {/* Info if To Bin already has stock */}
-      {selectedToBin && (
+      {isAdminRole(role) && selectedToBin && (
         <View
           style={{
             flexDirection: "row",

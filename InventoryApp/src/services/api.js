@@ -326,6 +326,15 @@ export const fetchItemsBulk = async () => {
   return res.data; // { version, total, items }
 };
 
+// Download one page of items. Low-memory-safe — phone fetches page by page.
+export const fetchItemsBulkPage = async (page = 1, limit = 5000) => {
+  const res = await apiClient.get(
+    `/items/bulk-page?page=${page}&limit=${limit}`,
+    { timeout: 60000 },
+  );
+  return res.data; // { version, page, totalPages, totalItems, count, items }
+};
+
 // Download only items created/updated after `since` (ISO string).
 // Pass `lastFullSync` (ISO) so server can detect if a full replace happened.
 // Returns { version, serverTime, requiresFullSync, items, total }
@@ -529,13 +538,17 @@ export const fetchBinContentList = async ({
 
 // Distinct category codes for filter chips
 export const fetchBinContentCategories = async () => {
-  const res = await apiClient.get("/bin-content/categories", { timeout: 10000 });
+  const res = await apiClient.get("/bin-content/categories", {
+    timeout: 10000,
+  });
   return res.data.categories || [];
 };
 
 // Distinct zone codes for filter chips
 export const fetchBinContentZones = async () => {
-  const res = await apiClient.get("/bin-content/zone-codes", { timeout: 10000 });
+  const res = await apiClient.get("/bin-content/zone-codes", {
+    timeout: 10000,
+  });
   return res.data.zoneCodes || [];
 };
 
@@ -553,8 +566,14 @@ export const fetchBinContentStats = async () => {
 
 // ─── Bin Master ───────────────────────────────────────────────────────────────
 
-// Returns flat list of all valid worker bin codes (excludes SHIP/NAV ERP bins)
+// Returns flat list of ALL bin codes from the bin master
 export const fetchBinMasterCodes = async () => {
   const res = await apiClient.get("/bin-master/codes", { timeout: 60000 });
-  return res.data; // { success, codes: [...], total }
+  return res.data; // { success, codes: [...], total, version }
+};
+
+// Quick version check — phones call this to decide if they need to re-download
+export const fetchBinMasterVersion = async () => {
+  const res = await apiClient.get("/bin-master/version", { timeout: 10000 });
+  return res.data; // { success, total, version }
 };

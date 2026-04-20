@@ -47,6 +47,7 @@ export default function BinSelector({
   onSubmitEditing,
   editable = true,
   onBinValidate, // async (binCode) => bool — returns true if bin exists in master
+  showQty = true, // false hides qty badges/counts (e.g. for workers)
 }) {
   const [filterText, setFilterText] = useState("");
   const [listOpen, setListOpen] = useState(bins.length > 0);
@@ -173,9 +174,11 @@ export default function BinSelector({
             />
             <View style={{ flex: 1, marginLeft: 8 }}>
               <Text style={styles.chipBinCode}>{selectedBin.bin_code}</Text>
-              <Text style={styles.chipQty}>
-                Available: {selectedBin.qty.toLocaleString()} pcs
-              </Text>
+              {showQty && (
+                <Text style={styles.chipQty}>
+                  Available: {selectedBin.qty.toLocaleString()} pcs
+                </Text>
+              )}
             </View>
             <TouchableOpacity
               onPress={() => {
@@ -265,11 +268,13 @@ export default function BinSelector({
                           style={{ marginRight: 8 }}
                         />
                         <Text style={styles.binRowCode}>{b.bin_code}</Text>
-                        <View style={styles.qtyBadge}>
-                          <Text style={styles.qtyBadgeText}>
-                            {b.qty.toLocaleString()} pcs
-                          </Text>
-                        </View>
+                        {showQty && (
+                          <View style={styles.qtyBadge}>
+                            <Text style={styles.qtyBadgeText}>
+                              {b.qty.toLocaleString()} pcs
+                            </Text>
+                          </View>
+                        )}
                       </TouchableOpacity>
                     ))
                   )}
