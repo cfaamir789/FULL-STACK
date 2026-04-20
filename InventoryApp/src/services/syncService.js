@@ -67,33 +67,18 @@ export const checkConnectivity = async () => {
 };
 
 // ─── Item Master Download (standalone, admin-triggered only) ─────────────────
-// Downloads items PAGE BY PAGE from the server to avoid OOM on low-RAM devices.
-// Each page (~5000 items) is fetched, saved to DB, then discarded before next page.
-// Peak memory: ~1-2 MB per page instead of ~50-80 MB for all 157K items.
-const PAGE_SIZE = 5000;
+// PRIMARY: single gzip request served from server RAM cache — one round-trip.
+// FALLBACK: paginated if bulk times out or fails (uses fewer-but-larger pages).
+const PAGE_SIZE = 20000; // fallback: 8 pages instead of 32 (less skip overhead)
 export const downloadItemMaster = async (onProgress) => {
   onProgress?.({ phase: "downloading", percent: 0 });
 
-  // Try paginated endpoint first (memory-safe for low-RAM devices).
-  // If server hasn't been updated yet (404), fall back to legacy /bulk endpoint.
-  let usePaginated = true;
-  let firstPage;
+  // ── PRIMARY: /bulk endpoint — pre-gzipped, served from RAM, one request ──
   try {
-    firstPage = await fetchItemsBulkPage(1, PAGE_SIZE);
-  } catch (err) {
-    if (err.response && err.response.status === 404) {
-      usePaginated = false; // server doesn't have the new endpoint yet
-    } else {
-      throw err; // network error or other failure — let caller handle
-    }
-  }
-
-  if (!usePaginated) {
-    // ── Legacy single-request fallback ──────────────────────────────────────
     let data = await fetchItemsBulk();
     const items = data.items || [];
     const serverVersion = data.version;
-    data = null;
+    data = null; // release before DB write
 
     if (items.length === 0) {
       return {
@@ -131,9 +116,24 @@ export const downloadItemMaster = async (onProgress) => {
       version: serverVersion,
       delta: false,
     };
+  } catch (bulkErr) {
+    // Only fall through to paginated on server/network errors, not auth/logic errors
+    const status = bulkErr?.response?.status;
+    if (status && status !== 500 && status !== 503 && status !== 504) {
+      throw bulkErr;
+    }
+    // fall through to paginated fallback below
+    console.warn("[downloadItemMaster] bulk failed, trying paginated:", bulkErr.message);
   }
 
-  // ── Paginated download (preferred) ──────────────────────────────────────
+  // ── FALLBACK: paginated download (larger pages = fewer requests) ──────────
+  let firstPage;
+  try {
+    firstPage = await fetchItemsBulkPage(1, PAGE_SIZE);
+  } catch (err) {
+    throw err;
+  }
+
   const serverVersion = firstPage.version;
   const totalPages = firstPage.totalPages;
   const totalItems = firstPage.totalItems;
@@ -147,23 +147,20 @@ export const downloadItemMaster = async (onProgress) => {
     };
   }
 
-  // 2. Clear local items before inserting (once, before first page)
   await deleteAllItemRows();
 
-  // 3. Save page 1 items to DB, then release
   let totalInserted = await insertItemsPage(firstPage.items);
-  firstPage = null; // release memory
+  firstPage = null;
 
   onProgress?.({
     phase: "downloading",
     percent: Math.round((1 / totalPages) * 100),
   });
 
-  // 4. Fetch remaining pages one by one
   for (let page = 2; page <= totalPages; page++) {
     let pageData = await fetchItemsBulkPage(page, PAGE_SIZE);
     totalInserted += await insertItemsPage(pageData.items);
-    pageData = null; // release memory immediately
+    pageData = null;
 
     onProgress?.({
       phase: "downloading",
@@ -171,7 +168,6 @@ export const downloadItemMaster = async (onProgress) => {
     });
   }
 
-  // 5. Save version and sync timestamps ONLY after all pages saved
   const syncNow = new Date().toISOString();
   await Promise.all([
     AsyncStorage.setItem("itemsVersion", String(serverVersion)),
