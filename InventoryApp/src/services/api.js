@@ -516,6 +516,13 @@ export const fetchBinsForItem = async (itemCode) => {
 
 // ─── Bin Content Browse (admin) ───────────────────────────────────────────────
 
+// Single request: stats + categories + zones (server serves from RAM cache)
+// Replaces 3 separate HTTP calls on screen open.
+export const fetchBinContentMeta = async () => {
+  const res = await apiClient.get("/bin-content/meta", { timeout: 10000 });
+  return res.data; // { success, stats, categories, zoneCodes }
+};
+
 // Paginated list with search, filters, sort
 export const fetchBinContentList = async ({
   q,

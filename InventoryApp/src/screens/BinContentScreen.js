@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
@@ -15,11 +21,27 @@ import {
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   fetchBinContentList,
+  fetchBinContentMeta,
   fetchBinContentCategories,
   fetchBinContentZones,
   fetchBinContentStats,
 } from "../services/api";
 import Colors from "../theme/colors";
+
+const IS_WEB = Platform.OS === "web";
+let CameraView, useCameraPermissions;
+if (!IS_WEB) {
+  try {
+    const cam = require("expo-camera");
+    CameraView = cam.CameraView;
+    useCameraPermissions = cam.useCameraPermissions;
+  } catch {
+    CameraView = null;
+    useCameraPermissions = () => [{ granted: false }, async () => {}];
+  }
+} else {
+  useCameraPermissions = () => [{ granted: false }, async () => {}];
+}
 
 const PAGE_SIZE = 50;
 
@@ -58,41 +80,63 @@ const Chip = React.memo(({ label, selected, onPress }) => (
 // ─── Bin Card component ─────────────────────────────────────────────────────
 const BinCard = React.memo(({ item }) => {
   const qty = item.Qty ?? 0;
-  const qtyColor = qty === 0 ? Colors.error : qty <= 5 ? Colors.warning : Colors.success;
+  const qtyColor =
+    qty === 0 ? Colors.error : qty <= 5 ? Colors.warning : Colors.success;
   return (
     <View style={styles.binCard}>
       <View style={styles.binCardHeader}>
         <View style={styles.binCodeWrap}>
-          <MaterialCommunityIcons name="archive-outline" size={16} color={Colors.primary} />
-          <Text style={styles.binCodeText} numberOfLines={1}>{item.BinCode}</Text>
+          <MaterialCommunityIcons
+            name="archive-outline"
+            size={16}
+            color={Colors.primary}
+          />
+          <Text style={styles.binCodeText} numberOfLines={1}>
+            {item.BinCode}
+          </Text>
         </View>
         <View style={[styles.qtyBadge, { backgroundColor: qtyColor + "18" }]}>
           <Text style={[styles.qtyText, { color: qtyColor }]}>{qty}</Text>
         </View>
       </View>
       <View style={styles.binCardBody}>
-        <Text style={styles.itemCodeText} numberOfLines={1}>
-          {item.ItemCode}
-          {item.Item_Name ? ` · ${item.Item_Name}` : ""}
-        </Text>
+        <Text style={styles.itemCodeText}>{item.ItemCode}</Text>
+        {item.Item_Name ? (
+          <Text style={styles.itemNameText}>{item.Item_Name}</Text>
+        ) : null}
       </View>
       <View style={styles.binCardFooter}>
         {item.CategoryCode ? (
           <View style={styles.tagWrap}>
-            <MaterialCommunityIcons name="tag-outline" size={12} color={Colors.textSecondary} />
+            <MaterialCommunityIcons
+              name="tag-outline"
+              size={12}
+              color={Colors.textSecondary}
+            />
             <Text style={styles.tagText}>{item.CategoryCode}</Text>
           </View>
         ) : null}
         {item.ZoneCode ? (
           <View style={styles.tagWrap}>
-            <MaterialCommunityIcons name="map-marker-outline" size={12} color={Colors.textSecondary} />
+            <MaterialCommunityIcons
+              name="map-marker-outline"
+              size={12}
+              color={Colors.textSecondary}
+            />
             <Text style={styles.tagText}>{item.ZoneCode}</Text>
           </View>
         ) : null}
         {item.Chamber ? (
           <View style={styles.tagWrap}>
-            <MaterialCommunityIcons name="warehouse" size={12} color={Colors.textSecondary} />
-            <Text style={styles.tagText}>{item.Chamber}{item.Aisle ? ` · ${item.Aisle}` : ""}</Text>
+            <MaterialCommunityIcons
+              name="warehouse"
+              size={12}
+              color={Colors.textSecondary}
+            />
+            <Text style={styles.tagText}>
+              {item.Chamber}
+              {item.Aisle ? ` · ${item.Aisle}` : ""}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -115,6 +159,10 @@ export default function BinContentScreen() {
 
   // Stats
   const [stats, setStats] = useState(null);
+
+  // Scanner
+  const [showScanner, setShowScanner] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
   // Search
   const [search, setSearch] = useState("");
@@ -145,16 +193,22 @@ export default function BinContentScreen() {
   useEffect(() => {
     const loadMeta = async () => {
       try {
-        const [cats, zns, st] = await Promise.all([
-          fetchBinContentCategories(),
-          fetchBinContentZones(),
-          fetchBinContentStats(),
-        ]);
-        setCategories(cats);
-        setZones(zns);
-        setStats(st);
+        const meta = await fetchBinContentMeta();
+        if (meta.categories) setCategories(meta.categories);
+        if (meta.zoneCodes) setZones(meta.zoneCodes);
+        if (meta.stats) setStats(meta.stats);
       } catch (e) {
-        console.warn("Failed to load filter meta:", e.message);
+        // fallback: fetch individually if /meta not available
+        try {
+          const [cats, zns, st] = await Promise.all([
+            fetchBinContentCategories(),
+            fetchBinContentZones(),
+            fetchBinContentStats(),
+          ]);
+          setCategories(cats);
+          setZones(zns);
+          setStats(st);
+        } catch {}
       }
     };
     loadMeta();
@@ -200,7 +254,13 @@ export default function BinContentScreen() {
         setError(e.message || "Failed to load bin content");
       }
     },
-    [debouncedSearch, selectedCategory, selectedZone, selectedChamber, selectedSort],
+    [
+      debouncedSearch,
+      selectedCategory,
+      selectedZone,
+      selectedChamber,
+      selectedSort,
+    ],
   );
 
   // ─── Initial load + re-fetch on filter/search change ──────────────────────
@@ -215,11 +275,11 @@ export default function BinContentScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const [st] = await Promise.all([
-        fetchBinContentStats().catch(() => null),
+      const [meta] = await Promise.all([
+        fetchBinContentMeta().catch(() => null),
         fetchBins(1, false),
       ]);
-      if (st) setStats(st);
+      if (meta?.stats) setStats(meta.stats);
     } finally {
       setRefreshing(false);
     }
@@ -254,7 +314,10 @@ export default function BinContentScreen() {
 
   // ─── Render helpers ────────────────────────────────────────────────────────
   const renderBinItem = useCallback(({ item }) => <BinCard item={item} />, []);
-  const keyExtractor = useCallback((item) => item._id || `${item.BinCode}_${item.ItemCode}`, []);
+  const keyExtractor = useCallback(
+    (item) => item._id || `${item.BinCode}_${item.ItemCode}`,
+    [],
+  );
 
   const filterPanelHeight = filterAnim.interpolate({
     inputRange: [0, 1],
@@ -265,7 +328,11 @@ export default function BinContentScreen() {
     () =>
       !loading && !error ? (
         <View style={styles.emptyWrap}>
-          <MaterialCommunityIcons name="package-variant" size={64} color={Colors.textLight} />
+          <MaterialCommunityIcons
+            name="package-variant"
+            size={64}
+            color={Colors.textLight}
+          />
           <Text style={styles.emptyTitle}>No bins found</Text>
           <Text style={styles.emptySubtitle}>
             {debouncedSearch || activeFilterCount > 0
@@ -287,23 +354,69 @@ export default function BinContentScreen() {
     [loadingMore],
   );
 
+  const openScanner = useCallback(async () => {
+    if (IS_WEB) return;
+    if (!permission?.granted) {
+      const p = await requestPermission();
+      if (!p.granted) return;
+    }
+    setShowScanner(true);
+  }, [permission, requestPermission]);
+
+  const handleBarCodeScanned = useCallback(({ data }) => {
+    setShowScanner(false);
+    setSearch(data.trim());
+  }, []);
+
   return (
     <View style={styles.container}>
+      {/* ─── Barcode Scanner Overlay ───────────────────────────────────── */}
+      {showScanner && !IS_WEB && CameraView && (
+        <View style={styles.scannerOverlay}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            barcodeScannerSettings={{
+              barcodeTypes: [
+                "ean13",
+                "ean8",
+                "code128",
+                "code39",
+                "upc_a",
+                "qr",
+              ],
+            }}
+            onBarcodeScanned={handleBarCodeScanned}
+          />
+          <TouchableOpacity
+            style={styles.scannerClose}
+            onPress={() => setShowScanner(false)}
+          >
+            <MaterialCommunityIcons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* ─── Stats Banner ──────────────────────────────────────────────── */}
       {stats && (
         <View style={styles.statsBanner}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{(stats.total ?? 0).toLocaleString()}</Text>
+            <Text style={styles.statValue}>
+              {(stats.total ?? 0).toLocaleString()}
+            </Text>
             <Text style={styles.statLabel}>Records</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{(stats.uniqueBins ?? 0).toLocaleString()}</Text>
+            <Text style={styles.statValue}>
+              {(stats.uniqueBins ?? 0).toLocaleString()}
+            </Text>
             <Text style={styles.statLabel}>Bins</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{(stats.uniqueItems ?? 0).toLocaleString()}</Text>
+            <Text style={styles.statValue}>
+              {(stats.uniqueItems ?? 0).toLocaleString()}
+            </Text>
             <Text style={styles.statLabel}>Items</Text>
           </View>
           <View style={styles.statDivider} />
@@ -319,7 +432,11 @@ export default function BinContentScreen() {
       {/* ─── Search Bar ────────────────────────────────────────────────── */}
       <View style={styles.searchRow}>
         <View style={styles.searchBar}>
-          <MaterialCommunityIcons name="magnify" size={20} color={Colors.textSecondary} />
+          <MaterialCommunityIcons
+            name="magnify"
+            size={20}
+            color={Colors.textSecondary}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search bin, item, description..."
@@ -332,12 +449,36 @@ export default function BinContentScreen() {
             onSubmitEditing={Keyboard.dismiss}
           />
           {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialCommunityIcons name="close-circle" size={18} color={Colors.textLight} />
+            <TouchableOpacity
+              onPress={() => setSearch("")}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons
+                name="close-circle"
+                size={18}
+                color={Colors.textLight}
+              />
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity style={styles.filterBtn} onPress={toggleFilters} activeOpacity={0.7}>
+        {!IS_WEB && (
+          <TouchableOpacity
+            style={styles.scanBtn}
+            onPress={openScanner}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="barcode-scan"
+              size={22}
+              color="#fff"
+            />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.filterBtn}
+          onPress={toggleFilters}
+          activeOpacity={0.7}
+        >
           <MaterialCommunityIcons
             name={showFilters ? "filter-off" : "filter-variant"}
             size={22}
@@ -354,17 +495,24 @@ export default function BinContentScreen() {
       {/* ─── Result count ──────────────────────────────────────────────── */}
       <View style={styles.resultRow}>
         <Text style={styles.resultText}>
-          {loading ? "Loading..." : `${total.toLocaleString()} results · ${totalQty.toLocaleString()} qty`}
+          {loading
+            ? "Loading..."
+            : `${total.toLocaleString()} results · ${totalQty.toLocaleString()} qty`}
         </Text>
         {activeFilterCount > 0 && (
-          <TouchableOpacity onPress={clearFilters} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+          <TouchableOpacity
+            onPress={clearFilters}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          >
             <Text style={styles.clearText}>Clear all</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {/* ─── Filter Panel (animated) ───────────────────────────────────── */}
-      <Animated.View style={[styles.filterPanel, { height: filterPanelHeight }]}>
+      <Animated.View
+        style={[styles.filterPanel, { height: filterPanelHeight }]}
+      >
         <View style={styles.filterInner}>
           {/* Category chips */}
           <Text style={styles.filterLabel}>Category</Text>
@@ -378,7 +526,9 @@ export default function BinContentScreen() {
               <Chip
                 label={c || "All"}
                 selected={selectedCategory === c}
-                onPress={() => setSelectedCategory(c === selectedCategory ? null : c)}
+                onPress={() =>
+                  setSelectedCategory(c === selectedCategory ? null : c)
+                }
               />
             )}
           />
@@ -412,7 +562,9 @@ export default function BinContentScreen() {
               <Chip
                 label={c || "All"}
                 selected={selectedChamber === c}
-                onPress={() => setSelectedChamber(c === selectedChamber ? null : c)}
+                onPress={() =>
+                  setSelectedChamber(c === selectedChamber ? null : c)
+                }
               />
             )}
           />
@@ -439,9 +591,18 @@ export default function BinContentScreen() {
       {/* ─── Error banner ──────────────────────────────────────────────── */}
       {error && (
         <View style={styles.errorBanner}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={16} color={Colors.error} />
+          <MaterialCommunityIcons
+            name="alert-circle-outline"
+            size={16}
+            color={Colors.error}
+          />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={() => { setError(null); handleRefresh(); }}>
+          <TouchableOpacity
+            onPress={() => {
+              setError(null);
+              handleRefresh();
+            }}
+          >
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -464,7 +625,11 @@ export default function BinContentScreen() {
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.4}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[Colors.primary]} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[Colors.primary]}
+            />
           }
           initialNumToRender={15}
           maxToRenderPerBatch={20}
@@ -550,6 +715,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   filterBadgeText: { color: "#fff", fontSize: 10, fontWeight: "bold" },
+  scanBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    backgroundColor: "#000",
+  },
+  scannerClose: {
+    position: "absolute",
+    top: 48,
+    right: 20,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 24,
+    padding: 8,
+  },
 
   // Result row
   resultRow: {
@@ -632,7 +818,13 @@ const styles = StyleSheet.create({
   binCardBody: { marginBottom: 6 },
   itemCodeText: {
     fontSize: 13,
+    color: Colors.textSecondary,
+    fontWeight: "600",
+  },
+  itemNameText: {
+    fontSize: 13,
     color: Colors.textPrimary,
+    marginTop: 2,
   },
   binCardFooter: {
     flexDirection: "row",
@@ -649,8 +841,18 @@ const styles = StyleSheet.create({
     paddingTop: 80,
     paddingHorizontal: 32,
   },
-  emptyTitle: { fontSize: 18, fontWeight: "bold", color: Colors.textSecondary, marginTop: 16 },
-  emptySubtitle: { fontSize: 13, color: Colors.textLight, textAlign: "center", marginTop: 6 },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.textSecondary,
+    marginTop: 16,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: Colors.textLight,
+    textAlign: "center",
+    marginTop: 6,
+  },
 
   // Error banner
   errorBanner: {

@@ -236,6 +236,15 @@ connectDB()
     } catch (e) {
       console.warn("[items-cache] warm-up failed (non-fatal):", e.message);
     }
+
+    // Warm bin-content meta cache (categories + zones + stats) on startup
+    try {
+      const { _warmBinMetaCache } = require("./routes/binContent");
+      await _warmBinMetaCache();
+      console.log("[bin-meta-cache] warm-up complete");
+    } catch (e) {
+      console.warn("[bin-meta-cache] warm-up failed (non-fatal):", e.message);
+    }
   })
   .catch((err) => {
     console.error("MongoDB connection failed:", err?.message);

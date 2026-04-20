@@ -385,6 +385,74 @@ async function getBinBulkCache() {
 function invalidateBinBulkCache() {
   _binBulkCache = { version: null, gzBuf: null, etag: null };
   _binBuildPromise = null;
+  invalidateBinMetaCache();
+}
+
+// ─── Meta Cache (categories + zoneCodes + stats) ──────────────────────────────
+// Built once per version, served from RAM in <1ms. Invalidated on every write.
+// Reduces 3 HTTP round-trips (categories + zones + stats) to 1 on screen open.
+let _binMetaCache = { version: null, data: null };
+let _binMetaBuildPromise = null;
+
+async function _buildBinMetaCache() {
+  const version = await getBinVersion();
+  const [result, categories, zoneCodes] = await Promise.all([
+    BinContent.aggregate([
+      {
+        $facet: {
+          total: [{ $count: "n" }],
+          upper: [{ $match: { BinRanking: { $lt: 0 } } }, { $count: "n" }],
+          floor: [{ $match: { BinRanking: { $eq: 0 } } }, { $count: "n" }],
+          display: [{ $match: { BinRanking: { $gt: 0 } } }, { $count: "n" }],
+          unresolved: [{ $match: { notInMaster: true } }, { $count: "n" }],
+          uniqueBins: [{ $group: { _id: "$BinCode" } }, { $count: "n" }],
+          uniqueItems: [{ $group: { _id: "$ItemCode" } }, { $count: "n" }],
+          totalQty: [{ $group: { _id: null, sum: { $sum: "$Qty" } } }],
+        },
+      },
+    ]),
+    BinContent.distinct("CategoryCode"),
+    BinContent.distinct("ZoneCode"),
+  ]);
+  const r = result[0] || {};
+  const stats = {
+    success: true,
+    total: r.total?.[0]?.n ?? 0,
+    upper: r.upper?.[0]?.n ?? 0,
+    floor: r.floor?.[0]?.n ?? 0,
+    display: r.display?.[0]?.n ?? 0,
+    unresolved: r.unresolved?.[0]?.n ?? 0,
+    uniqueBins: r.uniqueBins?.[0]?.n ?? 0,
+    uniqueItems: r.uniqueItems?.[0]?.n ?? 0,
+    totalQty: r.totalQty?.[0]?.sum ?? 0,
+  };
+  const sortedCats = categories
+    .filter((c) => c && String(c).trim() !== "")
+    .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+  const sortedZones = zoneCodes
+    .filter((c) => c && String(c).trim() !== "")
+    .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+
+  _binMetaCache = { version, data: { success: true, stats, categories: sortedCats, zoneCodes: sortedZones } };
+  console.log(`[bin-meta-cache] built v${version} — ${sortedCats.length} cats, ${sortedZones.length} zones`);
+  return _binMetaCache;
+}
+
+async function getBinMetaCache() {
+  const currentVersion = await getBinVersion();
+  if (_binMetaCache.version === currentVersion && _binMetaCache.data)
+    return _binMetaCache;
+  if (!_binMetaBuildPromise) {
+    _binMetaBuildPromise = _buildBinMetaCache().finally(() => {
+      _binMetaBuildPromise = null;
+    });
+  }
+  return _binMetaBuildPromise;
+}
+
+function invalidateBinMetaCache() {
+  _binMetaCache = { version: null, data: null };
+  _binMetaBuildPromise = null;
 }
 
 // GET /api/bin-content/version — lightweight version check for phones
@@ -511,6 +579,18 @@ router.get("/stats", async (req, res) => {
       uniqueItems: result.uniqueItems[0]?.n ?? 0,
       totalQty: result.totalQty[0]?.sum ?? 0,
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/bin-content/meta — ONE request: stats + categories + zones (RAM-cached)
+// Replaces 3 separate round-trips on screen open. Built once, served in <1ms.
+router.get("/meta", async (req, res) => {
+  try {
+    const cache = await getBinMetaCache();
+    res.set("Cache-Control", "no-cache");
+    res.json(cache.data);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -875,3 +955,4 @@ router.get(
 );
 
 module.exports = router;
+module.exports._warmBinMetaCache = async () => { try { await getBinMetaCache(); } catch(e) { console.warn("[bin-meta-cache] warm failed:", e.message); } };
