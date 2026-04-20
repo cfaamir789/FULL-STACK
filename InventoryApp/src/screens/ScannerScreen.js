@@ -337,6 +337,9 @@ export default function ScannerScreen({ role = "worker" }) {
         if (bins.length === 1) {
           setSelectedFromBin(bins[0]);
           setFrombin(bins[0].bin_code);
+          // From Bin is auto-selected — skip straight to To Bin
+          setTimeout(() => toBinRef.current?.focus(), 150);
+          return;
         }
       }
     } catch {
@@ -584,7 +587,13 @@ export default function ScannerScreen({ role = "worker" }) {
   // ─── Reusable UI pieces ─────────────────────────────────────────────────────
 
   const renderTabs = () => (
-    <View style={styles.tabRow}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.tabRow}
+      contentContainerStyle={styles.tabRowContent}
+      keyboardShouldPersistTaps="handled"
+    >
       {[
         { key: "barcode", icon: "barcode-scan", label: "Barcode" },
         { key: "itemcode", icon: "pound-box", label: "Item Code" },
@@ -602,17 +611,18 @@ export default function ScannerScreen({ role = "worker" }) {
         >
           <MaterialCommunityIcons
             name={t.icon}
-            size={18}
+            size={20}
             color={mode === t.key ? "#fff" : Colors.textSecondary}
           />
           <Text
             style={[styles.tabText, mode === t.key && styles.tabTextActive]}
+            numberOfLines={1}
           >
             {t.label}
           </Text>
         </TouchableOpacity>
       ))}
-    </View>
+    </ScrollView>
   );
 
   const renderSearchInput = () => {
@@ -657,14 +667,14 @@ export default function ScannerScreen({ role = "worker" }) {
               {searching ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
+                <MaterialCommunityIcons name="magnify" size={26} color="#fff" />
               )}
             </TouchableOpacity>
             {!IS_WEB && (
               <TouchableOpacity style={styles.searchBtn} onPress={openScanner}>
                 <MaterialCommunityIcons
                   name="barcode-scan"
-                  size={22}
+                  size={26}
                   color="#fff"
                 />
               </TouchableOpacity>
@@ -714,7 +724,7 @@ export default function ScannerScreen({ role = "worker" }) {
               {searching ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
+                <MaterialCommunityIcons name="magnify" size={26} color="#fff" />
               )}
             </TouchableOpacity>
             {!IS_WEB && (
@@ -728,7 +738,7 @@ export default function ScannerScreen({ role = "worker" }) {
               >
                 <MaterialCommunityIcons
                   name="barcode-scan"
-                  size={22}
+                  size={26}
                   color="#fff"
                 />
               </TouchableOpacity>
@@ -779,7 +789,7 @@ export default function ScannerScreen({ role = "worker" }) {
               {searching ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
+                <MaterialCommunityIcons name="magnify" size={26} color="#fff" />
               )}
             </TouchableOpacity>
           </View>
@@ -864,7 +874,7 @@ export default function ScannerScreen({ role = "worker" }) {
             {searching ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
+              <MaterialCommunityIcons name="magnify" size={26} color="#fff" />
             )}
           </TouchableOpacity>
         </View>
@@ -996,11 +1006,11 @@ export default function ScannerScreen({ role = "worker" }) {
           {found && (
             <>
               <Text style={styles.itemBannerDetail}>
-                <Text style={{ fontWeight: "700" }}>Code: </Text>
-                {foundItem.item_code}
+                <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>Code: </Text>
+                <Text style={{ fontWeight: "800", color: Colors.primary, fontSize: 13 }}>{foundItem.item_code}</Text>
               </Text>
               <Text style={styles.itemBannerDetail}>
-                <Text style={{ fontWeight: "700" }}>Barcode: </Text>
+                <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>Barcode: </Text>
                 {foundItem.barcode}
               </Text>
             </>
@@ -1380,7 +1390,6 @@ const styles = StyleSheet.create({
   permBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
   tabRow: {
-    flexDirection: "row",
     marginHorizontal: 12,
     marginVertical: 10,
     borderRadius: 12,
@@ -1394,16 +1403,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
+  tabRowContent: {
+    flexDirection: "row",
+    flexGrow: 1,
+  },
   tab: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
-    gap: 6,
+    paddingHorizontal: 14,
+    gap: 5,
+    minWidth: 80,
   },
   tabActive: { backgroundColor: Colors.primary },
-  tabText: { fontSize: 12, fontWeight: "700", color: Colors.textSecondary },
+  tabText: { fontSize: 13, fontWeight: "700", color: Colors.textSecondary },
   tabTextActive: { color: "#fff" },
 
   cameraWrap: { height: 240, overflow: "hidden", backgroundColor: "#000" },
@@ -1532,7 +1546,7 @@ const styles = StyleSheet.create({
   searchBtn: {
     backgroundColor: Colors.primary,
     borderRadius: 10,
-    padding: 12,
+    padding: 14,
     marginLeft: 6,
     elevation: 2,
   },
