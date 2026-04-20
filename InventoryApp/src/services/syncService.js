@@ -74,8 +74,66 @@ const PAGE_SIZE = 5000;
 export const downloadItemMaster = async (onProgress) => {
   onProgress?.({ phase: "downloading", percent: 0 });
 
-  // 1. Fetch page 1 to learn total pages and version
-  let firstPage = await fetchItemsBulkPage(1, PAGE_SIZE);
+  // Try paginated endpoint first (memory-safe for low-RAM devices).
+  // If server hasn't been updated yet (404), fall back to legacy /bulk endpoint.
+  let usePaginated = true;
+  let firstPage;
+  try {
+    firstPage = await fetchItemsBulkPage(1, PAGE_SIZE);
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      usePaginated = false; // server doesn't have the new endpoint yet
+    } else {
+      throw err; // network error or other failure — let caller handle
+    }
+  }
+
+  if (!usePaginated) {
+    // ── Legacy single-request fallback ──────────────────────────────────────
+    let data = await fetchItemsBulk();
+    const items = data.items || [];
+    const serverVersion = data.version;
+    data = null;
+
+    if (items.length === 0) {
+      return {
+        success: false,
+        count: 0,
+        version: serverVersion,
+        error: "Server has no items",
+      };
+    }
+
+    onProgress?.({ phase: "downloading", percent: 100 });
+    onProgress?.({ phase: "saving", percent: 0 });
+
+    const inserted = await clearAndReplaceAllItems(
+      items,
+      ({ processed, total }) => {
+        onProgress?.({
+          phase: "saving",
+          percent: Math.round((processed / total) * 100),
+        });
+      },
+    );
+
+    const syncNow = new Date().toISOString();
+    await Promise.all([
+      AsyncStorage.setItem("itemsVersion", String(serverVersion)),
+      AsyncStorage.setItem("lastItemSyncTime", syncNow),
+      AsyncStorage.setItem("lastItemFullSync", syncNow),
+    ]);
+
+    onProgress?.({ phase: "done", percent: 100 });
+    return {
+      success: true,
+      count: inserted,
+      version: serverVersion,
+      delta: false,
+    };
+  }
+
+  // ── Paginated download (preferred) ──────────────────────────────────────
   const serverVersion = firstPage.version;
   const totalPages = firstPage.totalPages;
   const totalItems = firstPage.totalItems;
