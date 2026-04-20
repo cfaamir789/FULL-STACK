@@ -586,44 +586,45 @@ export default function ScannerScreen({ role = "worker" }) {
 
   // ─── Reusable UI pieces ─────────────────────────────────────────────────────
 
-  const renderTabs = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.tabRow}
-      contentContainerStyle={styles.tabRowContent}
-      keyboardShouldPersistTaps="handled"
-    >
-      {[
-        { key: "barcode", icon: "barcode-scan", label: "Barcode" },
-        { key: "itemcode", icon: "pound-box", label: "Item Code" },
-        ...(canUseAdvancedModes
-          ? [
-              { key: "quickcode", icon: "dialpad", label: "Quick Code" },
-              { key: "itemname", icon: "text-search", label: "Item Name" },
-            ]
-          : []),
-      ].map((t) => (
-        <TouchableOpacity
-          key={t.key}
-          style={[styles.tab, mode === t.key && styles.tabActive]}
-          onPress={() => switchMode(t.key)}
-        >
-          <MaterialCommunityIcons
-            name={t.icon}
-            size={20}
-            color={mode === t.key ? "#fff" : Colors.textSecondary}
-          />
-          <Text
-            style={[styles.tabText, mode === t.key && styles.tabTextActive]}
-            numberOfLines={1}
+  const renderTabs = () => {
+    const tabs = [
+      { key: "barcode", icon: "barcode-scan", label: "Barcode" },
+      { key: "itemcode", icon: "pound-box", label: "Item Code" },
+      ...(canUseAdvancedModes
+        ? [
+            { key: "quickcode", icon: "dialpad", label: "Quick Code" },
+            { key: "itemname", icon: "text-search", label: "Item Name" },
+          ]
+        : []),
+    ];
+    return (
+      <View style={styles.tabRow}>
+        {tabs.map((t, i) => (
+          <TouchableOpacity
+            key={t.key}
+            style={[
+              styles.tab,
+              mode === t.key && styles.tabActive,
+              i < tabs.length - 1 && styles.tabBorder,
+            ]}
+            onPress={() => switchMode(t.key)}
           >
-            {t.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
+            <MaterialCommunityIcons
+              name={t.icon}
+              size={18}
+              color={mode === t.key ? "#fff" : Colors.textSecondary}
+            />
+            <Text
+              style={[styles.tabText, mode === t.key && styles.tabTextActive]}
+              numberOfLines={1}
+            >
+              {t.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
 
   const renderSearchInput = () => {
     if (mode === "barcode") {
@@ -1006,11 +1007,23 @@ export default function ScannerScreen({ role = "worker" }) {
           {found && (
             <>
               <Text style={styles.itemBannerDetail}>
-                <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>Code: </Text>
-                <Text style={{ fontWeight: "800", color: Colors.primary, fontSize: 13 }}>{foundItem.item_code}</Text>
+                <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
+                  Code:{" "}
+                </Text>
+                <Text
+                  style={{
+                    fontWeight: "800",
+                    color: Colors.primary,
+                    fontSize: 13,
+                  }}
+                >
+                  {foundItem.item_code}
+                </Text>
               </Text>
               <Text style={styles.itemBannerDetail}>
-                <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>Barcode: </Text>
+                <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
+                  Barcode:{" "}
+                </Text>
                 {foundItem.barcode}
               </Text>
             </>
@@ -1390,6 +1403,7 @@ const styles = StyleSheet.create({
   permBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
 
   tabRow: {
+    flexDirection: "row",
     marginHorizontal: 12,
     marginVertical: 10,
     borderRadius: 12,
@@ -1403,21 +1417,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
   },
-  tabRowContent: {
-    flexDirection: "row",
-    flexGrow: 1,
-  },
   tab: {
-    flexDirection: "row",
+    flex: 1,
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 5,
-    minWidth: 80,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    gap: 3,
+  },
+  tabBorder: {
+    borderRightWidth: 1,
+    borderRightColor: Colors.border,
   },
   tabActive: { backgroundColor: Colors.primary },
-  tabText: { fontSize: 13, fontWeight: "700", color: Colors.textSecondary },
+  tabText: { fontSize: 10, fontWeight: "700", color: Colors.textSecondary },
   tabTextActive: { color: "#fff" },
 
   cameraWrap: { height: 240, overflow: "hidden", backgroundColor: "#000" },

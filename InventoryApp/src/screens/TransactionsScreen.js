@@ -37,8 +37,21 @@ import {
 } from "../services/api";
 import { setDataClearedListener } from "../services/syncService";
 import TransactionRow from "../components/TransactionRow";
-import VoiceMic from "../components/VoiceMic";
 import CalcInput from "../components/CalcInput";
+
+let CameraView, useCameraPermissions;
+if (!IS_WEB) {
+  try {
+    const cam = require("expo-camera");
+    CameraView = cam.CameraView;
+    useCameraPermissions = cam.useCameraPermissions;
+  } catch {
+    CameraView = null;
+    useCameraPermissions = () => [{ granted: false }, async () => {}];
+  }
+} else {
+  useCameraPermissions = () => [{ granted: false }, async () => {}];
+}
 import Colors from "../theme/colors";
 import { isAdminRole } from "../utils/roles";
 import {
@@ -101,6 +114,25 @@ export default function TransactionsScreen({ username, role, scope = "self" }) {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [workerFilter, setWorkerFilter] = useState("all");
   const [exporting, setExporting] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+
+  const openScanner = async () => {
+    if (IS_WEB) return;
+    if (!permission?.granted) {
+      const p = await requestPermission();
+      if (!p.granted) return;
+    }
+    setShowScanner(true);
+  };
+
+  const handleBarCodeScanned = ({ data }) => {
+    const upper = data.trim().toUpperCase();
+    setShowScanner(false);
+    setQuery(upper);
+    setDebouncedQuery(upper);
+    setTimeout(() => queryRef.current?.focus(), 100);
+  };
 
   // Get unique worker names for filter chips
   const workerNames = useMemo(
@@ -576,52 +608,82 @@ export default function TransactionsScreen({ username, role, scope = "self" }) {
 
   return (
     <View style={styles.container}>
-      {/* Search bar with voice */}
-      <View style={styles.searchBar}>
-        <MaterialCommunityIcons
-          name="magnify"
-          size={20}
-          color={Colors.textSecondary}
-          style={{ marginRight: 8 }}
-        />
-        <TextInput
-          ref={queryRef}
-          style={styles.searchInput}
-          placeholder="Search by item code, barcode or name..."
-          value={query}
-          onChangeText={(t) => {
-            const upper = t.toUpperCase();
-            setQuery(upper);
-            if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-            searchTimerRef.current = setTimeout(
-              () => setDebouncedQuery(upper),
-              250,
-            );
-          }}
-          autoCapitalize="characters"
-          clearButtonMode="never"
-          returnKeyType="search"
-        />
-        <VoiceMic
-          onResult={(t) => {
-            setQuery(t);
-            setDebouncedQuery(t);
-          }}
-          focusTargetRef={queryRef}
-          size={18}
-          style={{ backgroundColor: "transparent", marginRight: 2 }}
-        />
-        {query.length > 0 && (
-          <TouchableOpacity
-            onPress={() => {
-              setQuery("");
-              setDebouncedQuery("");
+      {/* Barcode scanner overlay */}
+      {showScanner && !IS_WEB && CameraView && (
+        <View style={styles.scannerOverlay}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            barcodeScannerSettings={{
+              barcodeTypes: [
+                "ean13",
+                "ean8",
+                "code128",
+                "code39",
+                "upc_a",
+                "qr",
+              ],
             }}
+            onBarcodeScanned={handleBarCodeScanned}
+          />
+          <TouchableOpacity
+            style={styles.scannerCloseBtn}
+            onPress={() => setShowScanner(false)}
           >
+            <MaterialCommunityIcons name="close" size={28} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.scannerHint}>Scan a barcode to search</Text>
+        </View>
+      )}
+      {/* Search bar */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchBar}>
+          <MaterialCommunityIcons
+            name="magnify"
+            size={20}
+            color={Colors.textSecondary}
+            style={{ marginRight: 8 }}
+          />
+          <TextInput
+            ref={queryRef}
+            style={styles.searchInput}
+            placeholder="Search by item code, barcode or name..."
+            value={query}
+            onChangeText={(t) => {
+              const upper = t.toUpperCase();
+              setQuery(upper);
+              if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+              searchTimerRef.current = setTimeout(
+                () => setDebouncedQuery(upper),
+                250,
+              );
+            }}
+            autoCapitalize="characters"
+            clearButtonMode="never"
+            returnKeyType="search"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setQuery("");
+                setDebouncedQuery("");
+                queryRef.current?.focus();
+              }}
+              style={{ padding: 4 }}
+            >
+              <MaterialCommunityIcons
+                name="close-circle"
+                size={18}
+                color={Colors.textLight}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+        {!IS_WEB && (
+          <TouchableOpacity style={styles.scanBtn} onPress={openScanner}>
             <MaterialCommunityIcons
-              name="close-circle"
-              size={18}
-              color={Colors.textLight}
+              name="barcode-scan"
+              size={20}
+              color="#fff"
             />
           </TouchableOpacity>
         )}
@@ -1041,20 +1103,57 @@ export default function TransactionsScreen({ username, role, scope = "self" }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  searchBar: {
+  searchRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.card,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    gap: 8,
+  },
+  searchBar: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
     paddingVertical: 4,
     color: Colors.textPrimary,
+  },
+  scanBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    padding: 8,
+  },
+  scannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    backgroundColor: "#000",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingBottom: 40,
+  },
+  scannerCloseBtn: {
+    position: "absolute",
+    top: 48,
+    right: 20,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 24,
+    padding: 8,
+  },
+  scannerHint: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 16,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
   workerFilterBar: {
     backgroundColor: Colors.card,

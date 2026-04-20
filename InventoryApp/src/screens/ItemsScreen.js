@@ -22,7 +22,6 @@ import {
   searchItemSummaries,
 } from "../database/db";
 import ItemCard from "../components/ItemCard";
-import VoiceMic from "../components/VoiceMic";
 import Colors from "../theme/colors";
 
 const PAGE_SIZE = 250;
@@ -53,6 +52,7 @@ export default function ItemsScreen({ navigation, route }) {
   const [showScanner, setShowScanner] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const searchTimer = useRef(null);
+  const queryRef = useRef(null);
   const loadTokenRef = useRef(0);
 
   const runItemsQuery = useCallback(
@@ -178,22 +178,21 @@ export default function ItemsScreen({ navigation, route }) {
             style={styles.searchIcon}
           />
           <TextInput
+            ref={queryRef}
             style={styles.searchInput}
             placeholder="Search by name, item code or barcode..."
             value={query}
             onChangeText={(t) => setQuery(t.toUpperCase())}
             autoCapitalize="characters"
-            clearButtonMode="while-editing"
+            clearButtonMode="never"
             returnKeyType="search"
-          />
-          <VoiceMic
-            onResult={(t) => setQuery(t.toUpperCase())}
-            size={18}
-            style={{ backgroundColor: "transparent", marginRight: 2 }}
           />
           {query.length > 0 && (
             <TouchableOpacity
-              onPress={() => setQuery("")}
+              onPress={() => {
+                setQuery("");
+                queryRef.current?.focus();
+              }}
               style={{ padding: 4 }}
             >
               <MaterialCommunityIcons

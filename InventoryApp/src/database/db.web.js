@@ -713,3 +713,81 @@ export const clearAndReplaceBinMaster = async (codes) => {
     tx.onerror = (e) => reject(e.target.error);
   });
 };
+
+// ─── Item Summaries (grouped, for ItemsScreen) ────────────────────────────────
+
+export const getItemSummaries = async (limit = 250, offset = 0) => {
+  const items = await getItemsCache();
+  // Group by item_code (or item_name when code is empty)
+  const groups = new Map();
+  for (const item of items) {
+    const key = item.item_code
+      ? item.item_code.trim().toLowerCase()
+      : item.item_name.trim().toLowerCase();
+    if (!groups.has(key)) {
+      groups.set(key, {
+        item_key: key,
+        item_code: item.item_code || "",
+        item_name: item.item_name || "",
+        barcodeCount: 0,
+      });
+    }
+    groups.get(key).barcodeCount += 1;
+  }
+  const sorted = [...groups.values()].sort((a, b) =>
+    a.item_name.localeCompare(b.item_name),
+  );
+  return sorted.slice(offset, offset + limit);
+};
+
+export const searchItemSummaries = async (query, limit = 200) => {
+  const items = await getItemsCache();
+  const q = String(query || "")
+    .trim()
+    .toLowerCase();
+  if (!q) return [];
+
+  const groups = new Map();
+  for (const item of items) {
+    const nameMatch = item.item_name.toLowerCase().includes(q);
+    const codeMatch = item.item_code.toLowerCase().includes(q);
+    const barcodeMatch = item.barcode.toLowerCase().includes(q);
+    if (!nameMatch && !codeMatch && !barcodeMatch) continue;
+
+    const key = item.item_code
+      ? item.item_code.trim().toLowerCase()
+      : item.item_name.trim().toLowerCase();
+    if (!groups.has(key)) {
+      groups.set(key, {
+        item_key: key,
+        item_code: item.item_code || "",
+        item_name: item.item_name || "",
+        barcodeCount: 0,
+      });
+    }
+    groups.get(key).barcodeCount += 1;
+  }
+  return [...groups.values()]
+    .sort((a, b) => a.item_name.localeCompare(b.item_name))
+    .slice(0, limit);
+};
+
+export const getItemBarcodes = async (itemCode, itemName) => {
+  const items = await getItemsCache();
+  const code = String(itemCode || "")
+    .trim()
+    .toLowerCase();
+  if (code) {
+    return items
+      .filter((i) => i.item_code.toLowerCase() === code)
+      .map((i) => i.barcode)
+      .sort();
+  }
+  const name = String(itemName || "")
+    .trim()
+    .toLowerCase();
+  return items
+    .filter((i) => i.item_name.toLowerCase() === name)
+    .map((i) => i.barcode)
+    .sort();
+};

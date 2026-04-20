@@ -428,13 +428,27 @@ async function _buildBinMetaCache() {
   };
   const sortedCats = categories
     .filter((c) => c && String(c).trim() !== "")
-    .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+    .sort((a, b) =>
+      String(a).localeCompare(String(b), undefined, { numeric: true }),
+    );
   const sortedZones = zoneCodes
     .filter((c) => c && String(c).trim() !== "")
-    .sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+    .sort((a, b) =>
+      String(a).localeCompare(String(b), undefined, { numeric: true }),
+    );
 
-  _binMetaCache = { version, data: { success: true, stats, categories: sortedCats, zoneCodes: sortedZones } };
-  console.log(`[bin-meta-cache] built v${version} — ${sortedCats.length} cats, ${sortedZones.length} zones`);
+  _binMetaCache = {
+    version,
+    data: {
+      success: true,
+      stats,
+      categories: sortedCats,
+      zoneCodes: sortedZones,
+    },
+  };
+  console.log(
+    `[bin-meta-cache] built v${version} — ${sortedCats.length} cats, ${sortedZones.length} zones`,
+  );
   return _binMetaCache;
 }
 
@@ -955,4 +969,10 @@ router.get(
 );
 
 module.exports = router;
-module.exports._warmBinMetaCache = async () => { try { await getBinMetaCache(); } catch(e) { console.warn("[bin-meta-cache] warm failed:", e.message); } };
+module.exports._warmBinMetaCache = async () => {
+  try {
+    await getBinMetaCache();
+  } catch (e) {
+    console.warn("[bin-meta-cache] warm failed:", e.message);
+  }
+};

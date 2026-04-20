@@ -123,7 +123,10 @@ export const downloadItemMaster = async (onProgress) => {
       throw bulkErr;
     }
     // fall through to paginated fallback below
-    console.warn("[downloadItemMaster] bulk failed, trying paginated:", bulkErr.message);
+    console.warn(
+      "[downloadItemMaster] bulk failed, trying paginated:",
+      bulkErr.message,
+    );
   }
 
   // ── FALLBACK: paginated download (larger pages = fewer requests) ──────────

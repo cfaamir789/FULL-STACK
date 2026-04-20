@@ -162,7 +162,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontFamily: "monospace",
   },
-  metaRow: { flexDirection: "row", alignItems: "center", marginTop: 6, gap: 10, flexWrap: "wrap" },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+    gap: 10,
+    flexWrap: "wrap",
+  },
   binPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -174,7 +180,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  binLabel: { fontSize: 12, fontWeight: "700", color: Colors.textSecondary, letterSpacing: 0.2 },
+  binLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: Colors.textSecondary,
+    letterSpacing: 0.2,
+  },
   qtyPill: {
     backgroundColor: Colors.primary + "18",
     borderRadius: 6,

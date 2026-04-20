@@ -77,6 +77,8 @@ export default function BinSelector({
     onSelectBin(bin);
     setFilterText(bin.bin_code);
     setListOpen(false);
+    // Auto-advance to next field (To Bin or Qty) once bin is chosen
+    if (onSubmitEditing) setTimeout(onSubmitEditing, 80);
   };
 
   const handleSwitchToCustom = () => {
@@ -213,12 +215,14 @@ export default function BinSelector({
                 style={{ marginRight: 6 }}
               />
               <TextInput
+                ref={inputRef}
                 style={styles.filterInput}
                 value={filterText}
                 onChangeText={handleFilterChange}
                 placeholder={`Search or type bin code (${bins.length} bins)`}
                 placeholderTextColor={Colors.textLight}
                 autoCapitalize="characters"
+                keyboardType="default"
                 returnKeyType="next"
                 onFocus={() => setListOpen(true)}
                 onSubmitEditing={onSubmitEditing}
@@ -355,7 +359,11 @@ export default function BinSelector({
               <TouchableOpacity
                 key={b.bin_code}
                 style={styles.quickChip}
-                onPress={() => onCustomChange(b.bin_code)}
+                onPress={() => {
+                  onCustomChange(b.bin_code);
+                  // Auto-advance after quick chip selection
+                  if (onSubmitEditing) setTimeout(onSubmitEditing, 80);
+                }}
                 disabled={isDisabled}
               >
                 <Text style={styles.quickChipCode}>{b.bin_code}</Text>
@@ -424,6 +432,7 @@ export default function BinSelector({
               placeholder={placeholder}
               placeholderTextColor={Colors.textLight}
               autoCapitalize="characters"
+              keyboardType="default"
               returnKeyType="next"
               onSubmitEditing={handleCustomSubmit}
               editable={!isDisabled}
