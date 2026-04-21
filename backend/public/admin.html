@@ -4227,6 +4227,8 @@
             if (msg.type === "transactions_updated") {
               invalidateApiCache("/transactions/stats");
               invalidateApiCache("/sync/worker-status");
+              invalidateApiCache("/transactions");
+              pageLastLoaded.processed = 0;
               loadStats();
               if (currentPage === "workers" && pageLoaded.workers) {
                 refreshWorkersPage(true);
@@ -6344,6 +6346,8 @@
             " transaction(s) as done for " +
             esc(worker) +
             ".</div>";
+          invalidateApiCache("/transactions");
+          pageLastLoaded.processed = 0;
           await refreshWorkersPage();
         } catch (err) {
           resultDiv.innerHTML =

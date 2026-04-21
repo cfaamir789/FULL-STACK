@@ -32,7 +32,12 @@ const adminClients = new Set();
 
 wss.on("connection", (ws) => {
   adminClients.add(ws);
+  ws.isAlive = true;
   console.log(`WS client connected (${adminClients.size} total)`);
+
+  ws.on("pong", () => {
+    ws.isAlive = true;
+  });
 
   ws.on("close", () => {
     adminClients.delete(ws);
@@ -43,6 +48,19 @@ wss.on("connection", (ws) => {
     adminClients.delete(ws);
   });
 });
+
+// Ping all clients every 30s to keep connections alive through Render's proxy
+const wsPingInterval = setInterval(() => {
+  for (const ws of adminClients) {
+    if (!ws.isAlive) {
+      ws.terminate();
+      adminClients.delete(ws);
+      continue;
+    }
+    ws.isAlive = false;
+    ws.ping();
+  }
+}, 30000);
 
 // Broadcast a message to all connected admin dashboards
 function broadcast(eventType, data = {}) {

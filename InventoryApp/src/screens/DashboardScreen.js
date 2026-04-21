@@ -149,6 +149,10 @@ export default function DashboardScreen({ username }) {
       if (recent.length === 0 || Date.now() - lastLoadedAtRef.current > 15000) {
         loadData();
       }
+      // Clear search query when user leaves this tab
+      return () => {
+        setQuery("");
+      };
     }, [loadData, recent.length]),
   );
 

@@ -300,6 +300,11 @@ export const deleteUser = async (username) => {
   return res.data;
 };
 
+export const changeUserRole = async (username, role) => {
+  const res = await apiClient.put(`/auth/users/${username}/role`, { role });
+  return res.data;
+};
+
 // ─── Items ────────────────────────────────────────────────────────────────────
 
 export const fetchItems = async () => {

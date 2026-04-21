@@ -91,8 +91,8 @@ export default function BinSelector({
     onSelectBin(bin);
     setFilterText(bin.bin_code);
     setListOpen(false);
-    // Auto-advance to next field (To Bin or Qty) once bin is chosen
-    if (onSubmitEditing) setTimeout(onSubmitEditing, 80);
+    // Immediately advance to next field so keyboard stays visible
+    if (onSubmitEditing) setTimeout(onSubmitEditing, 30);
   };
 
   const handleSwitchToCustom = () => {
@@ -288,6 +288,7 @@ export default function BinSelector({
                 autoCapitalize="characters"
                 keyboardType="default"
                 returnKeyType="next"
+                showSoftInputOnFocus={true}
                 onFocus={() => setListOpen(true)}
                 onSubmitEditing={onSubmitEditing}
                 editable={!isDisabled}
@@ -504,6 +505,7 @@ export default function BinSelector({
               autoCapitalize="characters"
               keyboardType="default"
               returnKeyType="next"
+              showSoftInputOnFocus={true}
               onSubmitEditing={handleCustomSubmit}
               editable={!isDisabled}
             />

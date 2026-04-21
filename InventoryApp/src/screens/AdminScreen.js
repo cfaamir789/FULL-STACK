@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { getUsers, registerWorker, deleteUser } from "../services/api";
+import { getUsers, registerWorker, deleteUser, changeUserRole } from "../services/api";
 import Colors from "../theme/colors";
 import { isAdminRole, isSuperAdminRole } from "../utils/roles";
 
@@ -29,6 +29,16 @@ export default function AdminScreen({ viewerRole = "admin" }) {
   const [newRole, setNewRole] = useState("worker");
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState("");
+  const [showRoleChange, setShowRoleChange] = useState(false);
+  const [roleChangeTarget, setRoleChangeTarget] = useState(null);
+  const [roleChanging, setRoleChanging] = useState(false);
+  const [roleChangeError, setRoleChangeError] = useState("");
+
+  const displayRole = (role) => {
+    if (role === "superadmin") return "SUPER ADMIN";
+    if (role === "worker") return "PICKER";
+    return role.toUpperCase();
+  };
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -81,6 +91,30 @@ export default function AdminScreen({ viewerRole = "admin" }) {
       );
     } finally {
       setAdding(false);
+    }
+  };
+
+  const openRoleChange = (user) => {
+    setRoleChangeTarget(user);
+    setRoleChangeError("");
+    setShowRoleChange(true);
+  };
+
+  const confirmRoleChange = async (newRoleValue) => {
+    if (!roleChangeTarget) return;
+    setRoleChanging(true);
+    setRoleChangeError("");
+    try {
+      await changeUserRole(roleChangeTarget.username, newRoleValue);
+      setShowRoleChange(false);
+      setRoleChangeTarget(null);
+      loadUsers();
+    } catch (err) {
+      setRoleChangeError(
+        err?.response?.data?.error || err.message || "Could not change role.",
+      );
+    } finally {
+      setRoleChanging(false);
     }
   };
 
@@ -141,7 +175,7 @@ export default function AdminScreen({ viewerRole = "admin" }) {
               />
               <Text style={styles.emptyText}>No users yet.</Text>
               <Text style={styles.emptySubText}>
-                Tap "Add User" to create a worker account.
+                Tap "Add User" to create a Picker or Checker account.
               </Text>
             </View>
           }
@@ -154,7 +188,9 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                       ? "crown"
                       : isAdminRole(item.role)
                         ? "shield-account"
-                        : "account-hard-hat"
+                        : item.role === "checker"
+                          ? "account-search"
+                          : "account-hard-hat"
                   }
                   size={26}
                   color={
@@ -162,7 +198,9 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                       ? Colors.error
                       : isAdminRole(item.role)
                         ? Colors.primary
-                        : Colors.textSecondary
+                        : item.role === "checker"
+                          ? Colors.warning
+                          : Colors.textSecondary
                   }
                 />
               </View>
@@ -175,7 +213,9 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                       ? styles.roleSuperAdmin
                       : isAdminRole(item.role)
                         ? styles.roleAdmin
-                        : styles.roleWorker,
+                        : item.role === "checker"
+                          ? styles.roleChecker
+                          : styles.roleWorker,
                   ]}
                 >
                   <Text
@@ -185,16 +225,29 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                         ? styles.roleTextSuperAdmin
                         : isAdminRole(item.role)
                           ? styles.roleTextAdmin
-                          : styles.roleTextWorker,
+                          : item.role === "checker"
+                            ? styles.roleTextChecker
+                            : styles.roleTextWorker,
                     ]}
                   >
-                    {item.role === "superadmin"
-                      ? "SUPER ADMIN"
-                      : item.role.toUpperCase()}
+                    {displayRole(item.role)}
                   </Text>
                 </View>
               </View>
+              {item.role !== "superadmin" && (
+                <TouchableOpacity
+                  style={styles.roleChangeBtn}
+                  onPress={() => openRoleChange(item)}
+                >
+                  <MaterialCommunityIcons
+                    name="swap-horizontal"
+                    size={20}
+                    color={Colors.primary}
+                  />
+                </TouchableOpacity>
+              )}
               {(item.role === "worker" ||
+                item.role === "checker" ||
                 (item.role === "admin" && canManageAdmins)) && (
                 <TouchableOpacity
                   style={styles.deleteBtn}
@@ -277,7 +330,30 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                       newRole === "worker" && styles.roleToggleTextActive,
                     ]}
                   >
-                    Worker
+                    Picker
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.roleToggle,
+                    newRole === "checker" && styles.roleToggleCheckerActive,
+                  ]}
+                  onPress={() => setNewRole("checker")}
+                >
+                  <MaterialCommunityIcons
+                    name="account-search"
+                    size={16}
+                    color={
+                      newRole === "checker" ? "#fff" : Colors.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.roleToggleText,
+                      newRole === "checker" && styles.roleToggleTextActive,
+                    ]}
+                  >
+                    Checker
                   </Text>
                 </TouchableOpacity>
                 {canManageAdmins && (
@@ -330,6 +406,112 @@ export default function AdminScreen({ viewerRole = "admin" }) {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Role Change Modal ─────────────────────────────────────── */}
+      <Modal
+        visible={showRoleChange}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowRoleChange(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Change Role
+                {roleChangeTarget ? ` — ${roleChangeTarget.username}` : ""}
+              </Text>
+              <TouchableOpacity onPress={() => setShowRoleChange(false)}>
+                <MaterialCommunityIcons
+                  name="close"
+                  size={22}
+                  color={Colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+            {roleChangeTarget && (
+              <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 14 }}>
+                Current role:{" "}
+                <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
+                  {displayRole(roleChangeTarget.role)}
+                </Text>
+              </Text>
+            )}
+            <Text style={styles.label}>Select New Role</Text>
+            <View style={[styles.roleToggleRow, { marginTop: 8 }]}>
+              <TouchableOpacity
+                style={[
+                  styles.roleToggle,
+                  roleChangeTarget?.role === "worker" && { opacity: 0.4 },
+                  roleChangeTarget?.role !== "worker" && styles.roleToggleActive,
+                ]}
+                disabled={roleChanging || roleChangeTarget?.role === "worker"}
+                onPress={() => confirmRoleChange("worker")}
+              >
+                <MaterialCommunityIcons
+                  name="account-hard-hat"
+                  size={18}
+                  color="#fff"
+                />
+                <Text style={[styles.roleToggleText, styles.roleToggleTextActive]}>
+                  Picker
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.roleToggle,
+                  roleChangeTarget?.role === "checker" && { opacity: 0.4 },
+                  roleChangeTarget?.role !== "checker" && styles.roleToggleCheckerActive,
+                ]}
+                disabled={roleChanging || roleChangeTarget?.role === "checker"}
+                onPress={() => confirmRoleChange("checker")}
+              >
+                <MaterialCommunityIcons
+                  name="account-search"
+                  size={18}
+                  color="#fff"
+                />
+                <Text style={[styles.roleToggleText, styles.roleToggleTextActive]}>
+                  Checker
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {canManageAdmins && (
+              <View style={[styles.roleToggleRow, { marginTop: 8 }]}>
+                <TouchableOpacity
+                  style={[
+                    styles.roleToggle,
+                    roleChangeTarget?.role === "admin" && { opacity: 0.4 },
+                    roleChangeTarget?.role !== "admin" && styles.roleToggleActive,
+                  ]}
+                  disabled={roleChanging || roleChangeTarget?.role === "admin"}
+                  onPress={() => confirmRoleChange("admin")}
+                >
+                  <MaterialCommunityIcons
+                    name="shield-account"
+                    size={18}
+                    color="#fff"
+                  />
+                  <Text style={[styles.roleToggleText, styles.roleToggleTextActive]}>
+                    Admin
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {roleChanging && (
+              <ActivityIndicator
+                color={Colors.primary}
+                style={{ marginTop: 12 }}
+              />
+            )}
+            {roleChangeError ? (
+              <Text style={[styles.errorText, { marginTop: 8 }]}>
+                {roleChangeError}
+              </Text>
+            ) : null}
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -410,10 +592,18 @@ const styles = StyleSheet.create({
   roleSuperAdmin: { backgroundColor: Colors.error + "20" },
   roleAdmin: { backgroundColor: Colors.primary + "20" },
   roleWorker: { backgroundColor: Colors.success + "20" },
+  roleChecker: { backgroundColor: Colors.warning + "25" },
   roleText: { fontSize: 11, fontWeight: "700" },
   roleTextSuperAdmin: { color: Colors.error },
   roleTextAdmin: { color: Colors.primary },
   roleTextWorker: { color: Colors.success },
+  roleTextChecker: { color: Colors.warning },
+  roleChangeBtn: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.primary + "15",
+    marginRight: 4,
+  },
   deleteBtn: {
     padding: 8,
     borderRadius: 8,
@@ -473,6 +663,10 @@ const styles = StyleSheet.create({
   roleToggleActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
+  },
+  roleToggleCheckerActive: {
+    backgroundColor: Colors.warning,
+    borderColor: Colors.warning,
   },
   roleToggleText: {
     fontSize: 13,

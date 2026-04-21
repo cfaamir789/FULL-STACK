@@ -14,8 +14,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   getItemBarcodes,
   getItemSummaries,
@@ -50,6 +52,7 @@ export default function ItemsScreen({ navigation, route }) {
   const [hasMore, setHasMore] = useState(false);
   const [loadedCount, setLoadedCount] = useState(0);
   const [showScanner, setShowScanner] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const searchTimer = useRef(null);
   const queryRef = useRef(null);
@@ -125,6 +128,21 @@ export default function ItemsScreen({ navigation, route }) {
   const loadBarcodesForItem = useCallback(async (item) => {
     return await getItemBarcodes(item.item_code, item.item_name);
   }, []);
+
+  // Clear search query when user leaves this tab
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setQuery("");
+      };
+    }, []),
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await runItemsQuery({ reset: true, searchText: query.trim() });
+    setRefreshing(false);
+  }, [query, runItemsQuery]);
 
   const handleBarCodeScanned = ({ data }) => {
     setShowScanner(false);
@@ -225,6 +243,16 @@ export default function ItemsScreen({ navigation, route }) {
         >
           <MaterialCommunityIcons name="database-sync" size={20} color="#fff" />
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.importBtn, { backgroundColor: "#455A64" }]}
+          onPress={onRefresh}
+        >
+          <MaterialCommunityIcons
+            name={refreshing ? "loading" : "refresh"}
+            size={20}
+            color="#fff"
+          />
+        </TouchableOpacity>
       </View>
 
       <Text style={styles.countText}>
@@ -280,6 +308,14 @@ export default function ItemsScreen({ navigation, route }) {
           windowSize={7}
           onEndReached={loadMoreItems}
           onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.primary]}
+              tintColor={Colors.primary}
+            />
+          }
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator
@@ -322,6 +358,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     borderRadius: 8,
     padding: 10,
+    marginLeft: 6,
+  },
+  scanBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    padding: 10,
+    marginLeft: 6,
   },
   countText: {
     fontSize: 12,
@@ -353,12 +396,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   emptyImportText: { color: "#fff", fontWeight: "700", fontSize: 15 },
-  scanBtn: {
-    backgroundColor: Colors.success,
-    borderRadius: 8,
-    padding: 10,
-    marginRight: 8,
-  },
   scannerOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 100,

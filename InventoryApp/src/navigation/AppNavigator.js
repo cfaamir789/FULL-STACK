@@ -25,7 +25,7 @@ import BackupRestoreScreen from "../screens/BackupRestoreScreen";
 import ItemMasterScreen from "../screens/ItemMasterScreen";
 import BinContentScreen from "../screens/BinContentScreen";
 import Colors from "../theme/colors";
-import { isAdminRole } from "../utils/roles";
+import { isAdminRole, isCheckerRole } from "../utils/roles";
 import { loadServerUrl } from "../services/api";
 import {
   attemptSync,
@@ -37,7 +37,7 @@ const Tab = createBottomTabNavigator();
 const ItemsStack = createStackNavigator();
 const AdminStack = createStackNavigator();
 
-const ItemsStackNavigator = ({ role }) => (
+const ItemsStackNavigator = ({ role, onLogout }) => (
   <ItemsStack.Navigator
     screenOptions={{
       headerStyle: { backgroundColor: Colors.primary },
@@ -49,7 +49,25 @@ const ItemsStackNavigator = ({ role }) => (
       name="ItemsList"
       component={ItemsScreen}
       initialParams={{ role }}
-      options={{ title: "Items" }}
+      options={{
+        title: "Items",
+        ...(onLogout
+          ? {
+              headerRight: () => (
+                <TouchableOpacity
+                  onPress={onLogout}
+                  style={{ marginRight: 14 }}
+                >
+                  <MaterialCommunityIcons
+                    name="logout"
+                    size={22}
+                    color="#fff"
+                  />
+                </TouchableOpacity>
+              ),
+            }
+          : {}),
+      }}
     />
     <ItemsStack.Screen
       name="Import"
@@ -109,6 +127,26 @@ const AdminStackNavigator = ({ username, role }) => (
   </AdminStack.Navigator>
 );
 
+/** Decode the role claim from a JWT without a library.
+ *  Returns null if the token is missing, malformed, or has no role. */
+function decodeJwtRole(token) {
+  try {
+    const payload = token.split(".")[1];
+    // Replace URL-safe chars and pad to a multiple of 4
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const json = decodeURIComponent(
+      atob(padded)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    );
+    return JSON.parse(json).role || null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AppNavigator() {
   const [session, setSession] = useState(null);
   const [checking, setChecking] = useState(true);
@@ -123,10 +161,18 @@ export default function AppNavigator() {
           "authToken",
         ]);
         const name = pairs[0][1];
-        const role = pairs[1][1];
+        const storedRole = pairs[1][1];
         const token = pairs[2][1];
-        if (name && (token || role)) {
-          setSession({ username: name, role: role || "worker" });
+        if (name && (token || storedRole)) {
+          // Prefer the role embedded in the JWT (always up-to-date) over the
+          // cached AsyncStorage value, which may be missing on older installs.
+          const tokenRole = token ? decodeJwtRole(token) : null;
+          const role = tokenRole || storedRole || "worker";
+          // Keep AsyncStorage in sync so future restores work even offline
+          if (tokenRole && tokenRole !== storedRole) {
+            AsyncStorage.setItem("workerRole", tokenRole).catch(() => {});
+          }
+          setSession({ username: name, role });
         }
       } catch (e) {
         console.warn("session restore error:", e);
@@ -139,6 +185,12 @@ export default function AppNavigator() {
 
   useEffect(() => {
     if (!session?.username) {
+      return undefined;
+    }
+
+    // Checker role: items-only, no transactions — skip all background sync
+    // to keep RAM usage minimal on low-end devices
+    if (isCheckerRole(session.role)) {
       return undefined;
     }
 
@@ -176,6 +228,11 @@ export default function AppNavigator() {
 
   const { username: workerName, role } = session;
 
+  const handleLogout = async () => {
+    await AsyncStorage.multiRemove(["workerName", "workerRole", "authToken"]);
+    setSession(null);
+  };
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>
@@ -211,72 +268,69 @@ export default function AppNavigator() {
             headerTitleStyle: { fontWeight: "bold" },
           })}
         >
-          <Tab.Screen
-            name="Dashboard"
-            options={{
-              title: `Dashboard · ${workerName}`,
-              headerRight: () => (
-                <TouchableOpacity
-                  onPress={async () => {
-                    await AsyncStorage.multiRemove([
-                      "workerName",
-                      "workerRole",
-                      "authToken",
-                    ]);
-                    setSession(null);
-                  }}
-                  style={{ marginRight: 14 }}
-                >
-                  <MaterialCommunityIcons
-                    name="logout"
-                    size={22}
-                    color="#fff"
-                  />
-                </TouchableOpacity>
-              ),
-            }}
-          >
-            {() => <DashboardScreen username={workerName} />}
-          </Tab.Screen>
-          <Tab.Screen name="Scanner" options={{ headerShown: false }}>
-            {() => <ScannerScreen role={role} />}
-          </Tab.Screen>
+          {!isCheckerRole(role) && (
+            <Tab.Screen
+              name="Dashboard"
+              options={{
+                title: `Dashboard · ${workerName}`,
+                headerRight: () => (
+                  <TouchableOpacity
+                    onPress={handleLogout}
+                    style={{ marginRight: 14 }}
+                  >
+                    <MaterialCommunityIcons
+                      name="logout"
+                      size={22}
+                      color="#fff"
+                    />
+                  </TouchableOpacity>
+                ),
+              }}
+            >
+              {() => <DashboardScreen username={workerName} />}
+            </Tab.Screen>
+          )}
+          {!isCheckerRole(role) && (
+            <Tab.Screen name="Scanner" options={{ headerShown: false }}>
+              {() => <ScannerScreen role={role} />}
+            </Tab.Screen>
+          )}
           <Tab.Screen name="Items" options={{ headerShown: false }}>
-            {() => <ItemsStackNavigator role={role} />}
-          </Tab.Screen>
-          <Tab.Screen
-            name="Transactions"
-            options={{
-              title: "Transactions",
-              headerRight: () => (
-                <TouchableOpacity
-                  onPress={async () => {
-                    await AsyncStorage.multiRemove([
-                      "workerName",
-                      "workerRole",
-                      "authToken",
-                    ]);
-                    setSession(null);
-                  }}
-                  style={{ marginRight: 14 }}
-                >
-                  <MaterialCommunityIcons
-                    name="account-switch"
-                    size={22}
-                    color="#fff"
-                  />
-                </TouchableOpacity>
-              ),
-            }}
-          >
             {() => (
-              <TransactionsScreen
-                username={workerName}
+              <ItemsStackNavigator
                 role={role}
-                scope="self"
+                onLogout={isCheckerRole(role) ? handleLogout : undefined}
               />
             )}
           </Tab.Screen>
+          {!isCheckerRole(role) && (
+            <Tab.Screen
+              name="Transactions"
+              options={{
+                title: "Transactions",
+                headerRight: () => (
+                  <TouchableOpacity
+                    onPress={handleLogout}
+                    style={{ marginRight: 14 }}
+                  >
+                    <MaterialCommunityIcons
+                      name="account-switch"
+                      size={22}
+                      color="#fff"
+                    />
+                  </TouchableOpacity>
+                ),
+              }}
+            >
+              {() => (
+                <TransactionsScreen
+                  username={workerName}
+                  role={role}
+                  scope="self"
+                />
+              )}
+            </Tab.Screen>
+          )}
           {isAdminRole(role) && (
             <Tab.Screen
               name="Admin"

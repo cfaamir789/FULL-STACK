@@ -158,14 +158,18 @@ export default function ScannerScreen({ role = "worker" }) {
     return /^[A-Z0-9]+$/.test(bin);
   };
 
-  const focusFromBin = () =>
+  const focusFromBin = () => {
+    // First focus attempt — gives Android time to finish processing DataWedge keystrokes
     setTimeout(() => {
-      if (skipFocusFromBin.current) {
-        skipFocusFromBin.current = false;
-        return;
-      }
       fromBinRef.current?.focus();
-    }, 120);
+    }, 200);
+    // Second focus attempt — forces Android IME (soft keyboard) to appear on Zebra PDT devices
+    // where DataWedge suppresses the keyboard after a hardware scan
+    setTimeout(() => {
+      fromBinRef.current?.blur();
+      setTimeout(() => fromBinRef.current?.focus(), 50);
+    }, 320);
+  };
 
   // Live search as user types in Item Name mode
   useEffect(() => {
@@ -272,8 +276,8 @@ export default function ScannerScreen({ role = "worker" }) {
   const clearItem = () => {
     isResetting.current = true;
     clearFormState();
+    isResetting.current = false;
     setTimeout(() => {
-      isResetting.current = false;
       if (mode === "barcode") barcodeRef.current?.focus();
       else if (mode === "itemcode") itemCodeRef.current?.focus();
       else if (mode === "quickcode") quickCodeRef.current?.focus();
@@ -289,8 +293,10 @@ export default function ScannerScreen({ role = "worker" }) {
   };
 
   const switchMode = (m) => {
+    isResetting.current = true;
     setMode(m);
     clearFormState();
+    isResetting.current = false;
     // Auto-focus the primary input of the selected tab
     setTimeout(() => {
       if (m === "barcode") barcodeRef.current?.focus();
@@ -335,25 +341,23 @@ export default function ScannerScreen({ role = "worker" }) {
     setScanned(true);
     setNameResults([]);
     setQuickCodeResults([]);
+    // Always wipe bin/qty state so a re-scan of a different item starts fresh
+    setFrombin("");
+    setTobin("");
+    setQty("");
+    setSelectedFromBin(null);
+    setSelectedToBin(null);
     // Load bins for this item from local DB
     try {
       const bins = await getBinsForItem(item.item_code || "");
       setItemBins(bins);
-      setSelectedFromBin(null);
-      setSelectedToBin(null);
       if (bins.length === 0) {
         setFromBinMode("custom");
         setToBinMode("custom");
       } else {
         setFromBinMode("suggest");
         setToBinMode("suggest");
-        if (bins.length === 1) {
-          setSelectedFromBin(bins[0]);
-          setFrombin(bins[0].bin_code);
-          // From Bin is auto-selected — skip straight to To Bin
-          setTimeout(() => toBinRef.current?.focus(), 150);
-          return;
-        }
+        // Never auto-select — user must explicitly pick from the list
       }
     } catch {
       setItemBins([]);
@@ -476,7 +480,7 @@ export default function ScannerScreen({ role = "worker" }) {
       const effectiveTo =
         toBinMode === "suggest" ? selectedToBin?.bin_code || "" : tobin;
       if (!effectiveFrom.trim() || !effectiveTo.trim()) {
-        Alert.alert("Missing Bins", "From Bin and To Bin are required.");
+        showToast("From Bin and To Bin are required.");
         return;
       }
     }
@@ -488,7 +492,7 @@ export default function ScannerScreen({ role = "worker" }) {
     const effectiveToBin =
       toBinMode === "suggest" ? selectedToBin?.bin_code || tobin : tobin;
     if (!effectiveFromBin.trim() || !effectiveToBin.trim()) {
-      Alert.alert("Missing Bins", "From Bin and To Bin are required.");
+      showToast("From Bin and To Bin are required.");
       return;
     }
     if (!validateBinFormat(effectiveFromBin.trim())) {
@@ -532,12 +536,10 @@ export default function ScannerScreen({ role = "worker" }) {
       }
     }
     // Use directQty if it's a valid numeric string (from CalcInput), else fall back to state
-    // Workers: qty field is hidden — default to 1 per scan
-    const qtyStr = isAdminRole(role)
-      ? typeof directQty === "string" && /^\d+(\.\d+)?$/.test(directQty)
+    const qtyStr =
+      typeof directQty === "string" && /^\d+(\.\d+)?$/.test(directQty)
         ? directQty
-        : qty
-      : "1";
+        : qty;
     const qtyNum = parseInt(qtyStr, 10);
     if (!qtyStr || isNaN(qtyNum) || qtyNum < 1) {
       Alert.alert(
@@ -580,7 +582,7 @@ export default function ScannerScreen({ role = "worker" }) {
         from: effectiveFromBin.trim().toUpperCase(),
         to: effectiveToBin.trim().toUpperCase(),
       });
-      skipFocusFromBin.current = true;
+      skipFocusFromBin.current = false;
       resetForm();
       setSaving(false);
       attemptSync().catch(() => {});
@@ -652,7 +654,7 @@ export default function ScannerScreen({ role = "worker" }) {
             <View style={styles.inputWithMic}>
               <TextInput
                 ref={barcodeRef}
-                style={styles.inputInner}
+                style={[styles.inputInner, { fontSize: 22, fontWeight: "700" }]}
                 value={barcode}
                 onChangeText={(t) => setBarcode(digitsOnly(t))}
                 placeholder="Scan or type barcode"
@@ -697,7 +699,7 @@ export default function ScannerScreen({ role = "worker" }) {
             <View style={styles.inputWithMic}>
               <TextInput
                 ref={itemCodeRef}
-                style={styles.inputInner}
+                style={[styles.inputInner, { fontSize: 22, fontWeight: "700" }]}
                 value={itemCode}
                 onChangeText={(t) => setItemCode(digitsOnly(t))}
                 placeholder="Type item code"
@@ -1010,7 +1012,6 @@ export default function ScannerScreen({ role = "worker" }) {
           ) || null;
     const qtyNum = parseInt(qty, 10);
     const exceedsStock =
-      isAdmin &&
       effectiveFromBinStock &&
       qty &&
       !isNaN(qtyNum) &&
@@ -1043,6 +1044,15 @@ export default function ScannerScreen({ role = "worker" }) {
           onModeChange={setFromBinMode}
           selectedBin={selectedFromBin}
           onSelectBin={(bin) => {
+            // Focus To Bin BEFORE state update so keyboard never dismisses
+            // Double-focus forces Android IME to appear on Zebra PDT devices
+            if (bin) {
+              toBinRef.current?.focus();
+              setTimeout(() => {
+                toBinRef.current?.blur();
+                setTimeout(() => toBinRef.current?.focus(), 50);
+              }, 120);
+            }
             setSelectedFromBin(bin);
             if (bin) setFrombin(bin.bin_code);
             else setFrombin("");
@@ -1065,6 +1075,15 @@ export default function ScannerScreen({ role = "worker" }) {
           onModeChange={setToBinMode}
           selectedBin={selectedToBin}
           onSelectBin={(bin) => {
+            // Focus Qty BEFORE state update so keyboard never dismisses
+            // Double-focus forces Android IME to appear on Zebra PDT devices
+            if (bin) {
+              qtyRef.current?.focus();
+              setTimeout(() => {
+                qtyRef.current?.blur();
+                setTimeout(() => qtyRef.current?.focus(), 50);
+              }, 120);
+            }
             setSelectedToBin(bin);
             if (bin) setTobin(bin.bin_code);
             else setTobin("");
@@ -1072,13 +1091,7 @@ export default function ScannerScreen({ role = "worker" }) {
           customValue={tobin}
           onCustomChange={setTobin}
           inputRef={toBinRef}
-          onSubmitEditing={() => {
-            if (isAdmin) {
-              qtyRef.current?.focus();
-            } else {
-              handleSave();
-            }
-          }}
+          onSubmitEditing={() => qtyRef.current?.focus()}
           editable={scanned}
           onBinValidate={checkBinExists}
           showQty={isAdmin}
@@ -1108,63 +1121,61 @@ export default function ScannerScreen({ role = "worker" }) {
           </View>
         )}
 
-        {/* Qty — admin only; workers default to 1 on save */}
-        {isAdmin && (
-          <>
-            <Text style={styles.label}>
-              Quantity{" "}
+        {/* Qty — required for all users (admin and worker) */}
+        <>
+          <Text style={styles.label}>
+            Quantity{" "}
+            <Text
+              style={{
+                fontWeight: "400",
+                color: Colors.textLight,
+                fontSize: 11,
+              }}
+            >
+              (tap calculator for math: 3×48 = 144)
+            </Text>
+          </Text>
+          <CalcInput
+            ref={qtyRef}
+            value={qty}
+            onValueChange={setQty}
+            placeholder="Qty — tap to open calculator"
+            onSubmitEditing={handleSave}
+          />
+          {exceedsStock && (
+            <View
+              style={{
+                backgroundColor: "#FFEBEE",
+                borderRadius: 8,
+                padding: 10,
+                marginTop: 6,
+                borderLeftWidth: 4,
+                borderLeftColor: "#D32F2F",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <MaterialCommunityIcons
+                name="alert-circle"
+                size={18}
+                color="#D32F2F"
+              />
               <Text
                 style={{
-                  fontWeight: "400",
-                  color: Colors.textLight,
-                  fontSize: 11,
+                  color: "#D32F2F",
+                  fontWeight: "700",
+                  fontSize: 13,
+                  flex: 1,
                 }}
               >
-                (tap calculator for math: 3×48 = 144)
+                ⚠️ Exceeds stock! Only{" "}
+                {effectiveFromBinStock.qty.toLocaleString()} pcs available in{" "}
+                {effectiveFromBinStock.bin_code}.
               </Text>
-            </Text>
-            <CalcInput
-              ref={qtyRef}
-              value={qty}
-              onValueChange={setQty}
-              placeholder="Qty — tap to open calculator"
-              onSubmitEditing={handleSave}
-            />
-            {exceedsStock && (
-              <View
-                style={{
-                  backgroundColor: "#FFEBEE",
-                  borderRadius: 8,
-                  padding: 10,
-                  marginTop: 6,
-                  borderLeftWidth: 4,
-                  borderLeftColor: "#D32F2F",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <MaterialCommunityIcons
-                  name="alert-circle"
-                  size={18}
-                  color="#D32F2F"
-                />
-                <Text
-                  style={{
-                    color: "#D32F2F",
-                    fontWeight: "700",
-                    fontSize: 13,
-                    flex: 1,
-                  }}
-                >
-                  ⚠️ Exceeds stock! Only{" "}
-                  {effectiveFromBinStock.qty.toLocaleString()} pcs available in{" "}
-                  {effectiveFromBinStock.bin_code}.
-                </Text>
-              </View>
-            )}
-          </>
-        )}
+            </View>
+          )}
+        </>
 
         <Text style={styles.label}>
           Notes{" "}

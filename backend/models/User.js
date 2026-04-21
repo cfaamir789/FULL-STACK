@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   pin_hash: { type: String, required: true },
   role: {
     type: String,
-    enum: ["superadmin", "admin", "worker"],
+    enum: ["superadmin", "admin", "worker", "checker"],
     default: "worker",
   },
   recoveryKeys: { type: [String], default: [] },

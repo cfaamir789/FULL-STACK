@@ -279,10 +279,10 @@ router.post(
           error: "Cannot create another Super Admin.",
         });
       }
-      if (!["admin", "worker"].includes(role)) {
+      if (!["admin", "worker", "checker"].includes(role)) {
         return res
           .status(400)
-          .json({ success: false, error: "role must be admin or worker." });
+          .json({ success: false, error: "role must be admin, worker, or checker." });
       }
       const { employeeId = "", deviceModel = "" } = req.body;
       const hash = await bcrypt.hash(String(pin), 10);
@@ -580,6 +580,72 @@ router.put(
         username: user.username,
         isBlocked: user.isBlocked,
       });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  },
+);
+
+// ─── PUT /api/auth/users/:username/role ────────────────────────────────────
+// Change a user's role. Admin can swap worker↔checker freely.
+// Only superadmin can promote/demote admin accounts.
+router.put(
+  "/users/:username/role",
+  requireDB,
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const username = req.params.username.toUpperCase();
+      const { role } = req.body;
+      if (!role) {
+        return res
+          .status(400)
+          .json({ success: false, error: "role is required." });
+      }
+      if (!["admin", "worker", "checker"].includes(role)) {
+        return res.status(400).json({
+          success: false,
+          error: "role must be admin, worker, or checker.",
+        });
+      }
+      if (username === req.user.username) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Cannot change your own role." });
+      }
+      const user = await User.findOne({ username });
+      if (!user) {
+        return res
+          .status(404)
+          .json({ success: false, error: "User not found." });
+      }
+      if (user.role === "superadmin") {
+        return res
+          .status(403)
+          .json({ success: false, error: "Cannot change Super Admin's role." });
+      }
+      // Only superadmin can promote to admin or demote from admin
+      if (
+        (role === "admin" || user.role === "admin") &&
+        req.user.role !== "superadmin"
+      ) {
+        return res.status(403).json({
+          success: false,
+          error: "Only Super Admin can assign or remove the admin role.",
+        });
+      }
+      const oldRole = user.role;
+      user.role = role;
+      await user.save();
+      audit(
+        req.user.username,
+        req.user.role,
+        "change_role",
+        username,
+        `Changed role: ${oldRole} -> ${role}`,
+      );
+      res.json({ success: true, username: user.username, role: user.role });
     } catch (err) {
       res.status(500).json({ success: false, error: err.message });
     }
