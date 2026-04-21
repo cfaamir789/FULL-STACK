@@ -743,6 +743,9 @@ router.get("/", async (req, res) => {
         );
       }
     }
+    if (req.query.notInMaster === "1") {
+      conditions.push({ notInMaster: true });
+    }
 
     let query = {};
     if (conditions.length === 1) query = conditions[0];

@@ -1910,7 +1910,7 @@
             </div>
             <button
               class="btn-sm btn-export"
-              onclick="loadProcessedTransactions()"
+              onclick="invalidateApiCache('/transactions');loadProcessedTransactions()"
             >
               &#128260; Refresh
             </button>
@@ -2572,12 +2572,17 @@
               </div>
             </div>
             <div
+              id="binStatUnresolvedCard"
+              onclick="toggleNotInMasterFilter()"
+              title="Click to filter: show only items not in Item Master"
               style="
                 background: #fff8e1;
                 border: 1.5px solid #ffe082;
                 border-radius: 12px;
                 padding: 12px 14px;
                 text-align: center;
+                cursor: pointer;
+                transition: box-shadow 0.15s, outline 0.15s;
               "
             >
               <div
@@ -2604,7 +2609,7 @@
                 &#9888;&#65039; Not in Master
               </div>
               <div style="font-size: 10px; color: #999; margin-top: 2px">
-                Unresolved items
+                Click to filter
               </div>
             </div>
           </div>
@@ -6953,6 +6958,9 @@
             method: "POST",
             body: JSON.stringify(body),
           });
+          // Invalidate all transaction caches so processed/history views refresh
+          invalidateApiCache("/transactions");
+          pageLastLoaded.processed = 0;
           await refreshWorkersPage();
           alert((data.updated || 0) + " transaction(s) updated.");
         } catch (err) {
@@ -7885,6 +7893,25 @@
         } catch {}
       }
 
+      var _binNotInMasterFilter = false;
+      function toggleNotInMasterFilter() {
+        _binNotInMasterFilter = !_binNotInMasterFilter;
+        const card = document.getElementById("binStatUnresolvedCard");
+        if (card) {
+          card.style.outline = _binNotInMasterFilter
+            ? "2.5px solid #ff8f00"
+            : "";
+          card.style.boxShadow = _binNotInMasterFilter
+            ? "0 0 0 3px #ffe08288"
+            : "";
+        }
+        loadBinContent(1);
+        if (_binNotInMasterFilter) {
+          const tbl = document.getElementById("binContainer");
+          if (tbl) setTimeout(() => tbl.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+        }
+      }
+
       // Debounce + request-ID guard: only the latest request updates the UI
       var _binSearchTimer = null;
       var _binReqId = 0;
@@ -8043,6 +8070,7 @@
             url += "&zoneCodes=" + encodeURIComponent(zoneCodes.join(","));
           if (zones.length)
             url += "&zones=" + encodeURIComponent(zones.join(","));
+          if (_binNotInMasterFilter) url += "&notInMaster=1";
           const data = await apiFetch(url);
           if (reqId !== _binReqId) return; // stale response — a newer request is in flight
           currentBinPage = data.page || 1;
