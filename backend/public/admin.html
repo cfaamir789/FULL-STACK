@@ -7085,7 +7085,13 @@
         if (workerFilter) params.set("worker", workerFilter);
         params.set("status", statusFilter);
         url += "?" + params.toString();
-        const filename = nextExportFilename(workerFilter) + "." + format;
+        const filenameLabel =
+          selectedWorkers.length === 1
+            ? selectedWorkers[0]
+            : selectedWorkers.length > 1
+              ? selectedWorkers.length + "_workers"
+              : "";
+        const filename = nextExportFilename(filenameLabel) + "." + format;
 
         const visibleCols = txCols.filter((c) => c.vis);
         const headers = visibleCols.map((c) => c.label);
@@ -7096,7 +7102,13 @@
         })
           .then((r) => r.json())
           .then((data) => {
-            const rows = Array.isArray(data) ? data : data.transactions || [];
+            let rows = Array.isArray(data) ? data : data.transactions || [];
+            // When multiple workers are selected, filter client-side
+            if (selectedWorkers.length > 1) {
+              rows = rows.filter((tx) =>
+                selectedWorkers.includes(tx.Worker_Name),
+              );
+            }
             if (!rows.length) {
               alert("No transactions to export.");
               return;
