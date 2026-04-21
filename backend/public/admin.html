@@ -3978,6 +3978,34 @@
       </div>
     </div>
 
+    <!-- Role Change Modal -->
+    <div
+      class="pin-overlay"
+      id="roleChangeOverlay"
+      onclick="if (event.target === this) closeRoleChangeModal();"
+    >
+      <div class="pin-modal" style="max-width:380px">
+        <div class="pin-modal-header">
+          <h3>&#8645; Change Role</h3>
+          <button class="pin-modal-close" onclick="closeRoleChangeModal()">&#10005;</button>
+        </div>
+        <div style="padding:20px 24px">
+          <p style="margin:0 0 6px;font-size:13px;color:#666">User: <strong id="roleChangeModalUser"></strong></p>
+          <p style="margin:0 0 18px;font-size:13px;color:#666">Current role: <strong id="roleChangeModalCurrent"></strong></p>
+          <label style="display:block;font-size:13px;font-weight:600;margin-bottom:8px">New Role</label>
+          <select id="roleChangeSelect" class="search-box" style="margin:0 0 16px;width:100%">
+            <option value="worker">Picker</option>
+            <option value="checker">Checker</option>
+          </select>
+          <div id="roleChangeResult" style="margin-bottom:10px;font-size:13px"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn" style="background:#eee;color:#333" onclick="closeRoleChangeModal()">Cancel</button>
+            <button id="roleChangeConfirmBtn" class="btn btn-primary" onclick="confirmRoleChange()">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- PIN Reset Modal (outside mainPanel for proper overlay) -->
     <div
       class="pin-overlay"
@@ -7332,6 +7360,12 @@
             }
             if (!isSuperAdmin && !isAdmin) {
               h +=
+                '<button class="btn-sm btn-change-role" data-user="' +
+                esc(u.username) +
+                '" data-role="' +
+                esc(u.role) +
+                '" style="background:#e3f2fd;color:#1565c0">&#8645; Change Role</button>';
+              h +=
                 '<button class="btn-sm btn-del-user" data-user="' +
                 esc(u.username) +
                 '" style="background:#fce4ec;color:#c62828">&#128100; Delete User</button>';
@@ -7509,6 +7543,11 @@
             }
           });
         });
+        container.querySelectorAll(".btn-change-role").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            openRoleChangeModal(this.dataset.user, this.dataset.role);
+          });
+        });
         // Block / Unblock event listeners
         container.querySelectorAll(".btn-toggle-block").forEach(function (btn) {
           btn.addEventListener("click", async function () {
@@ -7557,6 +7596,59 @@
             }
           });
         });
+      }
+
+      function openRoleChangeModal(username, currentRole) {
+        document.getElementById("roleChangeModalUser").textContent = username;
+        document.getElementById("roleChangeModalCurrent").textContent =
+          currentRole === "worker" ? "Picker" : "Checker";
+        document.getElementById("roleChangeResult").innerHTML = "";
+        // Pre-select the opposite role
+        document.getElementById("roleChangeSelect").value =
+          currentRole === "worker" ? "checker" : "worker";
+        document.getElementById("roleChangeOverlay").classList.add("open");
+        document.getElementById("roleChangeOverlay").dataset.user = username;
+      }
+
+      function closeRoleChangeModal() {
+        document.getElementById("roleChangeOverlay").classList.remove("open");
+      }
+
+      async function confirmRoleChange() {
+        const username =
+          document.getElementById("roleChangeOverlay").dataset.user;
+        const newRole = document.getElementById("roleChangeSelect").value;
+        const resultEl = document.getElementById("roleChangeResult");
+        const confirmBtn = document.getElementById("roleChangeConfirmBtn");
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "Saving…";
+        resultEl.innerHTML = "";
+        try {
+          const res = await fetch(
+            window.location.origin +
+              "/api/auth/users/" +
+              encodeURIComponent(username) +
+              "/role",
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + authToken,
+              },
+              body: JSON.stringify({ role: newRole }),
+            },
+          );
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Request failed");
+          closeRoleChangeModal();
+          await loadUsers();
+        } catch (err) {
+          resultEl.innerHTML =
+            '<span style="color:#c62828">' + err.message + "</span>";
+        } finally {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = "Confirm";
+        }
       }
 
       function openPinModal(username) {
