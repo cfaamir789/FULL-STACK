@@ -3984,23 +3984,56 @@
       id="roleChangeOverlay"
       onclick="if (event.target === this) closeRoleChangeModal();"
     >
-      <div class="pin-modal" style="max-width:380px">
+      <div class="pin-modal" style="max-width: 380px">
         <div class="pin-modal-header">
           <h3>&#8645; Change Role</h3>
-          <button class="pin-modal-close" onclick="closeRoleChangeModal()">&#10005;</button>
+          <button class="pin-modal-close" onclick="closeRoleChangeModal()">
+            &#10005;
+          </button>
         </div>
-        <div style="padding:20px 24px">
-          <p style="margin:0 0 6px;font-size:13px;color:#666">User: <strong id="roleChangeModalUser"></strong></p>
-          <p style="margin:0 0 18px;font-size:13px;color:#666">Current role: <strong id="roleChangeModalCurrent"></strong></p>
-          <label style="display:block;font-size:13px;font-weight:600;margin-bottom:8px">New Role</label>
-          <select id="roleChangeSelect" class="search-box" style="margin:0 0 16px;width:100%">
+        <div style="padding: 20px 24px">
+          <p style="margin: 0 0 6px; font-size: 13px; color: #666">
+            User: <strong id="roleChangeModalUser"></strong>
+          </p>
+          <p style="margin: 0 0 18px; font-size: 13px; color: #666">
+            Current role: <strong id="roleChangeModalCurrent"></strong>
+          </p>
+          <label
+            style="
+              display: block;
+              font-size: 13px;
+              font-weight: 600;
+              margin-bottom: 8px;
+            "
+            >New Role</label
+          >
+          <select
+            id="roleChangeSelect"
+            class="search-box"
+            style="margin: 0 0 16px; width: 100%"
+          >
             <option value="worker">Picker</option>
             <option value="checker">Checker</option>
           </select>
-          <div id="roleChangeResult" style="margin-bottom:10px;font-size:13px"></div>
-          <div style="display:flex;gap:10px;justify-content:flex-end">
-            <button class="btn" style="background:#eee;color:#333" onclick="closeRoleChangeModal()">Cancel</button>
-            <button id="roleChangeConfirmBtn" class="btn btn-primary" onclick="confirmRoleChange()">Confirm</button>
+          <div
+            id="roleChangeResult"
+            style="margin-bottom: 10px; font-size: 13px"
+          ></div>
+          <div style="display: flex; gap: 10px; justify-content: flex-end">
+            <button
+              class="btn"
+              style="background: #eee; color: #333"
+              onclick="closeRoleChangeModal()"
+            >
+              Cancel
+            </button>
+            <button
+              id="roleChangeConfirmBtn"
+              class="btn btn-primary"
+              onclick="confirmRoleChange()"
+            >
+              Confirm
+            </button>
           </div>
         </div>
       </div>

@@ -15,7 +15,12 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { getUsers, registerWorker, deleteUser, changeUserRole } from "../services/api";
+import {
+  getUsers,
+  registerWorker,
+  deleteUser,
+  changeUserRole,
+} from "../services/api";
 import Colors from "../theme/colors";
 import { isAdminRole, isSuperAdminRole } from "../utils/roles";
 
@@ -431,7 +436,13 @@ export default function AdminScreen({ viewerRole = "admin" }) {
               </TouchableOpacity>
             </View>
             {roleChangeTarget && (
-              <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 14 }}>
+              <Text
+                style={{
+                  color: Colors.textSecondary,
+                  fontSize: 13,
+                  marginBottom: 14,
+                }}
+              >
                 Current role:{" "}
                 <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
                   {displayRole(roleChangeTarget.role)}
@@ -444,7 +455,8 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                 style={[
                   styles.roleToggle,
                   roleChangeTarget?.role === "worker" && { opacity: 0.4 },
-                  roleChangeTarget?.role !== "worker" && styles.roleToggleActive,
+                  roleChangeTarget?.role !== "worker" &&
+                    styles.roleToggleActive,
                 ]}
                 disabled={roleChanging || roleChangeTarget?.role === "worker"}
                 onPress={() => confirmRoleChange("worker")}
@@ -454,7 +466,9 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                   size={18}
                   color="#fff"
                 />
-                <Text style={[styles.roleToggleText, styles.roleToggleTextActive]}>
+                <Text
+                  style={[styles.roleToggleText, styles.roleToggleTextActive]}
+                >
                   Picker
                 </Text>
               </TouchableOpacity>
@@ -462,7 +476,8 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                 style={[
                   styles.roleToggle,
                   roleChangeTarget?.role === "checker" && { opacity: 0.4 },
-                  roleChangeTarget?.role !== "checker" && styles.roleToggleCheckerActive,
+                  roleChangeTarget?.role !== "checker" &&
+                    styles.roleToggleCheckerActive,
                 ]}
                 disabled={roleChanging || roleChangeTarget?.role === "checker"}
                 onPress={() => confirmRoleChange("checker")}
@@ -472,7 +487,9 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                   size={18}
                   color="#fff"
                 />
-                <Text style={[styles.roleToggleText, styles.roleToggleTextActive]}>
+                <Text
+                  style={[styles.roleToggleText, styles.roleToggleTextActive]}
+                >
                   Checker
                 </Text>
               </TouchableOpacity>
@@ -483,7 +500,8 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                   style={[
                     styles.roleToggle,
                     roleChangeTarget?.role === "admin" && { opacity: 0.4 },
-                    roleChangeTarget?.role !== "admin" && styles.roleToggleActive,
+                    roleChangeTarget?.role !== "admin" &&
+                      styles.roleToggleActive,
                   ]}
                   disabled={roleChanging || roleChangeTarget?.role === "admin"}
                   onPress={() => confirmRoleChange("admin")}
@@ -493,7 +511,9 @@ export default function AdminScreen({ viewerRole = "admin" }) {
                     size={18}
                     color="#fff"
                   />
-                  <Text style={[styles.roleToggleText, styles.roleToggleTextActive]}>
+                  <Text
+                    style={[styles.roleToggleText, styles.roleToggleTextActive]}
+                  >
                     Admin
                   </Text>
                 </TouchableOpacity>

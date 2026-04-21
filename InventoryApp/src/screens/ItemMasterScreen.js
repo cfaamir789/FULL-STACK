@@ -22,6 +22,7 @@ import {
   downloadBinContentDelta,
 } from "../services/syncService";
 import Colors from "../theme/colors";
+import { isCheckerRole } from "../utils/roles";
 
 const IS_WEB = Platform.OS === "web";
 let DocumentPicker = null;
@@ -31,7 +32,8 @@ if (!IS_WEB) {
   FileSystem = require("expo-file-system/legacy");
 }
 
-export default function ItemMasterScreen() {
+export default function ItemMasterScreen({ route }) {
+  const role = route?.params?.role || "worker";
   const [localCount, setLocalCount] = useState(null);
   const [serverInfo, setServerInfo] = useState(null);
   const [downloading, setDownloading] = useState(false);
@@ -537,6 +539,7 @@ export default function ItemMasterScreen() {
       </View>
 
       {/* Danger */}
+      {!isCheckerRole(role) && (
       <View style={[styles.section, styles.dangerSection]}>
         <Text style={[styles.sectionTitle, { color: Colors.error }]}>
           Danger Zone
@@ -550,6 +553,7 @@ export default function ItemMasterScreen() {
           <Text style={styles.dangerBtnText}>Clear Local Items</Text>
         </TouchableOpacity>
       </View>
+      )}
     </ScrollView>
   );
 }

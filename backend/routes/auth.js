@@ -111,13 +111,11 @@ router.post("/login", requireDB, async (req, res) => {
         .json({ success: false, error: "Invalid username or PIN." });
     }
     if (user.isBlocked) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          error:
-            "Your account has been blocked. Please contact your administrator.",
-        });
+      return res.status(403).json({
+        success: false,
+        error:
+          "Your account has been blocked. Please contact your administrator.",
+      });
     }
     const match = await bcrypt.compare(String(pin), user.pin_hash);
     if (!match) {
@@ -210,12 +208,10 @@ router.post(
           .status(404)
           .json({ success: false, error: "User not found." });
       if (target.role === "superadmin")
-        return res
-          .status(403)
-          .json({
-            success: false,
-            error: "Cannot impersonate a superadmin account.",
-          });
+        return res.status(403).json({
+          success: false,
+          error: "Cannot impersonate a superadmin account.",
+        });
 
       audit(
         req.user.username,
@@ -282,7 +278,10 @@ router.post(
       if (!["admin", "worker", "checker"].includes(role)) {
         return res
           .status(400)
-          .json({ success: false, error: "role must be admin, worker, or checker." });
+          .json({
+            success: false,
+            error: "role must be admin, worker, or checker.",
+          });
       }
       const { employeeId = "", deviceModel = "" } = req.body;
       const hash = await bcrypt.hash(String(pin), 10);

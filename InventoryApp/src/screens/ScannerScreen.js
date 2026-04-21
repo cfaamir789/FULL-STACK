@@ -1007,9 +1007,8 @@ export default function ScannerScreen({ role = "worker" }) {
     const effectiveFromBinStock =
       fromBinMode === "suggest"
         ? selectedFromBin
-        : itemBins.find(
-            (b) => b.bin_code === frombin.trim().toUpperCase(),
-          ) || null;
+        : itemBins.find((b) => b.bin_code === frombin.trim().toUpperCase()) ||
+          null;
     const qtyNum = parseInt(qty, 10);
     const exceedsStock =
       effectiveFromBinStock &&

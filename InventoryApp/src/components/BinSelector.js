@@ -149,7 +149,7 @@ export default function BinSelector({
     if (allowedCustomBins && allowedCustomBins.length > 0) {
       if (!allowedCustomBins.includes(code)) {
         setCustomError(
-          `Only ${allowedCustomBins.join(", ")} allowed — type "IN" to select`
+          `Only ${allowedCustomBins.join(", ")} allowed — type "IN" to select`,
         );
         onCustomChange("");
         return;
@@ -180,11 +180,11 @@ export default function BinSelector({
     // Block any input that isn't a valid prefix of an allowed bin
     if (allowedCustomBins && allowedCustomBins.length > 0 && upper.length > 0) {
       const isValidPrefix = allowedCustomBins.some(
-        (allowed) => allowed.startsWith(upper) || upper === allowed
+        (allowed) => allowed.startsWith(upper) || upper === allowed,
       );
       if (!isValidPrefix) {
         setCustomError(
-          `Only ${allowedCustomBins.join(", ")} allowed — type "IN" to select`
+          `Only ${allowedCustomBins.join(", ")} allowed — type "IN" to select`,
         );
         return;
       }
@@ -453,7 +453,9 @@ export default function BinSelector({
           />
           <View style={{ flex: 1, marginLeft: 8 }}>
             <Text style={styles.chipBinCode}>
-              {matchedBin ? matchedBin.bin_code : customValue.trim().toUpperCase()}
+              {matchedBin
+                ? matchedBin.bin_code
+                : customValue.trim().toUpperCase()}
             </Text>
             {showQty && matchedBin && (
               <Text style={styles.chipQty}>

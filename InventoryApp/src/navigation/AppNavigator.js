@@ -77,6 +77,7 @@ const ItemsStackNavigator = ({ role, onLogout }) => (
     <ItemsStack.Screen
       name="ItemMaster"
       component={ItemMasterScreen}
+      initialParams={{ role }}
       options={{ title: "Item Master" }}
     />
   </ItemsStack.Navigator>
