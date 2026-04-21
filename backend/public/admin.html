@@ -1910,7 +1910,10 @@
             </div>
             <button
               class="btn-sm btn-export"
-              onclick="invalidateApiCache('/transactions');loadProcessedTransactions()"
+              onclick="
+                invalidateApiCache('/transactions');
+                loadProcessedTransactions();
+              "
             >
               &#128260; Refresh
             </button>
@@ -2582,7 +2585,9 @@
                 padding: 12px 14px;
                 text-align: center;
                 cursor: pointer;
-                transition: box-shadow 0.15s, outline 0.15s;
+                transition:
+                  box-shadow 0.15s,
+                  outline 0.15s;
               "
             >
               <div
@@ -3099,7 +3104,10 @@
                 <button
                   class="btn btn-primary"
                   style="font-size: 12px; padding: 4px 12px"
-                  onclick="event.stopPropagation(); refreshWorkersPage()"
+                  onclick="
+                    event.stopPropagation();
+                    refreshWorkersPage();
+                  "
                 >
                   &#128260; Refresh
                 </button>
@@ -3114,10 +3122,15 @@
                     color: #2e7d32;
                     cursor: pointer;
                   "
-                >&#9660; Show</button>
+                >
+                  &#9660; Show
+                </button>
               </div>
             </div>
-            <div id="workerStatusContainer" style="display: none; margin-top: 14px">
+            <div
+              id="workerStatusContainer"
+              style="display: none; margin-top: 14px"
+            >
               <div class="loading">Loading...</div>
             </div>
           </div>
@@ -3155,7 +3168,9 @@
                 color: #2e7d32;
                 cursor: pointer;
               "
-            >&#9660; Show</button>
+            >
+              &#9660; Show
+            </button>
           </div>
           <div id="erpGuideBody" style="display: none; margin-top: 14px">
             <div style="display: flex; flex-wrap: wrap; gap: 12px">
@@ -4655,11 +4670,12 @@
         if (page === "dashboard") {
           if (pageLoaded.dashboard) {
             if (isPageStale("dashboard")) {
-              Promise.allSettled([loadStats(), loadDashboardPanels(true)]).finally(
-                () => {
-                  pageLastLoaded.dashboard = Date.now();
-                },
-              );
+              Promise.allSettled([
+                loadStats(),
+                loadDashboardPanels(true),
+              ]).finally(() => {
+                pageLastLoaded.dashboard = Date.now();
+              });
             }
             return;
           }
@@ -4770,9 +4786,7 @@
         document.getElementById("statItems").textContent =
           itemsRes.status === "fulfilled" ? itemsRes.value.count || 0 : "?";
         document.getElementById("statUsers").textContent =
-          usersRes.status === "fulfilled"
-            ? usersRes.value.total || 0
-            : "?";
+          usersRes.status === "fulfilled" ? usersRes.value.total || 0 : "?";
         document.getElementById("statTx").textContent =
           statsRes.status === "fulfilled" ? statsRes.value.total || 0 : "?";
         const processed =
@@ -6244,7 +6258,9 @@
       }
 
       async function downloadWorkerEOD(format, resultId = "eodResult") {
-        const worker = document.getElementById("eodWorkerSelect")?.value || document.getElementById("eodWorkerSelectQueue")?.value;
+        const worker =
+          document.getElementById("eodWorkerSelect")?.value ||
+          document.getElementById("eodWorkerSelectQueue")?.value;
         const resultDiv = document.getElementById(resultId);
         if (!worker) {
           resultDiv.innerHTML =
@@ -6336,7 +6352,9 @@
       }
 
       async function markWorkerDoneOnly(resultId = "eodResult") {
-        const worker = document.getElementById("eodWorkerSelect")?.value || document.getElementById("eodWorkerSelectQueue")?.value;
+        const worker =
+          document.getElementById("eodWorkerSelect")?.value ||
+          document.getElementById("eodWorkerSelectQueue")?.value;
         const resultDiv = document.getElementById(resultId);
         if (!worker) {
           resultDiv.innerHTML =
@@ -7908,7 +7926,11 @@
         loadBinContent(1);
         if (_binNotInMasterFilter) {
           const tbl = document.getElementById("binContainer");
-          if (tbl) setTimeout(() => tbl.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+          if (tbl)
+            setTimeout(
+              () => tbl.scrollIntoView({ behavior: "smooth", block: "start" }),
+              400,
+            );
         }
       }
 

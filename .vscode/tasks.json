@@ -15,7 +15,18 @@
         "group": "servers"
       },
       "isBackground": true,
-      "problemMatcher": []
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^(ERROR)\\s+(.*)$",
+          "severity": 1,
+          "message": 2
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Restarting|Watching",
+          "endsPattern": "Server running on"
+        }
+      }
     },
     {
       "label": "Start Expo Web",
@@ -39,8 +50,8 @@
         },
         "background": {
           "activeOnStart": true,
-          "beginsPattern": "Starting Metro Bundler",
-          "endsPattern": "Bundling complete"
+          "beginsPattern": "Starting|Expo",
+          "endsPattern": "Metro waiting on|Web is now running|Bundling complete"
         }
       }
     },

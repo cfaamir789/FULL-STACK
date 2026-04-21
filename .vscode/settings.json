@@ -1,5 +1,4 @@
 {
-  "livePreview.serverRoot": "InventoryApp",
   "livePreview.defaultPreviewPath": "http://localhost:19006",
   "livePreview.openPreviewTarget": "embedded",
   "simpleBrowser.focusLockIndicator.enabled": true,
@@ -29,6 +28,13 @@
     "javascript": "javascriptreact"
   },
   "workbench.iconTheme": "material-icon-theme",
-  "java.configuration.updateBuildConfiguration": "automatic",
-  "java.compile.nullAnalysis.mode": "automatic"
+  "java.configuration.updateBuildConfiguration": "disabled",
+  "java.compile.nullAnalysis.mode": "disabled",
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/.expo/**",
+    "**/web-build/**",
+    "**/android/**",
+    "**/InventoryLegacyScanner/**"
+  ]
 }

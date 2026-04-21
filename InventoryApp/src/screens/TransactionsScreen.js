@@ -39,6 +39,7 @@ import { setDataClearedListener } from "../services/syncService";
 import TransactionRow from "../components/TransactionRow";
 import CalcInput from "../components/CalcInput";
 
+const IS_WEB = Platform.OS === "web";
 let CameraView, useCameraPermissions;
 if (!IS_WEB) {
   try {
@@ -59,8 +60,6 @@ import {
   mapServerTransactionToLocalShape,
   mergeTransactions,
 } from "../utils/transactions";
-
-const IS_WEB = Platform.OS === "web";
 let backupSvc = null;
 if (!IS_WEB) {
   backupSvc = require("../services/backupService");

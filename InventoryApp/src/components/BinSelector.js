@@ -48,14 +48,21 @@ export default function BinSelector({
   editable = true,
   onBinValidate, // async (binCode) => bool — returns true if bin exists in master
   showQty = true, // false hides qty badges/counts (e.g. for workers)
+  allowedCustomBins, // string[] — if set, only these bin codes are accepted in custom mode
 }) {
   const [filterText, setFilterText] = useState("");
   const [listOpen, setListOpen] = useState(bins.length > 0);
   const [customError, setCustomError] = useState(""); // inline red error for custom mode
 
-  // Auto-open the list whenever a new item is scanned and bins change
+  // Reset internal state whenever bins are cleared (item X'd or tab switched)
   useEffect(() => {
-    setListOpen(bins.length > 0);
+    if (bins.length === 0) {
+      setFilterText("");
+      setListOpen(false);
+      setCustomError("");
+    } else {
+      setListOpen(true);
+    }
   }, [bins.length]);
 
   // Filter the bins list based on what the user types in the autocomplete input
@@ -72,6 +79,13 @@ export default function BinSelector({
       bins.find((b) => b.bin_code === customValue.trim().toUpperCase()) || null
     );
   }, [customValue, bins]);
+
+  // Treat value as confirmed if it's the only allowed custom bin (even with no stock)
+  const isConfirmedAllowed = useMemo(() => {
+    if (!customValue || !allowedCustomBins || allowedCustomBins.length === 0)
+      return false;
+    return allowedCustomBins.includes(customValue.trim().toUpperCase());
+  }, [customValue, allowedCustomBins]);
 
   const handleSelectBin = (bin) => {
     onSelectBin(bin);
@@ -105,17 +119,48 @@ export default function BinSelector({
     if (selectedBin && upper !== selectedBin.bin_code) {
       onSelectBin(null);
     }
+    // Shortcut: typing "IN" auto-selects IN0001 (or the only IN* bin)
+    if (upper === "IN") {
+      const in0001 = bins.find((b) => b.bin_code === "IN0001");
+      if (in0001) {
+        handleSelectBin(in0001);
+        return;
+      }
+      const inBins = bins.filter((b) => b.bin_code.startsWith("IN"));
+      if (inBins.length === 1) {
+        handleSelectBin(inBins[0]);
+        return;
+      }
+      // IN0001 not in bins — if it's the only allowed custom bin, auto-fill it
+      if (allowedCustomBins && allowedCustomBins.includes("IN0001")) {
+        onModeChange("custom");
+        if (onCustomChange) onCustomChange("IN0001");
+        setFilterText("");
+        setListOpen(false);
+        if (onSubmitEditing) setTimeout(onSubmitEditing, 80);
+        return;
+      }
+    }
   };
 
   // Custom-mode: validate bin on submit (real-time hard block)
   const handleCustomSubmit = async () => {
-    if (onBinValidate && customValue.trim()) {
-      const code = customValue.trim().toUpperCase();
+    const code = customValue.trim().toUpperCase();
+    if (allowedCustomBins && allowedCustomBins.length > 0) {
+      if (!allowedCustomBins.includes(code)) {
+        setCustomError(
+          `Only ${allowedCustomBins.join(", ")} allowed — type "IN" to select`
+        );
+        onCustomChange("");
+        return;
+      }
+    }
+    if (onBinValidate && code) {
       const exists = await onBinValidate(code);
       if (!exists) {
         setCustomError(`❌ Bin "${code}" not found in master — cleared`);
         onCustomChange("");
-        return; // do NOT advance to next field
+        return;
       }
     }
     setCustomError("");
@@ -125,7 +170,26 @@ export default function BinSelector({
   // Clear error as soon as user starts typing
   const handleCustomChange = (text) => {
     if (customError) setCustomError("");
-    onCustomChange(text.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+    const upper = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    // Shortcut: "IN" expands to IN0001
+    if (upper === "IN") {
+      onCustomChange("IN0001");
+      if (onSubmitEditing) setTimeout(onSubmitEditing, 80);
+      return;
+    }
+    // Block any input that isn't a valid prefix of an allowed bin
+    if (allowedCustomBins && allowedCustomBins.length > 0 && upper.length > 0) {
+      const isValidPrefix = allowedCustomBins.some(
+        (allowed) => allowed.startsWith(upper) || upper === allowed
+      );
+      if (!isValidPrefix) {
+        setCustomError(
+          `Only ${allowedCustomBins.join(", ")} allowed — type "IN" to select`
+        );
+        return;
+      }
+    }
+    onCustomChange(upper);
   };
 
   const isDisabled = !editable;
@@ -346,8 +410,8 @@ export default function BinSelector({
         {label}
       </Text>
 
-      {/* Quick-select chips — shown when bins exist and no exact match yet */}
-      {bins.length > 0 && !matchedBin && (
+      {/* Quick-select chips — shown when bins exist and no confirmed selection yet */}
+      {bins.length > 0 && !matchedBin && !isConfirmedAllowed && (
         <View style={styles.quickSelectRow}>
           <Text style={styles.quickSelectLabel}>Quick select:</Text>
           <ScrollView
@@ -367,17 +431,19 @@ export default function BinSelector({
                 disabled={isDisabled}
               >
                 <Text style={styles.quickChipCode}>{b.bin_code}</Text>
-                <Text style={styles.quickChipQty}>
-                  {b.qty.toLocaleString()}
-                </Text>
+                {showQty && (
+                  <Text style={styles.quickChipQty}>
+                    {b.qty.toLocaleString()}
+                  </Text>
+                )}
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
       )}
 
-      {/* Green confirmed chip when typed bin exactly matches a stocked bin */}
-      {matchedBin ? (
+      {/* Green confirmed chip when typed bin exactly matches a stocked bin OR is the only allowed custom bin */}
+      {matchedBin || isConfirmedAllowed ? (
         <View style={styles.selectedChip}>
           <MaterialCommunityIcons
             name="check-circle"
@@ -385,10 +451,14 @@ export default function BinSelector({
             color={Colors.success}
           />
           <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={styles.chipBinCode}>{matchedBin.bin_code}</Text>
-            <Text style={styles.chipQty}>
-              Available: {matchedBin.qty.toLocaleString()} pcs
+            <Text style={styles.chipBinCode}>
+              {matchedBin ? matchedBin.bin_code : customValue.trim().toUpperCase()}
             </Text>
+            {showQty && matchedBin && (
+              <Text style={styles.chipQty}>
+                Available: {matchedBin.qty.toLocaleString()} pcs
+              </Text>
+            )}
           </View>
           <TouchableOpacity
             onPress={() => onCustomChange("")}

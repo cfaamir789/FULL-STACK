@@ -16,21 +16,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
-
-const IS_WEB = Platform.OS === "web";
-let CameraView, useCameraPermissions;
-if (!IS_WEB) {
-  try {
-    const cam = require("expo-camera");
-    CameraView = cam.CameraView;
-    useCameraPermissions = cam.useCameraPermissions;
-  } catch {
-    CameraView = null;
-    useCameraPermissions = () => [{ granted: false }, async () => {}];
-  }
-} else {
-  useCameraPermissions = () => [{ granted: false }, async () => {}];
-}
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -47,6 +32,23 @@ import {
 import { attemptSync } from "../services/syncService";
 import CalcInput from "../components/CalcInput";
 import BinSelector from "../components/BinSelector";
+import Colors from "../theme/colors";
+import { isAdminRole } from "../utils/roles";
+
+const IS_WEB = Platform.OS === "web";
+let CameraView, useCameraPermissions;
+if (!IS_WEB) {
+  try {
+    const cam = require("expo-camera");
+    CameraView = cam.CameraView;
+    useCameraPermissions = cam.useCameraPermissions;
+  } catch {
+    CameraView = null;
+    useCameraPermissions = () => [{ granted: false }, async () => {}];
+  }
+} else {
+  useCameraPermissions = () => [{ granted: false }, async () => {}];
+}
 // ClearButton — shows ✕ inside the input when there is text, invisible when empty
 const ClearButton = ({ value, onClear, onClearFocus, style }) => {
   if (!value) return null;
@@ -66,8 +68,6 @@ const ClearButton = ({ value, onClear, onClearFocus, style }) => {
     </TouchableOpacity>
   );
 };
-import Colors from "../theme/colors";
-import { isAdminRole } from "../utils/roles";
 
 export default function ScannerScreen({ role = "worker" }) {
   const canUseAdvancedModes = isAdminRole(role);
@@ -266,6 +266,19 @@ export default function ScannerScreen({ role = "worker" }) {
       isResetting.current = false;
     }, 300);
     clearFormState();
+  };
+
+  // X button on any search field — wipes ALL item/bin/qty state immediately
+  const clearItem = () => {
+    isResetting.current = true;
+    clearFormState();
+    setTimeout(() => {
+      isResetting.current = false;
+      if (mode === "barcode") barcodeRef.current?.focus();
+      else if (mode === "itemcode") itemCodeRef.current?.focus();
+      else if (mode === "quickcode") quickCodeRef.current?.focus();
+      else if (mode === "itemname") itemNameRef.current?.focus();
+    }, 50);
   };
 
   const openScanner = () => {
@@ -519,10 +532,12 @@ export default function ScannerScreen({ role = "worker" }) {
       }
     }
     // Use directQty if it's a valid numeric string (from CalcInput), else fall back to state
-    const qtyStr =
-      typeof directQty === "string" && /^\d+(\.\d+)?$/.test(directQty)
+    // Workers: qty field is hidden — default to 1 per scan
+    const qtyStr = isAdminRole(role)
+      ? typeof directQty === "string" && /^\d+(\.\d+)?$/.test(directQty)
         ? directQty
-        : qty;
+        : qty
+      : "1";
     const qtyNum = parseInt(qtyStr, 10);
     if (!qtyStr || isNaN(qtyNum) || qtyNum < 1) {
       Alert.alert(
@@ -531,15 +546,17 @@ export default function ScannerScreen({ role = "worker" }) {
       );
       return;
     }
-    // Hard block: qty cannot exceed available stock in the selected From Bin
-    if (
-      fromBinMode === "suggest" &&
-      selectedFromBin &&
-      qtyNum > selectedFromBin.qty
-    ) {
+    // Hard block: qty cannot exceed available stock in the From Bin (suggest or matched custom)
+    const fromBinStockCheck =
+      fromBinMode === "suggest"
+        ? selectedFromBin
+        : itemBins.find(
+            (b) => b.bin_code === effectiveFromBin.trim().toUpperCase(),
+          ) || null;
+    if (fromBinStockCheck && qtyNum > fromBinStockCheck.qty) {
       Alert.alert(
         "Quantity Exceeds Stock",
-        `Cannot move ${qtyNum} pcs. Only ${selectedFromBin.qty} pcs available in bin ${selectedFromBin.bin_code}.`,
+        `❌ Cannot move ${qtyNum} pcs.\nOnly ${fromBinStockCheck.qty.toLocaleString()} pcs available in bin ${fromBinStockCheck.bin_code}.`,
       );
       return;
     }
@@ -647,19 +664,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton
-                value={barcode}
-                onClear={() => {
-                  setBarcode("");
-                  setFoundItem(null);
-                  setScanned(false);
-                  setFrombin("");
-                  setTobin("");
-                  setQty("");
-                  setNotes("");
-                  setTimeout(() => barcodeRef.current?.focus(), 50);
-                }}
-              />
+              <ClearButton value={barcode} onClear={clearItem} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -704,19 +709,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton
-                value={itemCode}
-                onClear={() => {
-                  setItemCode("");
-                  setFoundItem(null);
-                  setScanned(false);
-                  setFrombin("");
-                  setTobin("");
-                  setQty("");
-                  setNotes("");
-                  setTimeout(() => itemCodeRef.current?.focus(), 50);
-                }}
-              />
+              <ClearButton value={itemCode} onClear={clearItem} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -768,20 +761,7 @@ export default function ScannerScreen({ role = "worker" }) {
                 }}
                 blurOnSubmit={false}
               />
-              <ClearButton
-                value={quickCode}
-                onClear={() => {
-                  setQuickCode("");
-                  setFoundItem(null);
-                  setScanned(false);
-                  setQuickCodeResults([]);
-                  setFrombin("");
-                  setTobin("");
-                  setQty("");
-                  setNotes("");
-                  setTimeout(() => quickCodeRef.current?.focus(), 50);
-                }}
-              />
+              <ClearButton value={quickCode} onClear={clearItem} />
             </View>
             <TouchableOpacity
               style={styles.searchBtn}
@@ -853,20 +833,7 @@ export default function ScannerScreen({ role = "worker" }) {
               }}
               blurOnSubmit={false}
             />
-            <ClearButton
-              value={itemName}
-              onClear={() => {
-                setItemName("");
-                setFoundItem(null);
-                setScanned(false);
-                setNameResults([]);
-                setFrombin("");
-                setTobin("");
-                setQty("");
-                setNotes("");
-                setTimeout(() => itemNameRef.current?.focus(), 50);
-              }}
-            />
+            <ClearButton value={itemName} onClear={clearItem} />
           </View>
           <TouchableOpacity
             style={styles.searchBtn}
@@ -1033,182 +1000,234 @@ export default function ScannerScreen({ role = "worker" }) {
     );
   };
 
-  const renderBinQtyFields = () => (
-    <>
-      {!scanned && (
-        <View
-          style={{
-            backgroundColor: "#FFF8E1",
-            borderRadius: 10,
-            padding: 12,
-            marginTop: 12,
-            borderLeftWidth: 4,
-            borderLeftColor: "#F57F17",
-          }}
-        >
-          <Text style={{ color: "#F57F17", fontWeight: "600", fontSize: 13 }}>
-            ⚠️ Please scan or search for an item first
-          </Text>
-        </View>
-      )}
+  const renderBinQtyFields = () => {
+    const isAdmin = isAdminRole(role);
+    const effectiveFromBinStock =
+      fromBinMode === "suggest"
+        ? selectedFromBin
+        : itemBins.find(
+            (b) => b.bin_code === frombin.trim().toUpperCase(),
+          ) || null;
+    const qtyNum = parseInt(qty, 10);
+    const exceedsStock =
+      isAdmin &&
+      effectiveFromBinStock &&
+      qty &&
+      !isNaN(qtyNum) &&
+      qtyNum > effectiveFromBinStock.qty;
 
-      <BinSelector
-        label="From Bin"
-        placeholder="e.g. A10101A"
-        bins={itemBins}
-        mode={fromBinMode}
-        onModeChange={setFromBinMode}
-        selectedBin={selectedFromBin}
-        onSelectBin={(bin) => {
-          setSelectedFromBin(bin);
-          if (bin) setFrombin(bin.bin_code);
-          else setFrombin("");
-        }}
-        customValue={frombin}
-        onCustomChange={setFrombin}
-        inputRef={fromBinRef}
-        onSubmitEditing={() => toBinRef.current?.focus()}
-        editable={scanned}
-        onBinValidate={checkBinExists}
-        showQty={isAdminRole(role)}
-      />
-
-      {/* Qty warning if user types more than available in selected From Bin */}
-      {isAdminRole(role) &&
-        selectedFromBin &&
-        qty &&
-        parseInt(qty, 10) > selectedFromBin.qty && (
-          <Text
+    return (
+      <>
+        {!scanned && (
+          <View
             style={{
-              color: Colors.error || "#D32F2F",
-              fontSize: 12,
-              fontWeight: "600",
+              backgroundColor: "#FFF8E1",
+              borderRadius: 10,
+              padding: 12,
+              marginTop: 12,
+              borderLeftWidth: 4,
+              borderLeftColor: "#F57F17",
+            }}
+          >
+            <Text style={{ color: "#F57F17", fontWeight: "600", fontSize: 13 }}>
+              ⚠️ Please scan or search for an item first
+            </Text>
+          </View>
+        )}
+
+        <BinSelector
+          label="From Bin"
+          placeholder="e.g. A10101A"
+          bins={itemBins}
+          mode={fromBinMode}
+          onModeChange={setFromBinMode}
+          selectedBin={selectedFromBin}
+          onSelectBin={(bin) => {
+            setSelectedFromBin(bin);
+            if (bin) setFrombin(bin.bin_code);
+            else setFrombin("");
+          }}
+          customValue={frombin}
+          onCustomChange={setFrombin}
+          inputRef={fromBinRef}
+          onSubmitEditing={() => toBinRef.current?.focus()}
+          editable={scanned}
+          onBinValidate={checkBinExists}
+          showQty={isAdmin}
+          allowedCustomBins={["IN0001"]}
+        />
+
+        <BinSelector
+          label="To Bin"
+          placeholder="e.g. B192506B"
+          bins={itemBins}
+          mode={toBinMode}
+          onModeChange={setToBinMode}
+          selectedBin={selectedToBin}
+          onSelectBin={(bin) => {
+            setSelectedToBin(bin);
+            if (bin) setTobin(bin.bin_code);
+            else setTobin("");
+          }}
+          customValue={tobin}
+          onCustomChange={setTobin}
+          inputRef={toBinRef}
+          onSubmitEditing={() => {
+            if (isAdmin) {
+              qtyRef.current?.focus();
+            } else {
+              handleSave();
+            }
+          }}
+          editable={scanned}
+          onBinValidate={checkBinExists}
+          showQty={isAdmin}
+        />
+
+        {/* Info if To Bin already has stock — admin only */}
+        {isAdmin && selectedToBin && (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
               marginTop: 4,
             }}
           >
-            ⚠️ Exceeds available stock ({selectedFromBin.qty.toLocaleString()}{" "}
-            pcs in {selectedFromBin.bin_code})
-          </Text>
+            <MaterialCommunityIcons
+              name="information"
+              size={14}
+              color={Colors.primary}
+            />
+            <Text
+              style={{ fontSize: 12, color: Colors.primary, fontWeight: "600" }}
+            >
+              This bin already has {selectedToBin.qty.toLocaleString()} pcs of
+              this item
+            </Text>
+          </View>
         )}
 
-      <BinSelector
-        label="To Bin"
-        placeholder="e.g. B192506B"
-        bins={itemBins}
-        mode={toBinMode}
-        onModeChange={setToBinMode}
-        selectedBin={selectedToBin}
-        onSelectBin={(bin) => {
-          setSelectedToBin(bin);
-          if (bin) setTobin(bin.bin_code);
-          else setTobin("");
-        }}
-        customValue={tobin}
-        onCustomChange={setTobin}
-        inputRef={toBinRef}
-        onSubmitEditing={() => qtyRef.current?.focus()}
-        editable={scanned}
-        onBinValidate={checkBinExists}
-        showQty={isAdminRole(role)}
-      />
-
-      {/* Info if To Bin already has stock */}
-      {isAdminRole(role) && selectedToBin && (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-            marginTop: 4,
-          }}
-        >
-          <MaterialCommunityIcons
-            name="information"
-            size={14}
-            color={Colors.primary}
-          />
-          <Text
-            style={{ fontSize: 12, color: Colors.primary, fontWeight: "600" }}
-          >
-            This bin already has {selectedToBin.qty.toLocaleString()} pcs of
-            this item
-          </Text>
-        </View>
-      )}
-
-      <Text style={styles.label}>
-        Quantity{" "}
-        <Text
-          style={{ fontWeight: "400", color: Colors.textLight, fontSize: 11 }}
-        >
-          (tap calculator for math: 3×48 = 144)
-        </Text>
-      </Text>
-      <CalcInput
-        ref={qtyRef}
-        value={qty}
-        onValueChange={setQty}
-        placeholder="Qty — tap to open calculator"
-        onSubmitEditing={handleSave}
-      />
-
-      <Text style={styles.label}>
-        Notes{" "}
-        <Text style={{ fontWeight: "400", color: Colors.textLight }}>
-          (optional)
-        </Text>
-      </Text>
-      <View style={styles.inputWithMic}>
-        <TextInput
-          ref={notesRef}
-          style={styles.inputInner}
-          value={notes}
-          onChangeText={uc(setNotes)}
-          placeholder="e.g. DAMAGE, EXPIRY 2026-12"
-          autoCapitalize="characters"
-          returnKeyType="done"
-          onSubmitEditing={handleSave}
-          onKeyPress={(e) => {
-            if (e.nativeEvent.key === "Enter") handleSave();
-          }}
-        />
-        <ClearButton
-          value={notes}
-          onClear={() => setNotes("")}
-          onClearFocus={() => notesRef.current?.focus()}
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-        onPress={handleSave}
-        disabled={saving}
-      >
-        {saving ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
-          <MaterialCommunityIcons name="content-save" size={22} color="#fff" />
+        {/* Qty — admin only; workers default to 1 on save */}
+        {isAdmin && (
+          <>
+            <Text style={styles.label}>
+              Quantity{" "}
+              <Text
+                style={{
+                  fontWeight: "400",
+                  color: Colors.textLight,
+                  fontSize: 11,
+                }}
+              >
+                (tap calculator for math: 3×48 = 144)
+              </Text>
+            </Text>
+            <CalcInput
+              ref={qtyRef}
+              value={qty}
+              onValueChange={setQty}
+              placeholder="Qty — tap to open calculator"
+              onSubmitEditing={handleSave}
+            />
+            {exceedsStock && (
+              <View
+                style={{
+                  backgroundColor: "#FFEBEE",
+                  borderRadius: 8,
+                  padding: 10,
+                  marginTop: 6,
+                  borderLeftWidth: 4,
+                  borderLeftColor: "#D32F2F",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <MaterialCommunityIcons
+                  name="alert-circle"
+                  size={18}
+                  color="#D32F2F"
+                />
+                <Text
+                  style={{
+                    color: "#D32F2F",
+                    fontWeight: "700",
+                    fontSize: 13,
+                    flex: 1,
+                  }}
+                >
+                  ⚠️ Exceeds stock! Only{" "}
+                  {effectiveFromBinStock.qty.toLocaleString()} pcs available in{" "}
+                  {effectiveFromBinStock.bin_code}.
+                </Text>
+              </View>
+            )}
+          </>
         )}
-        <Text style={styles.saveBtnText}>
-          {saving ? "Saving..." : "Save Transaction"}
-        </Text>
-      </TouchableOpacity>
 
-      {lastSaved && (
-        <View style={styles.lastSavedBanner}>
-          <MaterialCommunityIcons
-            name="check-circle"
-            size={16}
-            color={Colors.success}
-          />
-          <Text style={styles.lastSavedText} numberOfLines={1}>
-            Saved: {lastSaved.name} | Qty {lastSaved.qty} | {lastSaved.from} to{" "}
-            {lastSaved.to}
+        <Text style={styles.label}>
+          Notes{" "}
+          <Text style={{ fontWeight: "400", color: Colors.textLight }}>
+            (optional)
           </Text>
+        </Text>
+        <View style={styles.inputWithMic}>
+          <TextInput
+            ref={notesRef}
+            style={styles.inputInner}
+            value={notes}
+            onChangeText={uc(setNotes)}
+            placeholder="e.g. DAMAGE, EXPIRY 2026-12"
+            autoCapitalize="characters"
+            returnKeyType="done"
+            onSubmitEditing={handleSave}
+            onKeyPress={(e) => {
+              if (e.nativeEvent.key === "Enter") handleSave();
+            }}
+          />
+          <ClearButton
+            value={notes}
+            onClear={() => setNotes("")}
+            onClearFocus={() => notesRef.current?.focus()}
+          />
         </View>
-      )}
-    </>
-  );
+
+        <TouchableOpacity
+          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <MaterialCommunityIcons
+              name="content-save"
+              size={22}
+              color="#fff"
+            />
+          )}
+          <Text style={styles.saveBtnText}>
+            {saving ? "Saving..." : "Save Transaction"}
+          </Text>
+        </TouchableOpacity>
+
+        {lastSaved && (
+          <View style={styles.lastSavedBanner}>
+            <MaterialCommunityIcons
+              name="check-circle"
+              size={16}
+              color={Colors.success}
+            />
+            <Text style={styles.lastSavedText} numberOfLines={1}>
+              Saved: {lastSaved.name} | Qty {lastSaved.qty} | {lastSaved.from}{" "}
+              to {lastSaved.to}
+            </Text>
+          </View>
+        )}
+      </>
+    );
+  };
 
   // ─── Web version ──────────────────────────────────────────────────────────
   if (IS_WEB) {
