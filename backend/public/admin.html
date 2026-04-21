@@ -484,6 +484,10 @@
         background: #e8f5e9;
         color: #2e7d32;
       }
+      .role-badge.checker {
+        background: #fff3e0;
+        color: #e65100;
+      }
       /* --- Grouped user sections --- */
       .user-section {
         margin-bottom: 28px;
@@ -3837,7 +3841,8 @@
               class="search-box"
               style="margin: 0; flex: 1; min-width: 120px"
             >
-              <option value="worker">Worker</option>
+              <option value="worker">Picker</option>
+              <option value="checker">Checker</option>
               <option value="admin">Admin</option>
             </select>
           </div>
@@ -7232,6 +7237,13 @@
         const superadmins = users.filter((u) => u.role === "superadmin");
         const admins = users.filter((u) => u.role === "admin");
         const workers = users.filter((u) => u.role === "worker");
+        const checkers = users.filter((u) => u.role === "checker");
+
+        function displayRoleLabel(role) {
+          if (role === "superadmin") return "SUPER ADMIN";
+          if (role === "worker") return "PICKER";
+          return role.toUpperCase();
+        }
 
         function renderUserCard(u) {
           const initials = u.username.substring(0, 2).toUpperCase();
@@ -7279,7 +7291,7 @@
             '"' +
             badgeStyle +
             ">" +
-            (isSuperAdmin ? "SUPER ADMIN" : u.role.toUpperCase()) +
+            (isSuperAdmin ? "SUPER ADMIN" : displayRoleLabel(u.role)) +
             "</span>";
           if (isBlocked) {
             h +=
@@ -7396,14 +7408,26 @@
           });
           html += "</div>";
         }
-        // Workers section
+        // Workers (Pickers) section
         if (workers.length) {
           html += '<div class="user-section">';
           html +=
-            '<div class="user-section-title worker-title">&#128119; Workers (' +
+            '<div class="user-section-title worker-title">&#128119; Pickers (' +
             workers.length +
             ")</div>";
           workers.forEach((u) => {
+            html += renderUserCard(u);
+          });
+          html += "</div>";
+        }
+        // Checkers section
+        if (checkers.length) {
+          html += '<div class="user-section">';
+          html +=
+            '<div class="user-section-title worker-title" style="color:#e65100;border-color:#ffe0b2;background:#fff8f0">&#128269; Checkers (' +
+            checkers.length +
+            ")</div>";
+          checkers.forEach((u) => {
             html += renderUserCard(u);
           });
           html += "</div>";
