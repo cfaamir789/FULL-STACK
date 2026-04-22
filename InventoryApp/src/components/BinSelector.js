@@ -412,38 +412,6 @@ export default function BinSelector({
         {label}
       </Text>
 
-      {/* Quick-select chips — shown when bins exist and no confirmed selection yet */}
-      {bins.length > 0 && !matchedBin && !isConfirmedAllowed && (
-        <View style={styles.quickSelectRow}>
-          <Text style={styles.quickSelectLabel}>Quick select:</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {bins.map((b) => (
-              <TouchableOpacity
-                key={b.bin_code}
-                style={styles.quickChip}
-                onPress={() => {
-                  onCustomChange(b.bin_code);
-                  // Auto-advance after quick chip selection
-                  if (onSubmitEditing) setTimeout(onSubmitEditing, 80);
-                }}
-                disabled={isDisabled}
-              >
-                <Text style={styles.quickChipCode}>{b.bin_code}</Text>
-                {showQty && (
-                  <Text style={styles.quickChipQty}>
-                    {b.qty.toLocaleString()}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
       {/* Green confirmed chip when typed bin exactly matches a stocked bin OR is the only allowed custom bin */}
       {matchedBin || isConfirmedAllowed ? (
         <View style={styles.selectedChip}>
@@ -478,18 +446,6 @@ export default function BinSelector({
         </View>
       ) : (
         <>
-          {/* Custom bin banner — only shown when no stock match */}
-          <View style={styles.customBanner}>
-            <MaterialCommunityIcons
-              name="pencil-circle"
-              size={16}
-              color={Colors.warning}
-            />
-            <Text style={styles.customBannerText}>
-              Custom bin — no stock validation (use for un-GRN'd goods)
-            </Text>
-          </View>
-
           {/* Free-text input */}
           <View
             style={[
