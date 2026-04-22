@@ -813,8 +813,8 @@ export default function TransactionsScreen({ username, role, scope = "self" }) {
               )}
               contentContainerStyle={{ paddingVertical: 8, paddingBottom: 24 }}
               initialNumToRender={15}
-              maxToRenderPerBatch={15}
-              windowSize={7}
+              maxToRenderPerBatch={10}
+              windowSize={5}
               onEndReached={loadMoreTransactions}
               onEndReachedThreshold={0.45}
               ListFooterComponent={

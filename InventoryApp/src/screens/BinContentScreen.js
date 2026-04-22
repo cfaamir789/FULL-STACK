@@ -632,8 +632,8 @@ export default function BinContentScreen() {
             />
           }
           initialNumToRender={15}
-          maxToRenderPerBatch={20}
-          windowSize={11}
+          maxToRenderPerBatch={10}
+          windowSize={5}
           removeClippedSubviews={Platform.OS !== "web"}
           getItemLayout={undefined}
         />

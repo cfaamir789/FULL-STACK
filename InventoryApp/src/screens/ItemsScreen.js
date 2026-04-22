@@ -304,8 +304,8 @@ export default function ItemsScreen({ navigation, route }) {
           )}
           contentContainerStyle={{ paddingBottom: 24 }}
           initialNumToRender={15}
-          maxToRenderPerBatch={15}
-          windowSize={7}
+          maxToRenderPerBatch={10}
+          windowSize={5}
           onEndReached={loadMoreItems}
           onEndReachedThreshold={0.5}
           refreshControl={
