@@ -81,7 +81,7 @@ const apiClient = axios.create({
 // Separate client with a short timeout just for reachability checks
 const healthClient = axios.create({
   baseURL: currentBaseUrl,
-  timeout: 3000,
+  timeout: 8000,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -266,8 +266,30 @@ export const getServerTimeISO = async () => {
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export const checkSetup = async () => {
-  const res = await healthClient.get("/auth/check-setup");
-  return res.data; // { needsSetup: true/false }
+  // Try the configured server first
+  try {
+    const res = await healthClient.get("/auth/check-setup");
+    return res.data; // { needsSetup: true/false }
+  } catch (primaryErr) {
+    // Explicitly try each cloud server before giving up
+    for (const server of CLOUD_SERVERS) {
+      const serverApiUrl = `${server}/api`;
+      if (serverApiUrl === currentBaseUrl) continue; // already tried
+      try {
+        const res = await axios.get(`${serverApiUrl}/auth/check-setup`, {
+          timeout: 8000,
+        });
+        if (res.data?.success !== false) {
+          // Switch to this working server
+          currentBaseUrl = serverApiUrl;
+          apiClient.defaults.baseURL = currentBaseUrl;
+          healthClient.defaults.baseURL = currentBaseUrl;
+          return res.data;
+        }
+      } catch (_) {}
+    }
+    throw primaryErr; // all servers unreachable
+  }
 };
 
 export const setupAdmin = async (username, pin) => {

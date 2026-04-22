@@ -180,20 +180,26 @@ server.listen(PORT, "0.0.0.0", () => {
 
   // Keep-alive self-ping every 4 min to prevent Render/Railway free tier sleep
   if (process.env.NODE_ENV === "production") {
-    const keepAliveUrl = process.env.RENDER_EXTERNAL_URL
+    const selfUrl = process.env.RENDER_EXTERNAL_URL
       ? `${process.env.RENDER_EXTERNAL_URL}/api/health`
       : process.env.RAILWAY_PUBLIC_DOMAIN
       ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/api/health`
       : `https://fullstck-production.up.railway.app/api/health`;
-    const ping = () => {
+
+    // Also ping the other deployment to keep it warm
+    const otherUrl = selfUrl.includes("railway")
+      ? `https://fullstck.onrender.com/api/health`
+      : `https://fullstck-production.up.railway.app/api/health`;
+
+    const ping = (url) => {
       require("https")
-        .get(keepAliveUrl, () => {})
+        .get(url, () => {})
         .on("error", () => {});
     };
     // First ping after 30s, then every 4 minutes
-    setTimeout(ping, 30 * 1000);
-    setInterval(ping, 4 * 60 * 1000);
-    console.log("Keep-alive ping enabled (every 4 min)");
+    setTimeout(() => { ping(selfUrl); ping(otherUrl); }, 30 * 1000);
+    setInterval(() => { ping(selfUrl); ping(otherUrl); }, 4 * 60 * 1000);
+    console.log("Keep-alive ping enabled (every 4 min) for self + partner");
   }
 });
 
