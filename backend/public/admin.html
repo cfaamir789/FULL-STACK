@@ -5929,9 +5929,9 @@
       async function clearWorkerPhone(workerName) {
         if (
           !confirm(
-            "⚠️ Clear ALL transactions for " +
+            "⚠️ Clear phone history for " +
               workerName +
-              "?\n\nThis will:\n• Immediately delete all server-side records for this worker\n• Clear their phone app history on next sync (within ~5 seconds)",
+              "?\n\nThis will:\n• Tell their phone app to wipe its local history on next sync\n• Server data (pending, processed, archived) is NOT touched.",
           )
         )
           return;
@@ -5942,9 +5942,7 @@
             body: JSON.stringify({ workers: [workerName] }),
           });
           alert(
-            "✅ Cleared! " +
-              (result.serverDeleted || 0) +
-              " server records deleted.\nPhone will clear within ~5 seconds.",
+            "✅ Phone clear command sent to " + workerName + ".\nTheir app will wipe local history on next sync.\nServer data is untouched.",
           );
           // Refresh the sync status table
           if (typeof loadWorkerSyncStatus === "function")
@@ -5958,7 +5956,7 @@
       async function clearAllWorkersPhones() {
         if (
           !confirm(
-            "⚠️ Clear ALL transactions from ALL workers?\n\nThis will:\n• Immediately delete ALL server-side transaction records\n• Clear every phone app history within ~5 seconds",
+            "⚠️ Clear phone history for ALL workers?\n\nThis will:\n• Tell every phone app to wipe its local history on next sync\n• Server data (pending, processed, archived) is NOT touched.",
           )
         )
           return;
@@ -5969,9 +5967,7 @@
             body: JSON.stringify({ workers: "all" }),
           });
           alert(
-            "✅ Cleared! " +
-              (result.serverDeleted || 0) +
-              " server records deleted.\nAll phones will clear within ~5 seconds.",
+            "✅ Phone clear command sent to all workers.\nEach app will wipe local history on next sync.\nServer data is untouched.",
           );
           if (typeof loadWorkerSyncStatus === "function")
             loadWorkerSyncStatus();
@@ -6782,10 +6778,13 @@
               ', this)" title="Update this row status">' +
               actionLabel +
               "</button></td>";
-            html +=
-              '<td><button class="copy-icon-btn" style="color:#c62828;border-color:#ef9a9a" onclick="deleteSingleTx(\'' +
-              txId.replace(/'/g, "") +
-              '\', this)" title="Delete this transaction permanently">&#128465; Delete</button></td>';
+            const txStatus = String(tx.syncStatus || "pending").toLowerCase();
+            const isHistory = txStatus === "processed" || txStatus === "archived";
+            html += isHistory
+              ? '<td><span style="color:#aaa;font-size:12px" title="Processed history cannot be deleted">&#128274; History</span></td>'
+              : '<td><button class="copy-icon-btn" style="color:#c62828;border-color:#ef9a9a" onclick="deleteSingleTx(\'' +
+                txId.replace(/'/g, "") +
+                '\', this)" title="Delete this transaction permanently">&#128465; Delete</button></td>';
             html += "</tr>";
           });
           html += "</tbody></table></div></div>";
@@ -6826,6 +6825,11 @@
       async function deleteSingleTx(txId, btnEl) {
         if (!txId) return;
         const tx = filteredTransactions.find((t) => String(t._id) === txId);
+        const status = String(tx?.syncStatus || "pending").toLowerCase();
+        if (status === "processed" || status === "archived") {
+          alert("❌ Processed and archived transactions cannot be deleted. They are permanent history.");
+          return;
+        }
         const label = tx
           ? (tx.Item_Code || "") +
             " | " +

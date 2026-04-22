@@ -572,15 +572,27 @@ router.post(
 
       if (ids.length > 0) {
         let deleted = 0;
+        let skipped = 0;
         for (const id of ids) {
+          // Never delete processed or archived — they are permanent history
+          const tx = await Transaction.findOne({ _id: id }, { syncStatus: 1 }).lean();
+          if (!tx) continue;
+          if (["processed", "archived"].includes(tx.syncStatus)) {
+            skipped++;
+            continue;
+          }
           const delResult = await Transaction.deleteOne({ _id: id });
           deleted += delResult.deletedCount;
         }
-        return res.json({ success: true, deleted });
+        return res.json({ success: true, deleted, skipped });
       }
 
       if (worker) {
-        const delResult = await Transaction.deleteMany({ Worker_Name: worker });
+        // Only delete pending records for this worker
+        const delResult = await Transaction.deleteMany({
+          Worker_Name: worker,
+          syncStatus: { $nin: ["processed", "archived"] },
+        });
         return res.json({ success: true, deleted: delResult.deletedCount });
       }
 
@@ -646,6 +658,12 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
       return res.status(403).json({
         success: false,
         error: "You can only delete your own transactions.",
+      });
+    }
+    if (["processed", "archived"].includes(tx.syncStatus)) {
+      return res.status(403).json({
+        success: false,
+        error: "Processed and archived transactions cannot be deleted. They are permanent history.",
       });
     }
 
@@ -731,26 +749,19 @@ router.post(
 
       const clearBefore = new Date();
       let updated = 0;
-      let serverDeleted = 0;
 
+      // "Clear Phone" only sets the clearBefore timestamp so the worker's phone
+      // clears its own local history on next sync. Nothing is deleted from the
+      // server — all transactions (pending, processed, archived) remain intact.
       if (workers === "all") {
-        const [wsResult, delResult] = await Promise.all([
-          WorkerSync.updateMany({}, { $set: { clearBefore } }),
-          Transaction.deleteMany({}),
-        ]);
+        const wsResult = await WorkerSync.updateMany({}, { $set: { clearBefore } });
         updated = wsResult.modifiedCount || 0;
-        serverDeleted = delResult.deletedCount || 0;
       } else if (Array.isArray(workers) && workers.length > 0) {
-        const workerNames = workers.map((w) => String(w).trim().toUpperCase());
-        const [wsResult, delResult] = await Promise.all([
-          WorkerSync.updateMany(
-            { worker: { $in: workers } },
-            { $set: { clearBefore } },
-          ),
-          Transaction.deleteMany({ Worker_Name: { $in: workerNames } }),
-        ]);
+        const wsResult = await WorkerSync.updateMany(
+          { worker: { $in: workers } },
+          { $set: { clearBefore } },
+        );
         updated = wsResult.modifiedCount || 0;
-        serverDeleted = delResult.deletedCount || 0;
       } else {
         return res
           .status(400)
@@ -764,19 +775,14 @@ router.post(
         req.user?.role || "admin",
         "clear_worker_phone",
         workerLabel,
-        `Cleared phone + server data for: ${workerLabel} (${serverDeleted} server records deleted)`,
+        `Sent phone-clear command to: ${workerLabel} (server data untouched)`,
         "admin-panel",
       );
-
-      // Notify admin dashboards of the deletion
-      const broadcast = req.app.get("broadcast");
-      if (broadcast)
-        broadcast("transactions_updated", { deleted: serverDeleted });
 
       res.json({
         success: true,
         updated,
-        serverDeleted,
+        serverDeleted: 0,
         clearBefore: clearBefore.toISOString(),
       });
     } catch (err) {
