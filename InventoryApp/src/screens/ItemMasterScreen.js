@@ -379,7 +379,7 @@ export default function ItemMasterScreen({ route }) {
       </View>
 
       {/* ── Bin Content Data ─────────────────────────────────────────── */}
-      <View style={styles.binSection}>
+      {!isCheckerRole(role) && <View style={styles.binSection}>
         <View
           style={{
             flexDirection: "row",
@@ -509,7 +509,7 @@ export default function ItemMasterScreen({ route }) {
             ⚠ Not connected to server
           </Text>
         )}
-      </View>
+      </View>}
 
       {/* Import from CSV */}
       <View style={styles.section}>
