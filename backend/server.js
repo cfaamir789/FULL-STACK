@@ -178,11 +178,13 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`Admin panel:  http://localhost:${PORT}/admin`);
   console.log(`WebSocket:    ws://localhost:${PORT}/ws`);
 
-  // Keep-alive self-ping every 4 min to prevent Render free tier sleep
+  // Keep-alive self-ping every 4 min to prevent Render/Railway free tier sleep
   if (process.env.NODE_ENV === "production") {
     const keepAliveUrl = process.env.RENDER_EXTERNAL_URL
       ? `${process.env.RENDER_EXTERNAL_URL}/api/health`
-      : `https://fullstck.onrender.com/api/health`;
+      : process.env.RAILWAY_PUBLIC_DOMAIN
+      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/api/health`
+      : `https://fullstck-production.up.railway.app/api/health`;
     const ping = () => {
       require("https")
         .get(keepAliveUrl, () => {})
