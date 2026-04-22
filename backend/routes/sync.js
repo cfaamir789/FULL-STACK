@@ -469,6 +469,13 @@ router.get("/", requireDB, requireAuth, async (req, res) => {
       query.Worker_Name = worker;
     }
 
+    // Workers pass ?after=<ISO> to hide transactions created before a phone-clear event.
+    // Admins never get this filter — they always see full history.
+    const afterParam = req.query.after ? new Date(req.query.after) : null;
+    if (afterParam && !isNaN(afterParam.getTime()) && (mine || !isAdmin)) {
+      query.createdAt = { $gt: afterParam };
+    }
+
     const [transactions, total] = await Promise.all([
       Transaction.find(query).sort(sort).skip(skip).limit(limit).lean(),
       Transaction.countDocuments(query),

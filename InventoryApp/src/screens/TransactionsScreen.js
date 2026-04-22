@@ -182,8 +182,10 @@ export default function TransactionsScreen({ username, role, scope = "self" }) {
         return await getServerTransactions(page, pageSize, "pending");
       }
 
+      const phoneClearedAt = await AsyncStorage.getItem("phoneClearedAt");
       return await getServerTransactions(page, pageSize, "all", {
         mine: true,
+        ...(phoneClearedAt ? { after: phoneClearedAt } : {}),
       });
     },
     [canManageAll, pageSize, scope],

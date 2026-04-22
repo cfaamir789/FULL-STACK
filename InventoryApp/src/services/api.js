@@ -438,6 +438,9 @@ export const getServerTransactions = async (
       )}`,
     );
   }
+  if (options.after) {
+    params.push(`after=${encodeURIComponent(String(options.after))}`);
+  }
   const res = await apiClient.get(`/transactions?${params.join("&")}`);
   return res.data;
 };

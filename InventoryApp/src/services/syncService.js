@@ -303,6 +303,7 @@ export const attemptSync = async () => {
           );
         }
         await ackClear();
+        await AsyncStorage.setItem("phoneClearedAt", new Date().toISOString());
         if (_onDataCleared) _onDataCleared();
       }
     } catch (e) {
@@ -381,6 +382,7 @@ export const attemptSync = async () => {
         );
       }
       await ackClear();
+      await AsyncStorage.setItem("phoneClearedAt", new Date().toISOString());
       if (_onDataCleared) _onDataCleared();
     }
   } catch (e) {

@@ -24,6 +24,7 @@ import {
   getPendingTransactions,
   getTransactionsPage,
 } from "../database/db";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getDisplayUrl, getServerTransactions } from "../services/api";
 import {
   attemptSync,
@@ -106,8 +107,10 @@ export default function DashboardScreen({ username }) {
     let nextRecent = localRecent;
 
     try {
+      const phoneClearedAt = await AsyncStorage.getItem("phoneClearedAt");
       const serverRes = await getServerTransactions(1, 200, "all", {
         mine: true,
+        ...(phoneClearedAt ? { after: phoneClearedAt } : {}),
       });
       const serverRecent = (serverRes.transactions || []).map(
         mapServerTransactionToLocalShape,
