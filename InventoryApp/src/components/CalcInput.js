@@ -95,8 +95,9 @@ const CalcInput = forwardRef(function CalcInput(
   useImperativeHandle(ref, () => ({
     focus: () => {
       setOpen(true);
-      // Focus the real TextInput so keyboard nav and physical keyboard work
-      setTimeout(() => inputRef.current?.focus(), 50);
+      // Longer delay for slow phones (1GB RAM / Zebra PDT) to ensure
+      // the calculator pad renders before the TextInput tries to focus
+      setTimeout(() => inputRef.current?.focus(), 120);
     },
     clear: () => {
       setExpr("");

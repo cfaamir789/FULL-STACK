@@ -92,8 +92,8 @@ android {
         applicationId 'com.inventorymanager'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 39
-        versionName "0.0.30"
+        versionCode 40
+        versionName "0.0.31"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }

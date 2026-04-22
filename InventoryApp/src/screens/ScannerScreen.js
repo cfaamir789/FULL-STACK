@@ -253,8 +253,8 @@ export default function ScannerScreen({ role = "worker" }) {
     setFrombin("");
     setTobin("");
     setItemBins([]);
-    setFromBinMode("suggest");
-    setToBinMode("suggest");
+    setFromBinMode("custom");
+    setToBinMode("custom");
     setSelectedFromBin(null);
     setSelectedToBin(null);
     setQty("");
@@ -325,8 +325,8 @@ export default function ScannerScreen({ role = "worker" }) {
       setFoundItem(null);
       setScanned(true);
       setItemBins([]);
-      setFromBinMode("suggest");
-      setToBinMode("suggest");
+      setFromBinMode("custom");
+      setToBinMode("custom");
       setSelectedFromBin(null);
       setSelectedToBin(null);
       focusFromBin();
@@ -351,14 +351,10 @@ export default function ScannerScreen({ role = "worker" }) {
     try {
       const bins = await getBinsForItem(item.item_code || "");
       setItemBins(bins);
-      if (bins.length === 0) {
-        setFromBinMode("custom");
-        setToBinMode("custom");
-      } else {
-        setFromBinMode("suggest");
-        setToBinMode("suggest");
-        // Never auto-select — user must explicitly pick from the list
-      }
+      // Always default to custom mode — user can switch to suggest if needed.
+      // This prevents the dropdown from auto-opening on Zebra PDT devices.
+      setFromBinMode("custom");
+      setToBinMode("custom");
     } catch {
       setItemBins([]);
       setFromBinMode("custom");

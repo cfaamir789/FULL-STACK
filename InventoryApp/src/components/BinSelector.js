@@ -91,8 +91,9 @@ export default function BinSelector({
     onSelectBin(bin);
     setFilterText(bin.bin_code);
     setListOpen(false);
-    // Immediately advance to next field so keyboard stays visible
-    if (onSubmitEditing) setTimeout(onSubmitEditing, 30);
+    // NOTE: do NOT call onSubmitEditing here.
+    // The parent's onSelectBin prop already handles focus-to-next-field.
+    // Calling it here too creates competing focus calls that crash Android IME.
   };
 
   const handleSwitchToCustom = () => {
