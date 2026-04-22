@@ -165,7 +165,9 @@ router.get(
       const todayStart = new Date(todayStr + "T00:00:00+03:00");
       const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-      // Fetch WorkerSync docs and live today-counts from Transaction in parallel
+      // Fetch WorkerSync docs and live today-counts from Transaction in parallel.
+      // "Today" counts only PENDING transactions — processed/archived items are
+      // already done and should not show as outstanding work for the worker.
       const [docs, todayAgg] = await Promise.all([
         WorkerSync.find(
           {},
@@ -174,7 +176,12 @@ router.get(
           .sort({ lastSync: -1 })
           .lean(),
         Transaction.aggregate([
-          { $match: { lastSyncedAt: { $gte: todayStart, $lt: todayEnd } } },
+          {
+            $match: {
+              lastSyncedAt: { $gte: todayStart, $lt: todayEnd },
+              ...PENDING_QUERY,
+            },
+          },
           { $group: { _id: "$Worker_Name", count: { $sum: 1 } } },
         ]),
       ]);
@@ -808,7 +815,7 @@ router.get("/clear-check", requireDB, requireAuth, async (req, res) => {
   }
 });
 
-// Worker confirms clear completed — removes the clearBefore flag
+// Worker confirms clear completed — removes the clearBefore flag and resets today counter
 router.post("/clear-ack", requireDB, requireAuth, async (req, res) => {
   try {
     const workerName = req.user?.username;
@@ -817,7 +824,7 @@ router.post("/clear-ack", requireDB, requireAuth, async (req, res) => {
     }
     await WorkerSync.updateOne(
       { worker: workerName },
-      { $unset: { clearBefore: 1 } },
+      { $unset: { clearBefore: 1 }, $set: { totalToday: 0 } },
     );
     res.json({ success: true });
   } catch (err) {
