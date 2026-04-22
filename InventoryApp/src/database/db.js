@@ -4,12 +4,6 @@ import { isAdminRole } from "../utils/roles";
 
 let db;
 
-// Yield to event loop — lets GC run between heavy batches, avoids ANR on low-RAM devices
-const _yield = () => new Promise((r) => setTimeout(r, 0));
-
-const ITEM_GROUP_EXPR =
-  "LOWER(COALESCE(NULLIF(TRIM(item_code), ''), TRIM(item_name)))";
-
 // Get server-aligned time using stored offset from last health check
 const getServerNow = async () => {
   try {
@@ -109,7 +103,6 @@ export const initDB = async () => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_items_item_code ON items(item_code);
-    CREATE INDEX IF NOT EXISTS idx_items_item_name ON items(item_name);
 
     CREATE TABLE IF NOT EXISTS transactions (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -129,8 +122,6 @@ export const initDB = async () => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_transactions_synced ON transactions(synced);
-    CREATE INDEX IF NOT EXISTS idx_transactions_timestamp ON transactions(timestamp DESC);
-    CREATE INDEX IF NOT EXISTS idx_transactions_worker_timestamp ON transactions(worker_name, timestamp DESC);
   `);
 
   // Migration 1: add item_code column if it doesn't exist yet (for existing DBs)
@@ -239,60 +230,32 @@ export const initDB = async () => {
        WHERE updated_at IS NULL OR updated_at = ''`,
     );
   });
-
-  // ─── Bin Contents table ─────────────────────────────────────────────────────
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS bin_contents (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      bin_code  TEXT NOT NULL,
-      item_code TEXT NOT NULL,
-      qty       INTEGER NOT NULL DEFAULT 0,
-      UNIQUE(bin_code, item_code)
-    );
-    CREATE INDEX IF NOT EXISTS idx_bin_contents_item_code ON bin_contents(item_code);
-  `);
-
-  // ─── Bin Master table (for hard-block bin validation) ───────────────────────
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS bin_master (
-      bin_code TEXT PRIMARY KEY
-    );
-  `);
 };
 
 // ─── Items ────────────────────────────────────────────────────────────────────
 
 export const upsertItems = async (itemsArray) => {
   if (!itemsArray || itemsArray.length === 0) return;
-  const ROWS_PER_INSERT = 200;
-  const ROWS_PER_TX = 2000;
-  const total = itemsArray.length;
-  for (let bStart = 0; bStart < total; bStart += ROWS_PER_TX) {
-    const bEnd = Math.min(bStart + ROWS_PER_TX, total);
-    await db.withTransactionAsync(async () => {
-      for (let i = bStart; i < bEnd; i += ROWS_PER_INSERT) {
-        const chunk = itemsArray.slice(i, Math.min(i + ROWS_PER_INSERT, bEnd));
-        const valid = chunk.filter(
-          (item) => item.Barcode && String(item.Barcode).trim(),
-        );
-        if (valid.length === 0) continue;
-        const placeholders = valid.map(() => "(?,?,?)").join(",");
-        const params = valid.flatMap((item) => [
-          item.ItemCode || "",
-          String(item.Barcode).trim(),
-          item.Item_Name || "",
-        ]);
-        await db.runAsync(
-          `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
-           ON CONFLICT(barcode) DO UPDATE SET
-             item_code = excluded.item_code,
-             item_name = excluded.item_name`,
-          params,
-        );
-      }
-    });
-    await _yield();
-  }
+  // 300 rows × 3 params = 900, safely under SQLite's 999 param limit
+  const CHUNK_SIZE = 300;
+  await db.withTransactionAsync(async () => {
+    for (let i = 0; i < itemsArray.length; i += CHUNK_SIZE) {
+      const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "(?,?,?)").join(",");
+      const params = chunk.flatMap((item) => [
+        item.ItemCode,
+        item.Barcode,
+        item.Item_Name,
+      ]);
+      await db.runAsync(
+        `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
+         ON CONFLICT(barcode) DO UPDATE SET
+           item_code = excluded.item_code,
+           item_name = excluded.item_name`,
+        params,
+      );
+    }
+  });
 };
 
 export const getItemByBarcode = async (barcode) => {
@@ -346,84 +309,9 @@ export const searchItems = async (query) => {
   );
 };
 
-export const searchItemsByName = async (query, limit = 200) => {
-  const q = `%${query}%`;
-  return await db.getAllAsync(
-    `SELECT * FROM items WHERE item_name LIKE ? ORDER BY item_name ASC LIMIT ?`,
-    [q, limit],
-  );
-};
-
-const mapItemSummary = (row) => ({
-  item_key: row.item_key,
-  item_code: String(row.item_code || "").trim(),
-  item_name: row.item_name,
-  barcodeCount: Number(row.barcode_count || 0),
-});
-
-export const getItemSummaries = async (limit = 250, offset = 0) => {
-  const rows = await db.getAllAsync(
-    `SELECT
-       ${ITEM_GROUP_EXPR} AS item_key,
-       TRIM(COALESCE(item_code, '')) AS item_code,
-       MIN(item_name) AS item_name,
-       COUNT(*) AS barcode_count
-     FROM items
-     GROUP BY ${ITEM_GROUP_EXPR}, TRIM(COALESCE(item_code, ''))
-     ORDER BY item_name COLLATE NOCASE ASC
-     LIMIT ? OFFSET ?`,
-    [limit, offset],
-  );
-  return rows.map(mapItemSummary);
-};
-
-export const searchItemSummaries = async (query, limit = 200) => {
-  const q = `%${String(query || "").trim()}%`;
-  const rows = await db.getAllAsync(
-    `SELECT
-       ${ITEM_GROUP_EXPR} AS item_key,
-       TRIM(COALESCE(item_code, '')) AS item_code,
-       MIN(item_name) AS item_name,
-       COUNT(*) AS barcode_count
-     FROM items
-     WHERE item_name LIKE ? OR barcode LIKE ? OR item_code LIKE ?
-     GROUP BY ${ITEM_GROUP_EXPR}, TRIM(COALESCE(item_code, ''))
-     ORDER BY item_name COLLATE NOCASE ASC
-     LIMIT ?`,
-    [q, q, q, limit],
-  );
-  return rows.map(mapItemSummary);
-};
-
-export const getItemBarcodes = async (itemCode, itemName, limit = 5000) => {
-  const normalizedCode = String(itemCode || "").trim();
-  if (normalizedCode) {
-    const rows = await db.getAllAsync(
-      `SELECT barcode
-       FROM items
-       WHERE TRIM(item_code) = ?
-       ORDER BY barcode ASC
-       LIMIT ?`,
-      [normalizedCode, limit],
-    );
-    return rows.map((row) => row.barcode);
-  }
-
-  const normalizedName = String(itemName || "").trim();
-  const rows = await db.getAllAsync(
-    `SELECT barcode
-     FROM items
-     WHERE TRIM(item_name) = ?
-     ORDER BY barcode ASC
-     LIMIT ?`,
-    [normalizedName, limit],
-  );
-  return rows.map((row) => row.barcode);
-};
-
 export const getAllItems = async () => {
   return await db.getAllAsync(
-    "SELECT * FROM items ORDER BY item_name ASC LIMIT 50000",
+    "SELECT * FROM items ORDER BY item_name ASC LIMIT 1000",
   );
 };
 
@@ -477,18 +365,7 @@ export const insertTransaction = async ({
   return result.lastInsertRowId;
 };
 
-export const getPendingTransactions = async (workerName = "") => {
-  const normalizedWorker = String(workerName || "").trim();
-  if (normalizedWorker) {
-    return await db.getAllAsync(
-      `SELECT *
-       FROM transactions
-       WHERE synced = 0 AND worker_name = ?
-       ORDER BY timestamp ASC`,
-      [normalizedWorker],
-    );
-  }
-
+export const getPendingTransactions = async () => {
   return await db.getAllAsync(
     "SELECT * FROM transactions WHERE synced = 0 ORDER BY timestamp ASC",
   );
@@ -508,51 +385,6 @@ export const getRecentTransactions = async (limit = 20) => {
     "SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?",
     [limit],
   );
-};
-
-export const getTransactionsPage = async (
-  limit = 100,
-  offset = 0,
-  workerName = "",
-) => {
-  const normalizedWorker = String(workerName || "").trim();
-  if (normalizedWorker) {
-    return await db.getAllAsync(
-      `SELECT *
-       FROM transactions
-       WHERE worker_name = ?
-       ORDER BY timestamp DESC
-       LIMIT ? OFFSET ?`,
-      [normalizedWorker, limit, offset],
-    );
-  }
-
-  return await db.getAllAsync(
-    `SELECT *
-     FROM transactions
-     ORDER BY timestamp DESC
-     LIMIT ? OFFSET ?`,
-    [limit, offset],
-  );
-};
-
-export const getTransactionsCount = async (workerName = "") => {
-  const normalizedWorker = String(workerName || "").trim();
-  if (normalizedWorker) {
-    const row = await db.getFirstAsync(
-      `SELECT COUNT(*) AS count
-       FROM transactions
-       WHERE worker_name = ?`,
-      [normalizedWorker],
-    );
-    return Number(row?.count || 0);
-  }
-
-  const row = await db.getFirstAsync(
-    `SELECT COUNT(*) AS count
-     FROM transactions`,
-  );
-  return Number(row?.count || 0);
 };
 
 export const getAllTransactions = async () => {
@@ -755,29 +587,23 @@ export const clearAllItems = async () => {
   return result.changes;
 };
 
-// Delete all items (DB only, no AsyncStorage). Used as step 1 of paginated download.
-export const deleteAllItemRows = async () => {
-  await db.runAsync("DELETE FROM items");
-};
-
-// Insert one page of items. Called repeatedly during paginated download.
-// Each call is a single small transaction — memory-safe on low-RAM devices.
-export const insertItemsPage = async (items) => {
-  if (!items || items.length === 0) return 0;
-  const ROWS_PER_INSERT = 200;
-  let inserted = 0;
+// Atomic clear + replace: downloads all items to memory first, then replaces in one transaction.
+// If ANY chunk fails, the entire operation rolls back — local data stays untouched.
+export const clearAndReplaceAllItems = async (itemsArray, onProgress) => {
+  if (!itemsArray || itemsArray.length === 0) return 0;
+  // 150 rows = 450 params per INSERT — well within SQLite's 999-param limit.
+  // Smaller chunks reduce peak heap usage on 1 GB RAM devices.
+  const CHUNK_SIZE = 150;
+  const total = itemsArray.length;
   await db.withTransactionAsync(async () => {
-    for (let i = 0; i < items.length; i += ROWS_PER_INSERT) {
-      const chunk = items.slice(i, i + ROWS_PER_INSERT);
-      const valid = chunk.filter(
-        (item) => item.Barcode && String(item.Barcode).trim(),
-      );
-      if (valid.length === 0) continue;
-      const placeholders = valid.map(() => "(?,?,?)").join(",");
-      const params = valid.flatMap((item) => [
-        item.ItemCode || "",
-        String(item.Barcode).trim(),
-        item.Item_Name || "",
+    await db.runAsync("DELETE FROM items");
+    for (let i = 0; i < total; i += CHUNK_SIZE) {
+      const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "(?,?,?)").join(",");
+      const params = chunk.flatMap((item) => [
+        item.ItemCode,
+        item.Barcode,
+        item.Item_Name,
       ]);
       await db.runAsync(
         `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
@@ -786,58 +612,15 @@ export const insertItemsPage = async (items) => {
            item_name = excluded.item_name`,
         params,
       );
-      inserted += valid.length;
+      if (onProgress)
+        onProgress({ processed: Math.min(i + CHUNK_SIZE, total), total });
+      // Yield to the JS event loop every ~3000 rows so the GC can reclaim
+      // memory and the UI progress bar can update on 1 GB RAM devices.
+      if (i > 0 && i % 3000 === 0)
+        await new Promise((r) => setTimeout(r, 0));
     }
   });
-  await _yield();
-  return inserted;
-};
-
-// Clear + replace in small batched transactions to avoid OOM on low-RAM devices.
-// Each batch commits independently — keeps WAL journal small and lets GC reclaim memory.
-// If the app crashes mid-way, a re-download will complete the replacement.
-export const clearAndReplaceAllItems = async (itemsArray, onProgress) => {
-  if (!itemsArray || itemsArray.length === 0) return 0;
-  const ROWS_PER_INSERT = 200; // params per INSERT (200×3 = 600, well under 999)
-  const ROWS_PER_TX = 2000; // rows per transaction — keeps WAL journal small
-  const total = itemsArray.length;
-
-  // 1. Delete all items (fast, separate transaction)
-  await db.runAsync("DELETE FROM items");
-
-  // 2. Insert in small batched transactions
-  let inserted = 0;
-  for (let bStart = 0; bStart < total; bStart += ROWS_PER_TX) {
-    const bEnd = Math.min(bStart + ROWS_PER_TX, total);
-    await db.withTransactionAsync(async () => {
-      for (let i = bStart; i < bEnd; i += ROWS_PER_INSERT) {
-        const chunk = itemsArray.slice(i, Math.min(i + ROWS_PER_INSERT, bEnd));
-        // Skip items with missing barcode (NOT NULL constraint)
-        const valid = chunk.filter(
-          (item) => item.Barcode && String(item.Barcode).trim(),
-        );
-        if (valid.length === 0) continue;
-        const placeholders = valid.map(() => "(?,?,?)").join(",");
-        const params = valid.flatMap((item) => [
-          item.ItemCode || "",
-          String(item.Barcode).trim(),
-          item.Item_Name || "",
-        ]);
-        await db.runAsync(
-          `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
-           ON CONFLICT(barcode) DO UPDATE SET
-             item_code = excluded.item_code,
-             item_name = excluded.item_name`,
-          params,
-        );
-        inserted += valid.length;
-      }
-    });
-    // Yield to event loop between batches — lets GC reclaim + avoids ANR
-    await _yield();
-    if (onProgress) onProgress({ processed: bEnd, total });
-  }
-  return inserted;
+  return total;
 };
 
 export const getPendingCount = async () => {
@@ -845,130 +628,4 @@ export const getPendingCount = async () => {
     "SELECT COUNT(*) as count FROM transactions WHERE synced = 0",
   );
   return row?.count ?? 0;
-};
-
-// ─── Bin Contents ─────────────────────────────────────────────────────────────
-
-export const upsertBinContents = async (rows) => {
-  if (!rows || rows.length === 0) return;
-  // 3 params per row, chunk at 300 rows (900 params < 999 SQLite limit)
-  const CHUNK_SIZE = 300;
-  await db.withTransactionAsync(async () => {
-    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
-      const chunk = rows.slice(i, i + CHUNK_SIZE);
-      const placeholders = chunk.map(() => "(?,?,?)").join(",");
-      const params = chunk.flatMap((r) => [
-        String(r.BinCode || r.bin_code || "").trim(),
-        String(r.ItemCode || r.item_code || "").trim(),
-        Number(r.Qty != null ? r.Qty : r.qty) || 0,
-      ]);
-      await db.runAsync(
-        `INSERT INTO bin_contents (bin_code, item_code, qty) VALUES ${placeholders}
-         ON CONFLICT(bin_code, item_code) DO UPDATE SET qty = excluded.qty`,
-        params,
-      );
-    }
-  });
-};
-
-export const getBinsForItem = async (itemCode) => {
-  const rows = await db.getAllAsync(
-    `SELECT bc.bin_code, bc.qty FROM bin_contents bc
-     INNER JOIN bin_master bm ON bm.bin_code = bc.bin_code
-     WHERE bc.item_code = ?
-     ORDER BY bc.qty DESC`,
-    [String(itemCode).trim()],
-  );
-  return rows;
-};
-
-export const getBinQtyForItemAndBin = async (itemCode, binCode) => {
-  const row = await db.getFirstAsync(
-    `SELECT qty FROM bin_contents WHERE item_code = ? AND bin_code = ? LIMIT 1`,
-    [String(itemCode).trim(), String(binCode).trim().toUpperCase()],
-  );
-  return row ? row.qty : null;
-};
-
-export const clearBinContents = async () => {
-  const result = await db.runAsync("DELETE FROM bin_contents");
-  try {
-    await AsyncStorage.removeItem("binContentVersion");
-    await AsyncStorage.removeItem("lastBinContentSyncTime");
-  } catch (_) {}
-  return result.changes;
-};
-
-export const clearAndReplaceBinContents = async (rows, onProgress) => {
-  if (!rows || rows.length === 0) {
-    await db.runAsync("DELETE FROM bin_contents");
-    return 0;
-  }
-  const CHUNK_SIZE = 300;
-  const total = rows.length;
-  await db.withTransactionAsync(async () => {
-    await db.runAsync("DELETE FROM bin_contents");
-    for (let i = 0; i < total; i += CHUNK_SIZE) {
-      const chunk = rows.slice(i, i + CHUNK_SIZE);
-      const placeholders = chunk.map(() => "(?,?,?)").join(",");
-      const params = chunk.flatMap((r) => [
-        String(r.BinCode || r.bin_code || "").trim(),
-        String(r.ItemCode || r.item_code || "").trim(),
-        Number(r.Qty != null ? r.Qty : r.qty) || 0,
-      ]);
-      await db.runAsync(
-        `INSERT INTO bin_contents (bin_code, item_code, qty) VALUES ${placeholders}`,
-        params,
-      );
-      if (onProgress)
-        onProgress({ processed: Math.min(i + CHUNK_SIZE, total), total });
-    }
-  });
-  return total;
-};
-
-export const getBinContentCount = async () => {
-  const row = await db.getFirstAsync(
-    "SELECT COUNT(*) as count FROM bin_contents",
-  );
-  return row?.count ?? 0;
-};
-
-// ─── Bin Master (hard-block validation) ──────────────────────────────────────
-
-export const getBinMasterCount = async () => {
-  const row = await db.getFirstAsync(
-    "SELECT COUNT(*) as count FROM bin_master",
-  );
-  return row?.count ?? 0;
-};
-
-export const checkBinExists = async (binCode) => {
-  const code = String(binCode).trim().toUpperCase();
-  const row = await db.getFirstAsync(
-    `SELECT 1 FROM bin_master WHERE bin_code = ?
-     UNION
-     SELECT 1 FROM bin_contents WHERE bin_code = ?
-     LIMIT 1`,
-    [code, code],
-  );
-  return !!row;
-};
-
-export const clearAndReplaceBinMaster = async (codes) => {
-  if (!codes || codes.length === 0) return 0;
-  const CHUNK_SIZE = 500;
-  const total = codes.length;
-  await db.withTransactionAsync(async () => {
-    await db.runAsync("DELETE FROM bin_master");
-    for (let i = 0; i < total; i += CHUNK_SIZE) {
-      const chunk = codes.slice(i, i + CHUNK_SIZE);
-      const placeholders = chunk.map(() => "(?)").join(",");
-      await db.runAsync(
-        `INSERT OR IGNORE INTO bin_master (bin_code) VALUES ${placeholders}`,
-        chunk.map((c) => String(c).trim().toUpperCase()),
-      );
-    }
-  });
-  return total;
 };

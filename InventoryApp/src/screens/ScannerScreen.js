@@ -169,6 +169,12 @@ export default function ScannerScreen({ role = "worker" }) {
       fromBinRef.current?.blur();
       setTimeout(() => fromBinRef.current?.focus(), 50);
     }, 320);
+    // Force-open the dropdown after ALL blur/onBlur timers have settled.
+    // Timeline: blur@320ms → onBlur fires 150ms delayed close@470ms → focus@370ms opens it
+    // → but stale onBlur timer closes it at 470ms. This call at 600ms wins last.
+    setTimeout(() => {
+      fromBinRef.current?.openList?.();
+    }, 600);
   };
 
   // Live search as user types in Item Name mode
@@ -253,8 +259,8 @@ export default function ScannerScreen({ role = "worker" }) {
     setFrombin("");
     setTobin("");
     setItemBins([]);
-    setFromBinMode("custom");
-    setToBinMode("custom");
+    setFromBinMode("suggest");
+    setToBinMode("suggest");
     setSelectedFromBin(null);
     setSelectedToBin(null);
     setQty("");
@@ -351,10 +357,17 @@ export default function ScannerScreen({ role = "worker" }) {
     try {
       const bins = await getBinsForItem(item.item_code || "");
       setItemBins(bins);
-      // Always default to custom mode — user can switch to suggest if needed.
-      // This prevents the dropdown from auto-opening on Zebra PDT devices.
-      setFromBinMode("custom");
-      setToBinMode("custom");
+      // Suggest mode when bins exist (shows dropdown), custom when no stock records (shows text input directly)
+      if (bins.length > 0) {
+        setFromBinMode("suggest");
+        setToBinMode("suggest");
+      } else {
+        setFromBinMode("custom");
+        setToBinMode("custom");
+        // Auto-fill IN0001 as From Bin — it's the only allowed incoming bin
+        // when the item has no stock records yet (user is receiving new stock)
+        setFrombin("IN0001");
+      }
     } catch {
       setItemBins([]);
       setFromBinMode("custom");
@@ -971,26 +984,18 @@ export default function ScannerScreen({ role = "worker" }) {
           </Text>
           {found && (
             <>
-              <Text style={styles.itemBannerDetail}>
-                <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
-                  Code:{" "}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", marginTop: 2 }}>
+                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>
+                  <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>Code: </Text>
+                  <Text style={{ fontWeight: "800", color: Colors.primary, fontSize: 12 }}>
+                    {foundItem.item_code}
+                  </Text>
                 </Text>
-                <Text
-                  style={{
-                    fontWeight: "800",
-                    color: Colors.primary,
-                    fontSize: 13,
-                  }}
-                >
-                  {foundItem.item_code}
+                <Text style={{ fontSize: 12, color: Colors.textSecondary }}>
+                  <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>Barcode: </Text>
+                  {foundItem.barcode}
                 </Text>
-              </Text>
-              <Text style={styles.itemBannerDetail}>
-                <Text style={{ fontWeight: "700", color: Colors.textPrimary }}>
-                  Barcode:{" "}
-                </Text>
-                {foundItem.barcode}
-              </Text>
+              </View>
             </>
           )}
         </View>
@@ -1047,6 +1052,8 @@ export default function ScannerScreen({ role = "worker" }) {
                 toBinRef.current?.blur();
                 setTimeout(() => toBinRef.current?.focus(), 50);
               }, 120);
+              // Safety net: open To Bin dropdown after all blur/onBlur timers settle
+              setTimeout(() => toBinRef.current?.openList?.(), 600);
             }
             setSelectedFromBin(bin);
             if (bin) setFrombin(bin.bin_code);
@@ -1058,8 +1065,8 @@ export default function ScannerScreen({ role = "worker" }) {
           onSubmitEditing={() => toBinRef.current?.focus()}
           editable={scanned}
           onBinValidate={checkBinExists}
-          showQty={isAdmin}
           allowedCustomBins={["IN0001"]}
+          showQty={isAdmin}
         />
 
         <BinSelector
@@ -1089,6 +1096,7 @@ export default function ScannerScreen({ role = "worker" }) {
           onSubmitEditing={() => qtyRef.current?.focus()}
           editable={scanned}
           onBinValidate={checkBinExists}
+          allowedCustomBins={["IN0001"]}
           showQty={isAdmin}
         />
 
@@ -1118,25 +1126,19 @@ export default function ScannerScreen({ role = "worker" }) {
 
         {/* Qty — required for all users (admin and worker) */}
         <>
-          <Text style={styles.label}>
-            Quantity{" "}
-            <Text
-              style={{
-                fontWeight: "400",
-                color: Colors.textLight,
-                fontSize: 11,
-              }}
-            >
-              (tap calculator for math: 3×48 = 144)
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+            <Text style={{ width: 72, fontSize: 13, fontWeight: "700", color: Colors.textPrimary, letterSpacing: 0.3, flexShrink: 0, marginRight: 8 }}>
+              Quantity
             </Text>
-          </Text>
-          <CalcInput
-            ref={qtyRef}
-            value={qty}
-            onValueChange={setQty}
-            placeholder="Qty — tap to open calculator"
+            <CalcInput
+              ref={qtyRef}
+              value={qty}
+              onValueChange={setQty}
+              placeholder="Qty — tap calculator (e.g. 3×48)"
             onSubmitEditing={handleSave}
-          />
+            style={{ flex: 1 }}
+            />
+          </View>
           {exceedsStock && (
             <View
               style={{
@@ -1172,31 +1174,31 @@ export default function ScannerScreen({ role = "worker" }) {
           )}
         </>
 
-        <Text style={styles.label}>
-          Notes{" "}
-          <Text style={{ fontWeight: "400", color: Colors.textLight }}>
-            (optional)
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+          <Text style={{ width: 72, fontSize: 13, fontWeight: "700", color: Colors.textPrimary, letterSpacing: 0.3, flexShrink: 0, marginRight: 8 }}>
+            Notes{" "}
+            <Text style={{ fontWeight: "400", color: Colors.textLight, fontSize: 11 }}>(optional)</Text>
           </Text>
-        </Text>
-        <View style={styles.inputWithMic}>
-          <TextInput
-            ref={notesRef}
-            style={styles.inputInner}
-            value={notes}
-            onChangeText={uc(setNotes)}
-            placeholder="e.g. DAMAGE, EXPIRY 2026-12"
-            autoCapitalize="characters"
-            returnKeyType="done"
-            onSubmitEditing={handleSave}
-            onKeyPress={(e) => {
-              if (e.nativeEvent.key === "Enter") handleSave();
-            }}
-          />
-          <ClearButton
-            value={notes}
-            onClear={() => setNotes("")}
-            onClearFocus={() => notesRef.current?.focus()}
-          />
+          <View style={[styles.inputWithMic, { flex: 1 }]}>
+            <TextInput
+              ref={notesRef}
+              style={styles.inputInner}
+              value={notes}
+              onChangeText={uc(setNotes)}
+              placeholder="e.g. DAMAGE, EXPIRY 2026-12"
+              autoCapitalize="characters"
+              returnKeyType="done"
+              onSubmitEditing={handleSave}
+              onKeyPress={(e) => {
+                if (e.nativeEvent.key === "Enter") handleSave();
+              }}
+            />
+            <ClearButton
+              value={notes}
+              onClear={() => setNotes("")}
+              onClearFocus={() => notesRef.current?.focus()}
+            />
+          </View>
         </View>
 
         <TouchableOpacity

@@ -70,12 +70,6 @@ function evaluate(expr) {
 
 const hasOperator = (s) => /[+\-×÷*/−]/.test(s);
 
-const ROWS = [
-  ["7", "8", "9", "÷"],
-  ["4", "5", "6", "×"],
-  ["1", "2", "3", "−"],
-  ["00", "0", ".", "+"],
-];
 const OP_KEYS = new Set(["÷", "×", "−", "+"]);
 
 const CalcInput = forwardRef(function CalcInput(
@@ -98,6 +92,9 @@ const CalcInput = forwardRef(function CalcInput(
       // Longer delay for slow phones (1GB RAM / Zebra PDT) to ensure
       // the calculator pad renders before the TextInput tries to focus
       setTimeout(() => inputRef.current?.focus(), 120);
+    },
+    blur: () => {
+      inputRef.current?.blur();
     },
     clear: () => {
       setExpr("");
@@ -140,7 +137,7 @@ const CalcInput = forwardRef(function CalcInput(
 
   // Called when user types on physical keyboard
   const handleTextChange = (text) => {
-    const clean = text.replace(/[^0-9.+\-×÷*/−x]/gi, "");
+    const clean = text.replace(/[^0-9.+\-×÷*/−]/g, "");
     setExpr(clean);
     notifyParent(clean);
   };
@@ -163,15 +160,33 @@ const CalcInput = forwardRef(function CalcInput(
           onFocus={() => setOpen(true)}
           onChangeText={handleTextChange}
           onSubmitEditing={handleSubmitEditing}
-          // showSoftInputOnFocus={false} hides the system keyboard on mobile
-          // so that our custom pad acts as the keyboard
-          showSoftInputOnFocus={false}
-          keyboardType={Platform.OS === "web" ? "default" : "numeric"}
+          keyboardType="number-pad"
           returnKeyType="done"
           blurOnSubmit={false}
           caretHidden={false}
           selectionColor={Colors.primary}
         />
+        {preview !== null && (
+          <View style={s.previewBadge}>
+            <Text style={s.previewInline}>= {preview}</Text>
+          </View>
+        )}
+        {expr.length > 0 && (
+          <TouchableOpacity
+            onPress={() => {
+              setExpr("");
+              onValueChange?.("");
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ marginRight: 4 }}
+          >
+            <MaterialCommunityIcons
+              name="close-circle"
+              size={20}
+              color={Colors.textSecondary}
+            />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           onPress={() => {
             setOpen((o) => !o);
@@ -188,52 +203,50 @@ const CalcInput = forwardRef(function CalcInput(
         </TouchableOpacity>
       </View>
 
-      {preview !== null && <Text style={s.previewText}>= {preview}</Text>}
-
       {/* ── Keypad ── */}
       {open && (
         <View style={s.pad}>
-          {ROWS.map((row, ri) => (
-            <View key={ri} style={s.row}>
-              {row.map((key) => (
-                <TouchableOpacity
-                  key={key}
-                  style={[s.key, OP_KEYS.has(key) && s.keyOp]}
-                  onPress={() => handleKey(key)}
-                  activeOpacity={0.65}
-                >
-                  <Text style={[s.keyText, OP_KEYS.has(key) && s.keyOpText]}>
-                    {key}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ))}
-          {/* Action row */}
+          {/* Row 1: 7 8 9  ⌫ */}
           <View style={s.row}>
-            <TouchableOpacity
-              style={[s.key, s.keyWide, s.keyBack]}
-              onPress={() => handleKey("⌫")}
-              activeOpacity={0.65}
-            >
-              <MaterialCommunityIcons
-                name="backspace-outline"
-                size={24}
-                color="#c0392b"
-              />
+            {["7", "8", "9"].map((key) => (
+              <TouchableOpacity key={key} style={s.key} onPress={() => handleKey(key)} activeOpacity={0.65}>
+                <Text style={s.keyText}>{key}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={[s.key, s.keyBack]} onPress={() => handleKey("⌫")} activeOpacity={0.65}>
+              <MaterialCommunityIcons name="backspace-outline" size={24} color="#c0392b" />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[s.key, s.keyWide, s.keySave]}
-              onPress={() => handleKey("→")}
-              activeOpacity={0.65}
-            >
-              <MaterialCommunityIcons
-                name="content-save"
-                size={20}
-                color="#fff"
-              />
-              <Text style={s.keySaveText}> SAVE TRANSACTION</Text>
+          </View>
+          {/* Row 2: 4 5 6  💾 SAVE */}
+          <View style={s.row}>
+            {["4", "5", "6"].map((key) => (
+              <TouchableOpacity key={key} style={s.key} onPress={() => handleKey(key)} activeOpacity={0.65}>
+                <Text style={s.keyText}>{key}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={[s.key, s.keySave]} onPress={() => handleKey("→")} activeOpacity={0.65}>
+              <MaterialCommunityIcons name="content-save" size={18} color="#fff" />
+              <Text style={s.keySaveText}> SAVE</Text>
             </TouchableOpacity>
+          </View>
+          {/* Row 3: 1 2 3  × */}
+          <View style={s.row}>
+            {["1", "2", "3"].map((key) => (
+              <TouchableOpacity key={key} style={s.key} onPress={() => handleKey(key)} activeOpacity={0.65}>
+                <Text style={s.keyText}>{key}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={[s.key, s.keyOp]} onPress={() => handleKey("×")} activeOpacity={0.65}>
+              <Text style={[s.keyText, s.keyOpText]}>×</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Row 4: 0  ÷  −  + */}
+          <View style={s.row}>
+            {["÷", "0", "−", "+"].map((key) => (
+              <TouchableOpacity key={key} style={[s.key, OP_KEYS.has(key) && s.keyOp]} onPress={() => handleKey(key)} activeOpacity={0.65}>
+                <Text style={[s.keyText, OP_KEYS.has(key) && s.keyOpText]}>{key}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       )}
@@ -273,6 +286,26 @@ const s = StyleSheet.create({
     fontWeight: "700",
     marginTop: 4,
     marginLeft: 4,
+  },
+  previewBadge: {
+    backgroundColor: "#E8F5E9",
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 4,
+    marginHorizontal: 6,
+    borderWidth: 1.5,
+    borderColor: "#A5D6A7",
+    shadowColor: Colors.success,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.18,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  previewInline: {
+    fontSize: 16,
+    color: "#2E7D32",
+    fontWeight: "800",
+    letterSpacing: 0.8,
   },
   pad: {
     marginTop: 6,

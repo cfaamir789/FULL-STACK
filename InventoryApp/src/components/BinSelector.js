@@ -21,7 +21,7 @@
  *   onSubmitEditing   fn       — called when user presses enter/next
  *   editable          bool     — disable inputs when no item scanned yet
  */
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef, useImperativeHandle } from "react";
 import {
   View,
   Text,
@@ -51,17 +51,47 @@ export default function BinSelector({
   allowedCustomBins, // string[] — if set, only these bin codes are accepted in custom mode
 }) {
   const [filterText, setFilterText] = useState("");
-  const [listOpen, setListOpen] = useState(bins.length > 0);
+  const [listOpen, setListOpen] = useState(false);
   const [customError, setCustomError] = useState(""); // inline red error for custom mode
 
+  // Internal ref for the actual TextInput
+  const internalInputRef = useRef(null);
+  // Tracks the pending onBlur close-timer so it can be cancelled on re-focus
+  const blurTimerRef = useRef(null);
+
+  // Intercept the external ref so ScannerScreen's programmatic .focus()
+  // also opens the dropdown (Android doesn't fire onFocus on programmatic focus)
+  useImperativeHandle(inputRef, () => ({
+    focus: () => {
+      // Cancel any pending onBlur close-timer before opening — prevents the
+      // stale timer from closing the dropdown after we open it
+      if (blurTimerRef.current) {
+        clearTimeout(blurTimerRef.current);
+        blurTimerRef.current = null;
+      }
+      internalInputRef.current?.focus();
+      setListOpen(true);
+    },
+    blur: () => {
+      // Don't close list here — let the TextInput's own onBlur handle it
+      internalInputRef.current?.blur();
+    },
+    openList: () => {
+      if (blurTimerRef.current) {
+        clearTimeout(blurTimerRef.current);
+        blurTimerRef.current = null;
+      }
+      setListOpen(true);
+    },
+  }));
+
   // Reset internal state whenever bins are cleared (item X'd or tab switched)
+  // Do NOT auto-open the list here — it opens only when the input is focused
   useEffect(() => {
     if (bins.length === 0) {
       setFilterText("");
       setListOpen(false);
       setCustomError("");
-    } else {
-      setListOpen(true);
     }
   }, [bins.length]);
 
@@ -88,6 +118,13 @@ export default function BinSelector({
   }, [customValue, allowedCustomBins]);
 
   const handleSelectBin = (bin) => {
+    // Cancel the pending onBlur close-timer immediately — on slow Android devices
+    // the onPress fires AFTER 150ms, by which time the dropdown has closed and
+    // the touch event is lost. Cancelling here guarantees the selection sticks.
+    if (blurTimerRef.current) {
+      clearTimeout(blurTimerRef.current);
+      blurTimerRef.current = null;
+    }
     onSelectBin(bin);
     setFilterText(bin.bin_code);
     setListOpen(false);
@@ -142,19 +179,26 @@ export default function BinSelector({
         return;
       }
     }
+    // Auto-switch to custom mode when typed text matches no bins
+    if (upper.length > 0) {
+      const matches = bins.filter((b) => b.bin_code.includes(upper));
+      if (matches.length === 0) {
+        onModeChange("custom");
+        if (onCustomChange) onCustomChange(upper);
+        setFilterText("");
+        setListOpen(false);
+      }
+    }
   };
 
   // Custom-mode: validate bin on submit (real-time hard block)
   const handleCustomSubmit = async () => {
     const code = customValue.trim().toUpperCase();
-    if (allowedCustomBins && allowedCustomBins.length > 0) {
-      if (!allowedCustomBins.includes(code)) {
-        setCustomError(
-          `Only ${allowedCustomBins.join(", ")} allowed — type "IN" to select`,
-        );
-        onCustomChange("");
-        return;
-      }
+    // Pre-approved bins (e.g. IN0001) skip master validation
+    if (allowedCustomBins && allowedCustomBins.includes(code)) {
+      setCustomError("");
+      if (onSubmitEditing) onSubmitEditing();
+      return;
     }
     if (onBinValidate && code) {
       const exists = await onBinValidate(code);
@@ -172,23 +216,10 @@ export default function BinSelector({
   const handleCustomChange = (text) => {
     if (customError) setCustomError("");
     const upper = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    // Shortcut: "IN" expands to IN0001
+    // "IN" shortcut → auto-fill IN0001 (works in custom mode)
     if (upper === "IN") {
       onCustomChange("IN0001");
-      if (onSubmitEditing) setTimeout(onSubmitEditing, 80);
       return;
-    }
-    // Block any input that isn't a valid prefix of an allowed bin
-    if (allowedCustomBins && allowedCustomBins.length > 0 && upper.length > 0) {
-      const isValidPrefix = allowedCustomBins.some(
-        (allowed) => allowed.startsWith(upper) || upper === allowed,
-      );
-      if (!isValidPrefix) {
-        setCustomError(
-          `Only ${allowedCustomBins.join(", ")} allowed — type "IN" to select`,
-        );
-        return;
-      }
     }
     onCustomChange(upper);
   };
@@ -202,24 +233,26 @@ export default function BinSelector({
     if (noBins) {
       return (
         <View style={[styles.wrapper, isDisabled && styles.disabled]}>
-          <Text style={[styles.label, isDisabled && { opacity: 0.5 }]}>
-            {label}
-          </Text>
-          <View style={[styles.noStockBox]}>
-            <MaterialCommunityIcons
-              name="information-outline"
-              size={16}
-              color={Colors.textSecondary}
-            />
-            <Text style={styles.noStockText}>
-              No bin stock records for this item.
+          <View style={styles.headerRow}>
+            <Text style={[styles.label, isDisabled && { opacity: 0.5 }]}>
+              {label}
             </Text>
-            <TouchableOpacity
-              onPress={handleSwitchToCustom}
-              disabled={isDisabled}
-            >
-              <Text style={styles.switchLink}>Use Custom Bin</Text>
-            </TouchableOpacity>
+            <View style={[styles.noStockBox, { flex: 1 }]}>
+              <MaterialCommunityIcons
+                name="information-outline"
+                size={16}
+                color={Colors.textSecondary}
+              />
+              <Text style={styles.noStockText}>
+                No bin stock records for this item.
+              </Text>
+              <TouchableOpacity
+                onPress={handleSwitchToCustom}
+                disabled={isDisabled}
+              >
+                <Text style={styles.switchLink}>Use Custom Bin</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       );
@@ -227,50 +260,51 @@ export default function BinSelector({
 
     return (
       <View style={[styles.wrapper, isDisabled && styles.disabled]}>
-        <Text style={[styles.label, isDisabled && { opacity: 0.5 }]}>
-          {label}
-        </Text>
+        {/* Label + input/chip on same row */}
+        <View style={styles.headerRow}>
+          <Text style={[styles.label, isDisabled && { opacity: 0.5 }]}>
+            {label}
+          </Text>
 
-        {/* Selected bin chip */}
-        {selectedBin ? (
-          <View style={styles.selectedChip}>
-            <MaterialCommunityIcons
-              name="warehouse"
-              size={18}
-              color={Colors.success}
-            />
-            <View style={{ flex: 1, marginLeft: 8 }}>
-              <Text style={styles.chipBinCode}>{selectedBin.bin_code}</Text>
-              {showQty && (
-                <Text style={styles.chipQty}>
-                  Available: {selectedBin.qty.toLocaleString()} pcs
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity
-              onPress={() => {
-                onSelectBin(null);
-                setFilterText("");
-                setListOpen(true);
-              }}
-              disabled={isDisabled}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
+          {/* Selected bin chip or search input — inline with label */}
+          {selectedBin ? (
+            <View style={[styles.selectedChip, { flex: 1 }]}>
               <MaterialCommunityIcons
-                name="close-circle"
-                size={22}
-                color={Colors.textSecondary}
+                name="check-circle"
+                size={18}
+                color={Colors.success}
               />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* Autocomplete search input */}
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={styles.chipBinCode}>{selectedBin.bin_code}</Text>
+                {showQty && (
+                  <Text style={styles.chipQty}>
+                    Available: {selectedBin.qty.toLocaleString()} pcs
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  onSelectBin(null);
+                  setFilterText("");
+                  setListOpen(true);
+                }}
+                disabled={isDisabled}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialCommunityIcons
+                  name="close-circle"
+                  size={22}
+                  color={Colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+          ) : (
             <View
               style={[
                 styles.inputBox,
                 listOpen && styles.inputBoxFocused,
                 isDisabled && { opacity: 0.5 },
+                { flex: 1 },
               ]}
             >
               <MaterialCommunityIcons
@@ -280,7 +314,7 @@ export default function BinSelector({
                 style={{ marginRight: 6 }}
               />
               <TextInput
-                ref={inputRef}
+                ref={internalInputRef}
                 style={styles.filterInput}
                 value={filterText}
                 onChangeText={handleFilterChange}
@@ -290,7 +324,16 @@ export default function BinSelector({
                 keyboardType="default"
                 returnKeyType="next"
                 showSoftInputOnFocus={true}
-                onFocus={() => setListOpen(true)}
+                onFocus={() => {
+                  if (blurTimerRef.current) {
+                    clearTimeout(blurTimerRef.current);
+                    blurTimerRef.current = null;
+                  }
+                  setListOpen(true);
+                }}
+                onBlur={() => {
+                  blurTimerRef.current = setTimeout(() => setListOpen(false), 300);
+                }}
                 onSubmitEditing={onSubmitEditing}
                 editable={!isDisabled}
               />
@@ -311,96 +354,66 @@ export default function BinSelector({
                 </TouchableOpacity>
               )}
             </View>
+          )}
+        </View>
 
-            {/* Bin list dropdown */}
-            {listOpen && (
-              <View style={styles.dropdown}>
-                <ScrollView
-                  nestedScrollEnabled
-                  keyboardShouldPersistTaps="handled"
-                  style={{ maxHeight: 220 }}
-                >
-                  {filteredBins.length === 0 ? (
-                    <Text style={styles.emptyMsg}>
-                      No matching bins — try Custom Bin below.
-                    </Text>
-                  ) : (
-                    filteredBins.map((b) => (
-                      <TouchableOpacity
-                        key={b.bin_code}
-                        style={styles.binRow}
-                        onPress={() => handleSelectBin(b)}
-                      >
-                        <MaterialCommunityIcons
-                          name="warehouse"
-                          size={16}
-                          color={Colors.primary}
-                          style={{ marginRight: 8 }}
-                        />
-                        <Text style={styles.binRowCode}>{b.bin_code}</Text>
-                        {showQty && (
-                          <View style={styles.qtyBadge}>
-                            <Text style={styles.qtyBadgeText}>
-                              {b.qty.toLocaleString()} pcs
-                            </Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </ScrollView>
-
-                {/* Custom Bin option at bottom of dropdown */}
-                <TouchableOpacity
-                  style={styles.customBinOption}
-                  onPress={handleSwitchToCustom}
-                >
-                  <MaterialCommunityIcons
-                    name="pencil-plus"
-                    size={16}
-                    color={Colors.warning}
-                  />
-                  <Text style={styles.customBinOptionText}>
-                    Use Custom Bin (not in system)
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Close dropdown tap-outside area hint */}
-            {!listOpen && (
-              <TouchableOpacity
-                style={styles.showListBtn}
-                onPress={() => setListOpen(true)}
-                disabled={isDisabled}
-              >
-                <MaterialCommunityIcons
-                  name="chevron-down"
-                  size={16}
-                  color={Colors.primary}
-                />
-                <Text style={styles.showListBtnText}>
-                  Show {bins.length} bin{bins.length !== 1 ? "s" : ""} with
-                  stock
+        {/* Bin list dropdown — below the header row */}
+        {!selectedBin && listOpen && (
+          <View style={styles.dropdown}>
+            <ScrollView
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              style={{ maxHeight: 132 }}
+            >
+              {filteredBins.length === 0 ? (
+                <Text style={styles.emptyMsg}>
+                  No matching bins.
                 </Text>
-              </TouchableOpacity>
-            )}
-          </>
+              ) : (
+                filteredBins.map((b) => (
+                  <TouchableOpacity
+                    key={b.bin_code}
+                    style={styles.binRow}
+                    onPress={() => handleSelectBin(b)}
+                  >
+                    <MaterialCommunityIcons
+                      name="warehouse"
+                      size={16}
+                      color={Colors.primary}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text style={styles.binRowCode}>{b.bin_code}</Text>
+                    {showQty && (
+                      <View style={styles.qtyBadge}>
+                        <Text style={styles.qtyBadgeText}>
+                          {b.qty.toLocaleString()} pcs
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </View>
         )}
 
-        {/* Switch to Custom Bin link */}
-        <TouchableOpacity
-          onPress={handleSwitchToCustom}
-          disabled={isDisabled}
-          style={styles.modeSwitchRow}
-        >
-          <MaterialCommunityIcons
-            name="pencil-outline"
-            size={14}
-            color={Colors.warning}
-          />
-          <Text style={styles.modeSwitchText}>Switch to Custom Bin</Text>
-        </TouchableOpacity>
+        {/* Show bins button when dropdown closed */}
+        {!selectedBin && !listOpen && (
+          <TouchableOpacity
+            style={styles.showListBtn}
+            onPress={() => setListOpen(true)}
+            disabled={isDisabled}
+          >
+            <MaterialCommunityIcons
+              name="chevron-down"
+              size={14}
+              color={Colors.primary}
+            />
+            <Text style={styles.showListBtnText}>
+              Show {bins.length} bin{bins.length !== 1 ? "s" : ""} with stock
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -408,54 +421,55 @@ export default function BinSelector({
   // ─── Custom mode ───────────────────────────────────────────────────────────
   return (
     <View style={[styles.wrapper, isDisabled && styles.disabled]}>
-      <Text style={[styles.label, isDisabled && { opacity: 0.5 }]}>
-        {label}
-      </Text>
+      {/* Label + input/chip on same row */}
+      <View style={styles.headerRow}>
+        <Text style={[styles.label, isDisabled && { opacity: 0.5 }]}>
+          {label}
+        </Text>
 
-      {/* Green confirmed chip when typed bin exactly matches a stocked bin OR is the only allowed custom bin */}
-      {matchedBin || isConfirmedAllowed ? (
-        <View style={styles.selectedChip}>
-          <MaterialCommunityIcons
-            name="check-circle"
-            size={18}
-            color={Colors.success}
-          />
-          <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={styles.chipBinCode}>
-              {matchedBin
-                ? matchedBin.bin_code
-                : customValue.trim().toUpperCase()}
-            </Text>
-            {showQty && matchedBin && (
-              <Text style={styles.chipQty}>
-                Available: {matchedBin.qty.toLocaleString()} pcs
-              </Text>
-            )}
-          </View>
-          <TouchableOpacity
-            onPress={() => onCustomChange("")}
-            disabled={isDisabled}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
+        {/* Green confirmed chip or free-text input — inline with label */}
+        {matchedBin || isConfirmedAllowed ? (
+          <View style={[styles.selectedChip, { flex: 1 }]}>
             <MaterialCommunityIcons
-              name="close-circle"
-              size={22}
-              color={Colors.textSecondary}
+              name="check-circle"
+              size={18}
+              color={Colors.success}
             />
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <>
-          {/* Free-text input */}
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.chipBinCode}>
+                {matchedBin
+                  ? matchedBin.bin_code
+                  : customValue.trim().toUpperCase()}
+              </Text>
+              {showQty && matchedBin && (
+                <Text style={styles.chipQty}>
+                  Available: {matchedBin.qty.toLocaleString()} pcs
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity
+              onPress={() => onCustomChange("")}
+              disabled={isDisabled}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons
+                name="close-circle"
+                size={22}
+                color={Colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+        ) : (
           <View
             style={[
               styles.inputBox,
               customError ? styles.inputBoxError : null,
               isDisabled && { opacity: 0.5 },
+              { flex: 1 },
             ]}
           >
             <TextInput
-              ref={inputRef}
+              ref={internalInputRef}
               style={styles.filterInput}
               value={customValue}
               onChangeText={handleCustomChange}
@@ -484,19 +498,20 @@ export default function BinSelector({
               </TouchableOpacity>
             )}
           </View>
-          {/* Inline validation error */}
-          {customError ? (
-            <View style={styles.binErrorRow}>
-              <MaterialCommunityIcons
-                name="alert-circle"
-                size={14}
-                color="#c62828"
-              />
-              <Text style={styles.binErrorText}>{customError}</Text>
-            </View>
-          ) : null}
-        </>
-      )}
+        )}
+      </View>
+
+      {/* Inline validation error — below the row */}
+      {!(matchedBin || isConfirmedAllowed) && customError ? (
+        <View style={styles.binErrorRow}>
+          <MaterialCommunityIcons
+            name="alert-circle"
+            size={14}
+            color="#c62828"
+          />
+          <Text style={styles.binErrorText}>{customError}</Text>
+        </View>
+      ) : null}
 
       {/* Back to suggestions link */}
       {bins.length > 0 && (
@@ -507,7 +522,7 @@ export default function BinSelector({
         >
           <MaterialCommunityIcons
             name="warehouse"
-            size={14}
+            size={12}
             color={Colors.primary}
           />
           <Text style={[styles.modeSwitchText, { color: Colors.primary }]}>
@@ -521,14 +536,20 @@ export default function BinSelector({
 }
 
 const styles = StyleSheet.create({
-  wrapper: { marginTop: 12 },
+  wrapper: { marginTop: 6 },
   disabled: { opacity: 0.5 },
   label: {
+    width: 72,
     fontSize: 13,
     fontWeight: "700",
     color: Colors.textPrimary,
-    marginBottom: 4,
     letterSpacing: 0.3,
+    flexShrink: 0,
+    marginRight: 8,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   inputBox: {
     flexDirection: "row",
@@ -561,23 +582,24 @@ const styles = StyleSheet.create({
   },
   filterInput: {
     flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: 8,
+    fontSize: 15,
     fontWeight: "600",
     color: Colors.textPrimary,
   },
   dropdown: {
-    marginTop: 2,
+    marginTop: 4,
+    marginLeft: 80,
     backgroundColor: Colors.card,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: Colors.primary + "40",
+    borderColor: Colors.primary + "50",
     overflow: "hidden",
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    elevation: 6,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
     zIndex: 100,
   },
   binRow: {
@@ -586,19 +608,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.border + "80",
   },
   binRowCode: {
     flex: 1,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "800",
     color: Colors.textPrimary,
+    letterSpacing: 0.4,
   },
   qtyBadge: {
-    backgroundColor: Colors.primary + "15",
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    backgroundColor: Colors.primary + "18",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   qtyBadgeText: {
     fontSize: 12,
@@ -649,24 +672,24 @@ const styles = StyleSheet.create({
   showListBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    marginTop: 4,
-    paddingHorizontal: 2,
+    gap: 3,
+    marginTop: 2,
+    marginLeft: 80,
   },
   showListBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.primary,
     fontWeight: "600",
   },
   modeSwitchRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    marginTop: 6,
+    gap: 3,
+    marginTop: 2,
     paddingHorizontal: 2,
   },
   modeSwitchText: {
-    fontSize: 12,
+    fontSize: 11,
     color: Colors.warning,
     fontWeight: "600",
   },

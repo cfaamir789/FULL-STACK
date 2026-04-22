@@ -68,8 +68,9 @@ export const checkConnectivity = async () => {
 
 // ─── Item Master Download (standalone, admin-triggered only) ─────────────────
 // PRIMARY: single gzip request served from server RAM cache — one round-trip.
-// FALLBACK: paginated if bulk times out or fails (uses fewer-but-larger pages).
-const PAGE_SIZE = 20000; // fallback: 8 pages instead of 32 (less skip overhead)
+// FALLBACK: paginated — 2000 items (~200 KB JSON) per page so 1 GB RAM phones
+// never OOM. 30 K item master = ~15 small requests instead of one giant blob.
+const PAGE_SIZE = 2000;
 export const downloadItemMaster = async (onProgress) => {
   onProgress?.({ phase: "downloading", percent: 0 });
 
