@@ -42,12 +42,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Cache Gradle dependencies
+      - name: Cache Gradle dependencies and build outputs
         uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
+            ~/.gradle/configuration-cache
           key: gradle-${{ hashFiles('InventoryApp/package.json') }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ hashFiles('InventoryApp/package.json') }}-
@@ -68,9 +69,16 @@ jobs:
       - name: Build release APK locally
         env:
           NODE_ENV: production
+          GRADLE_OPTS: "-Xmx4g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon --build-cache --parallel
+          ./gradlew assembleRelease \
+            --no-daemon \
+            --build-cache \
+            --parallel \
+            --configuration-cache \
+            -x lintVitalRelease \
+            -x testReleaseUnitTest
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

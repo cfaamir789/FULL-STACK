@@ -103,42 +103,36 @@ jobs:
             echo "EXPO_TOKEN=$SELECTED"
           } >> "$GITHUB_ENV"
 
-      - name: Push OTA update with retries (preview)
+      - name: Push OTA to preview + production in parallel
         shell: bash
         run: |
           if [ "${SKIP_OTA:-}" = "true" ]; then echo "OTA skipped (no valid token)."; exit 0; fi
           set -euo pipefail
           eas whoami
           MSG="${{ github.event.inputs.message || format('Auto OTA: {0}', github.event.head_commit.message) }}"
-          for attempt in 1 2 3; do
-            echo "Preview OTA attempt ${attempt}/3"
-            if eas update --branch preview --message "$MSG" --non-interactive; then
-              echo "Preview OTA succeeded"
-              exit 0
-            fi
-            if [ "$attempt" -lt 3 ]; then
-              sleep $((attempt * 5))
-            fi
-          done
-          echo "Preview OTA failed after 3 attempts"
-          exit 1
 
-      - name: Push OTA update with retries (production)
-        shell: bash
-        run: |
-          if [ "${SKIP_OTA:-}" = "true" ]; then echo "OTA skipped (no valid token)."; exit 0; fi
-          set -euo pipefail
-          eas whoami
-          MSG="${{ github.event.inputs.message || format('Auto OTA: {0}', github.event.head_commit.message) }}"
-          for attempt in 1 2 3; do
-            echo "Production OTA attempt ${attempt}/3"
-            if eas update --branch production --message "$MSG" --non-interactive; then
-              echo "Production OTA succeeded"
-              exit 0
-            fi
-            if [ "$attempt" -lt 3 ]; then
-              sleep $((attempt * 5))
-            fi
-          done
-          echo "Production OTA failed after 3 attempts"
-          exit 1
+          # Push to one branch with up to 3 retries
+          push_branch() {
+            local branch="$1"
+            for attempt in 1 2 3; do
+              echo "[$branch] attempt $attempt/3"
+              if eas update --branch "$branch" --message "$MSG" --non-interactive; then
+                echo "[$branch] OTA succeeded"
+                return 0
+              fi
+              [ "$attempt" -lt 3 ] && sleep $((attempt * 5))
+            done
+            echo "[$branch] failed after 3 attempts"
+            return 1
+          }
+
+          # Fire both channels simultaneously — cuts OTA time in half
+          push_branch preview &
+          PID_PREVIEW=$!
+          push_branch production &
+          PID_PROD=$!
+
+          wait $PID_PREVIEW; R_PREVIEW=$?
+          wait $PID_PROD;    R_PROD=$?
+
+          [ $R_PREVIEW -eq 0 ] && [ $R_PROD -eq 0 ]
