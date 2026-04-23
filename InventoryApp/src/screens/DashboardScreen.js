@@ -22,7 +22,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import {
   getDashboardStats,
   getPendingTransactions,
-  getTransactionsPage,
+  getRecentTransactions,
 } from "../database/db";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getDisplayUrl, getServerTransactions } from "../services/api";
@@ -95,7 +95,7 @@ export default function DashboardScreen({ username }) {
   const loadData = useCallback(async () => {
     const [localStats, localRecent, localPending] = await Promise.all([
       getDashboardStats(),
-      getTransactionsPage(50, 0, username),
+      getRecentTransactions(50),
       getPendingTransactions(username),
     ]);
 
