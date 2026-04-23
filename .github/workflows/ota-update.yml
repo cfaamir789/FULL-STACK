@@ -50,7 +50,7 @@ jobs:
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
-          eas-cache: false
+          eas-cache: true
 
       - name: Validate Expo token exists
         run: |
@@ -117,7 +117,7 @@ jobs:
               exit 0
             fi
             if [ "$attempt" -lt 3 ]; then
-              sleep $((attempt * 20))
+              sleep $((attempt * 5))
             fi
           done
           echo "Preview OTA failed after 3 attempts"
@@ -137,7 +137,7 @@ jobs:
               exit 0
             fi
             if [ "$attempt" -lt 3 ]; then
-              sleep $((attempt * 20))
+              sleep $((attempt * 5))
             fi
           done
           echo "Production OTA failed after 3 attempts"

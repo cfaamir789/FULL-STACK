@@ -1,4 +1,4 @@
-﻿name: Build Inventory App APK
+name: Build Inventory App APK
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -42,6 +42,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('InventoryApp/package.json') }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ hashFiles('InventoryApp/package.json') }}-
+            gradle-
+
       - name: Install JS dependencies
         run: npm ci
 
@@ -59,7 +70,7 @@ jobs:
           NODE_ENV: production
         run: |
           cd android
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon --build-cache --parallel
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
