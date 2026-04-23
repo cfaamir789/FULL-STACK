@@ -16,6 +16,9 @@ jobs:
     name: Build APK (local Gradle)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    concurrency:
+      group: apk-build-main
+      cancel-in-progress: true
     permissions:
       contents: write
     defaults:
@@ -48,7 +51,6 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            ~/.gradle/configuration-cache
           key: gradle-${{ hashFiles('InventoryApp/package.json') }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ hashFiles('InventoryApp/package.json') }}-
@@ -76,7 +78,6 @@ jobs:
             --no-daemon \
             --build-cache \
             --parallel \
-            --configuration-cache \
             -x lintVitalRelease \
             -x testReleaseUnitTest
 
