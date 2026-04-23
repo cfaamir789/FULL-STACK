@@ -157,19 +157,28 @@ export default function BinSelector({
     if (selectedBin && upper !== selectedBin.bin_code) {
       onSelectBin(null);
     }
-    // Shortcut: typing "IN0001" fully auto-selects — partial "IN" only pre-filters
-    if (upper === "IN0001") {
+    // Shortcut: typing "IN" autocompletes to IN0001 — user still confirms via row tap or Enter
+    if (upper === "IN") {
       const in0001 = bins.find((b) => b.bin_code === "IN0001");
       if (in0001) {
-        handleSelectBin(in0001);
+        setFilterText("IN0001");
+        setListOpen(true);
         return;
       }
-      // IN0001 not in suggest bins — switch to confirmed custom value, no auto-advance
+      // IN0001 not in suggest bins — switch to custom and fill value, no auto-advance
       if (allowedCustomBins && allowedCustomBins.includes("IN0001")) {
         onModeChange("custom");
         if (onCustomChange) onCustomChange("IN0001");
         setFilterText("");
         setListOpen(false);
+        return;
+      }
+    }
+    // Shortcut: full "IN0001" typed → auto-select
+    if (upper === "IN0001") {
+      const in0001 = bins.find((b) => b.bin_code === "IN0001");
+      if (in0001) {
+        handleSelectBin(in0001);
         return;
       }
     }
