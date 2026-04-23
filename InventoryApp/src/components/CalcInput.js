@@ -160,6 +160,9 @@ const CalcInput = forwardRef(function CalcInput(
           onFocus={() => setOpen(true)}
           onChangeText={handleTextChange}
           onSubmitEditing={handleSubmitEditing}
+          onKeyPress={(e) => {
+            if (e.nativeEvent.key === "Enter") handleSubmitEditing();
+          }}
           keyboardType="number-pad"
           showSoftInputOnFocus={false}
           returnKeyType="done"

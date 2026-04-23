@@ -161,14 +161,19 @@ export const downloadItemMaster = async (onProgress) => {
     percent: Math.round((1 / totalPages) * 100),
   });
 
-  for (let page = 2; page <= totalPages; page++) {
-    let pageData = await fetchItemsBulkPage(page, PAGE_SIZE);
-    totalInserted += await insertItemsPage(pageData.items);
-    pageData = null;
+  const PARALLEL_PAGES = 3;
+  for (let page = 2; page <= totalPages; page += PARALLEL_PAGES) {
+    const end = Math.min(page + PARALLEL_PAGES, totalPages + 1);
+    const fetches = [];
+    for (let p = page; p < end; p++) fetches.push(fetchItemsBulkPage(p, PAGE_SIZE));
+    const batchData = await Promise.all(fetches);
+    for (const pageData of batchData) {
+      totalInserted += await insertItemsPage(pageData.items);
+    }
 
     onProgress?.({
       phase: "downloading",
-      percent: Math.round((page / totalPages) * 100),
+      percent: Math.round((Math.min(end - 1, totalPages) / totalPages) * 100),
     });
   }
 
@@ -261,13 +266,12 @@ export const checkItemMasterUpdate = async () => {
 // Chunk large transaction arrays to avoid payload limits
 const CHUNK_SIZE = 200;
 const syncInChunks = async (payload) => {
-  let totalSynced = 0;
+  const chunks = [];
   for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
-    const chunk = payload.slice(i, i + CHUNK_SIZE);
-    const result = await syncTransactions(chunk);
-    totalSynced += result.synced ?? chunk.length;
+    chunks.push(payload.slice(i, i + CHUNK_SIZE));
   }
-  return totalSynced;
+  const results = await Promise.all(chunks.map((chunk) => syncTransactions(chunk)));
+  return results.reduce((sum, r) => sum + (r.synced ?? 0), 0);
 };
 
 export const attemptSync = async () => {

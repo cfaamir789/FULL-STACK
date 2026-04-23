@@ -157,25 +157,19 @@ export default function BinSelector({
     if (selectedBin && upper !== selectedBin.bin_code) {
       onSelectBin(null);
     }
-    // Shortcut: typing "IN" auto-selects IN0001 (or the only IN* bin)
-    if (upper === "IN") {
+    // Shortcut: typing "IN0001" fully auto-selects — partial "IN" only pre-filters
+    if (upper === "IN0001") {
       const in0001 = bins.find((b) => b.bin_code === "IN0001");
       if (in0001) {
         handleSelectBin(in0001);
         return;
       }
-      const inBins = bins.filter((b) => b.bin_code.startsWith("IN"));
-      if (inBins.length === 1) {
-        handleSelectBin(inBins[0]);
-        return;
-      }
-      // IN0001 not in bins — if it's the only allowed custom bin, auto-fill it
+      // IN0001 not in suggest bins — switch to confirmed custom value, no auto-advance
       if (allowedCustomBins && allowedCustomBins.includes("IN0001")) {
         onModeChange("custom");
         if (onCustomChange) onCustomChange("IN0001");
         setFilterText("");
         setListOpen(false);
-        if (onSubmitEditing) setTimeout(onSubmitEditing, 80);
         return;
       }
     }
@@ -269,19 +263,25 @@ export default function BinSelector({
           {/* Selected bin chip or search input — inline with label */}
           {selectedBin ? (
             <View style={[styles.selectedChip, { flex: 1 }]}>
-              <MaterialCommunityIcons
-                name="check-circle"
-                size={18}
-                color={Colors.success}
-              />
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={styles.chipBinCode}>{selectedBin.bin_code}</Text>
-                {showQty && (
-                  <Text style={styles.chipQty}>
-                    Available: {selectedBin.qty.toLocaleString()} pcs
-                  </Text>
-                )}
-              </View>
+              <TouchableOpacity
+                style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+                onPress={() => onSubmitEditing?.()}
+                disabled={isDisabled}
+              >
+                <MaterialCommunityIcons
+                  name="check-circle"
+                  size={18}
+                  color={Colors.success}
+                />
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={styles.chipBinCode}>{selectedBin.bin_code}</Text>
+                  {showQty && (
+                    <Text style={styles.chipQty}>
+                      Available: {selectedBin.qty.toLocaleString()} pcs
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
                   onSelectBin(null);
@@ -430,23 +430,29 @@ export default function BinSelector({
         {/* Green confirmed chip or free-text input — inline with label */}
         {matchedBin || isConfirmedAllowed ? (
           <View style={[styles.selectedChip, { flex: 1 }]}>
-            <MaterialCommunityIcons
-              name="check-circle"
-              size={18}
-              color={Colors.success}
-            />
-            <View style={{ flex: 1, marginLeft: 8 }}>
-              <Text style={styles.chipBinCode}>
-                {matchedBin
-                  ? matchedBin.bin_code
-                  : customValue.trim().toUpperCase()}
-              </Text>
-              {showQty && matchedBin && (
-                <Text style={styles.chipQty}>
-                  Available: {matchedBin.qty.toLocaleString()} pcs
+            <TouchableOpacity
+              style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+              onPress={() => onSubmitEditing?.()}
+              disabled={isDisabled}
+            >
+              <MaterialCommunityIcons
+                name="check-circle"
+                size={18}
+                color={Colors.success}
+              />
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={styles.chipBinCode}>
+                  {matchedBin
+                    ? matchedBin.bin_code
+                    : customValue.trim().toUpperCase()}
                 </Text>
-              )}
-            </View>
+                {showQty && matchedBin && (
+                  <Text style={styles.chipQty}>
+                    Available: {matchedBin.qty.toLocaleString()} pcs
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => onCustomChange("")}
               disabled={isDisabled}

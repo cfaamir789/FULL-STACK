@@ -781,7 +781,7 @@ export const clearAndReplaceBinContents = async (rows, onProgress) => {
         Number(r.Qty != null ? r.Qty : r.qty) || 0,
       ]);
       await db.runAsync(
-        `INSERT INTO bin_contents (bin_code, item_code, qty) VALUES ${placeholders}`,
+        `INSERT OR IGNORE INTO bin_contents (bin_code, item_code, qty) VALUES ${placeholders}`,
         params,
       );
       if (onProgress)

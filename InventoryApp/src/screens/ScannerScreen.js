@@ -361,19 +361,22 @@ export default function ScannerScreen({ role = "worker" }) {
       if (bins.length > 0) {
         setFromBinMode("suggest");
         setToBinMode("suggest");
+        focusFromBin();
       } else {
         setFromBinMode("custom");
         setToBinMode("custom");
         // Auto-fill IN0001 as From Bin — it's the only allowed incoming bin
         // when the item has no stock records yet (user is receiving new stock)
         setFrombin("IN0001");
+        // IN0001 is already confirmed, jump straight to To Bin
+        setTimeout(() => toBinRef.current?.focus(), 400);
       }
     } catch {
       setItemBins([]);
       setFromBinMode("custom");
       setToBinMode("custom");
+      focusFromBin();
     }
-    focusFromBin();
   };
 
   const handleBarCodeScanned = async ({ data }) => {
