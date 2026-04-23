@@ -122,6 +122,21 @@ export const initDB = async () => {
     );
 
     CREATE INDEX IF NOT EXISTS idx_transactions_synced ON transactions(synced);
+
+    CREATE TABLE IF NOT EXISTS bin_contents (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      bin_code  TEXT NOT NULL,
+      item_code TEXT NOT NULL,
+      qty       REAL NOT NULL DEFAULT 0,
+      UNIQUE(bin_code, item_code)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_bin_contents_item_code ON bin_contents(item_code);
+    CREATE INDEX IF NOT EXISTS idx_bin_contents_bin_code ON bin_contents(bin_code);
+
+    CREATE TABLE IF NOT EXISTS bin_master (
+      bin_code TEXT PRIMARY KEY
+    );
   `);
 
   // Migration 1: add item_code column if it doesn't exist yet (for existing DBs)
@@ -628,4 +643,222 @@ export const getPendingCount = async () => {
     "SELECT COUNT(*) as count FROM transactions WHERE synced = 0",
   );
   return row?.count ?? 0;
+};
+
+// ─── Items (additional) ───────────────────────────────────────────────────────
+
+export const searchItemsByName = async (query, limit = 50) => {
+  const q = `%${query}%`;
+  return await db.getAllAsync(
+    `SELECT * FROM items WHERE item_name LIKE ? ORDER BY item_name ASC LIMIT ?`,
+    [q, limit],
+  );
+};
+
+export const getItemCount = async () => {
+  const row = await db.getFirstAsync("SELECT COUNT(*) as count FROM items");
+  return row?.count ?? 0;
+};
+
+export const getItemSummaries = async (limit = 250, offset = 0) => {
+  const rows = await db.getAllAsync(
+    `SELECT
+       CASE WHEN TRIM(item_code) != '' THEN LOWER(TRIM(item_code)) ELSE LOWER(TRIM(item_name)) END as item_key,
+       item_code,
+       item_name,
+       COUNT(*) as barcodeCount
+     FROM items
+     GROUP BY item_key
+     ORDER BY item_name ASC
+     LIMIT ? OFFSET ?`,
+    [limit, offset],
+  );
+  return rows;
+};
+
+export const searchItemSummaries = async (query, limit = 200) => {
+  const q = `%${query}%`;
+  const rows = await db.getAllAsync(
+    `SELECT
+       CASE WHEN TRIM(item_code) != '' THEN LOWER(TRIM(item_code)) ELSE LOWER(TRIM(item_name)) END as item_key,
+       item_code,
+       item_name,
+       COUNT(*) as barcodeCount
+     FROM items
+     WHERE item_name LIKE ? OR item_code LIKE ? OR barcode LIKE ?
+     GROUP BY item_key
+     ORDER BY item_name ASC
+     LIMIT ?`,
+    [q, q, q, limit],
+  );
+  return rows;
+};
+
+export const getItemBarcodes = async (itemCode, itemName) => {
+  const code = String(itemCode || "").trim().toLowerCase();
+  if (code) {
+    const rows = await db.getAllAsync(
+      "SELECT barcode FROM items WHERE LOWER(item_code) = ? ORDER BY barcode ASC",
+      [code],
+    );
+    return rows.map((r) => r.barcode);
+  }
+  const name = String(itemName || "").trim().toLowerCase();
+  const rows = await db.getAllAsync(
+    "SELECT barcode FROM items WHERE LOWER(item_name) = ? ORDER BY barcode ASC",
+    [name],
+  );
+  return rows.map((r) => r.barcode);
+};
+
+// Used by paginated fallback in downloadItemMaster (syncService)
+export const deleteAllItemRows = async () => {
+  await db.runAsync("DELETE FROM items");
+};
+
+export const insertItemsPage = async (itemsArray) => {
+  if (!itemsArray || itemsArray.length === 0) return 0;
+  const CHUNK_SIZE = 150;
+  await db.withTransactionAsync(async () => {
+    for (let i = 0; i < itemsArray.length; i += CHUNK_SIZE) {
+      const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "(?,?,?)").join(",");
+      const params = chunk.flatMap((item) => [
+        item.ItemCode,
+        item.Barcode,
+        item.Item_Name,
+      ]);
+      await db.runAsync(
+        `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
+         ON CONFLICT(barcode) DO UPDATE SET
+           item_code = excluded.item_code,
+           item_name = excluded.item_name`,
+        params,
+      );
+    }
+  });
+  return itemsArray.length;
+};
+
+// ─── Bin Contents ─────────────────────────────────────────────────────────────
+
+export const upsertBinContents = async (rows) => {
+  if (!rows || rows.length === 0) return;
+  const CHUNK_SIZE = 150;
+  await db.withTransactionAsync(async () => {
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "(?,?,?)").join(",");
+      const params = chunk.flatMap((r) => [
+        String(r.BinCode || r.bin_code || "").trim(),
+        String(r.ItemCode || r.item_code || "").trim(),
+        Number(r.Qty != null ? r.Qty : r.qty) || 0,
+      ]);
+      await db.runAsync(
+        `INSERT INTO bin_contents (bin_code, item_code, qty) VALUES ${placeholders}
+         ON CONFLICT(bin_code, item_code) DO UPDATE SET qty = excluded.qty`,
+        params,
+      );
+    }
+  });
+};
+
+export const clearAndReplaceBinContents = async (rows, onProgress) => {
+  if (!rows || rows.length === 0) {
+    await db.runAsync("DELETE FROM bin_contents");
+    return 0;
+  }
+  const CHUNK_SIZE = 150;
+  const total = rows.length;
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM bin_contents");
+    for (let i = 0; i < total; i += CHUNK_SIZE) {
+      const chunk = rows.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "(?,?,?)").join(",");
+      const params = chunk.flatMap((r) => [
+        String(r.BinCode || r.bin_code || "").trim(),
+        String(r.ItemCode || r.item_code || "").trim(),
+        Number(r.Qty != null ? r.Qty : r.qty) || 0,
+      ]);
+      await db.runAsync(
+        `INSERT INTO bin_contents (bin_code, item_code, qty) VALUES ${placeholders}`,
+        params,
+      );
+      if (onProgress)
+        onProgress({ processed: Math.min(i + CHUNK_SIZE, total), total });
+      if (i > 0 && i % 3000 === 0) await new Promise((r) => setTimeout(r, 0));
+    }
+  });
+  return total;
+};
+
+export const getBinContentCount = async () => {
+  const row = await db.getFirstAsync(
+    "SELECT COUNT(*) as count FROM bin_contents",
+  );
+  return row?.count ?? 0;
+};
+
+export const getBinsForItem = async (itemCode) => {
+  const code = String(itemCode || "").trim();
+  if (!code) return [];
+  return await db.getAllAsync(
+    `SELECT bc.bin_code as BinCode, bc.qty as Qty
+     FROM bin_contents bc
+     INNER JOIN bin_master bm ON bm.bin_code = bc.bin_code
+     WHERE bc.item_code = ?
+     ORDER BY bc.qty DESC`,
+    [code],
+  );
+};
+
+export const getBinQtyForItemAndBin = async (itemCode, binCode) => {
+  const row = await db.getFirstAsync(
+    "SELECT qty FROM bin_contents WHERE item_code = ? AND bin_code = ? LIMIT 1",
+    [String(itemCode).trim(), String(binCode).trim().toUpperCase()],
+  );
+  return row ? row.qty : null;
+};
+
+// ─── Bin Master ───────────────────────────────────────────────────────────────
+
+export const getBinMasterCount = async () => {
+  const row = await db.getFirstAsync(
+    "SELECT COUNT(*) as count FROM bin_master",
+  );
+  return row?.count ?? 0;
+};
+
+export const checkBinExists = async (binCode) => {
+  const code = String(binCode).trim().toUpperCase();
+  const masterRow = await db.getFirstAsync(
+    "SELECT 1 as exists FROM bin_master WHERE bin_code = ? LIMIT 1",
+    [code],
+  );
+  if (masterRow) return true;
+  // Fallback: accept bin if it appears in bin_contents
+  const contentRow = await db.getFirstAsync(
+    "SELECT 1 as exists FROM bin_contents WHERE bin_code = ? LIMIT 1",
+    [code],
+  );
+  return !!contentRow;
+};
+
+export const clearAndReplaceBinMaster = async (codes) => {
+  if (!codes || codes.length === 0) return 0;
+  const CHUNK_SIZE = 300;
+  const total = codes.length;
+  await db.withTransactionAsync(async () => {
+    await db.runAsync("DELETE FROM bin_master");
+    for (let i = 0; i < total; i += CHUNK_SIZE) {
+      const chunk = codes.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "(?)").join(",");
+      const params = chunk.map((c) => String(c).trim().toUpperCase());
+      await db.runAsync(
+        `INSERT OR IGNORE INTO bin_master (bin_code) VALUES ${placeholders}`,
+        params,
+      );
+    }
+  });
+  return total;
 };
