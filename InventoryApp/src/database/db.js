@@ -803,7 +803,7 @@ export const getBinsForItem = async (itemCode) => {
   const code = String(itemCode || "").trim();
   if (!code) return [];
   return await db.getAllAsync(
-    `SELECT bc.bin_code as BinCode, bc.qty as Qty
+    `SELECT bc.bin_code as bin_code, bc.qty as qty
      FROM bin_contents bc
      INNER JOIN bin_master bm ON bm.bin_code = bc.bin_code
      WHERE bc.item_code = ?

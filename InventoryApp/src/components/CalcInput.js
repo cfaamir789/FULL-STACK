@@ -161,6 +161,7 @@ const CalcInput = forwardRef(function CalcInput(
           onChangeText={handleTextChange}
           onSubmitEditing={handleSubmitEditing}
           keyboardType="number-pad"
+          showSoftInputOnFocus={false}
           returnKeyType="done"
           blurOnSubmit={false}
           caretHidden={false}
