@@ -177,9 +177,14 @@ export default function DashboardScreen({ username }) {
 
   const handleSyncNow = async () => {
     setSyncing(true);
-    await attemptSync();
-    await loadData();
-    setSyncing(false);
+    try {
+      await attemptSync();
+      await loadData();
+    } catch (_) {
+      // network/sync error — button must never stay frozen
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const onRefresh = async () => {

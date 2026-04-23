@@ -49,15 +49,18 @@ export default function BinSelector({
   onBinValidate, // async (binCode) => bool — returns true if bin exists in master
   showQty = true, // false hides qty badges/counts (e.g. for workers)
   allowedCustomBins, // string[] — if set, only these bin codes are accepted in custom mode
+  onSearchMaster, // async (prefix, limit) => [{bin_code}] — searches full bin master by prefix (From Bin only)
 }) {
   const [filterText, setFilterText] = useState("");
   const [listOpen, setListOpen] = useState(false);
-  const [customError, setCustomError] = useState(""); // inline red error for custom mode
+  const [customError, setCustomError] = useState(""); // inline red error for custom/suggest validation
+  const [masterResults, setMasterResults] = useState([]); // bins from master prefix search
 
   // Internal ref for the actual TextInput
   const internalInputRef = useRef(null);
   // Tracks the pending onBlur close-timer so it can be cancelled on re-focus
   const blurTimerRef = useRef(null);
+  const masterSearchTimer = useRef(null); // debounce for master search
 
   // Intercept the external ref so ScannerScreen's programmatic .focus()
   // also opens the dropdown (Android doesn't fire onFocus on programmatic focus)
@@ -92,15 +95,21 @@ export default function BinSelector({
       setFilterText("");
       setListOpen(false);
       setCustomError("");
+      setMasterResults([]);
+      if (masterSearchTimer.current) clearTimeout(masterSearchTimer.current);
     }
   }, [bins.length]);
 
   // Filter the bins list based on what the user types in the autocomplete input
   const filteredBins = useMemo(() => {
-    if (!filterText.trim()) return bins;
     const q = filterText.trim().toUpperCase();
-    return bins.filter((b) => b.bin_code.includes(q));
-  }, [bins, filterText]);
+    const itemMatches = !q ? bins : bins.filter((b) => b.bin_code.includes(q));
+    if (!onSearchMaster || masterResults.length === 0) return itemMatches;
+    // Merge: item-stock bins first, then master-only bins not already in item bins
+    const itemCodes = new Set(bins.map((b) => b.bin_code));
+    const masterOnly = masterResults.filter((r) => !itemCodes.has(r.bin_code));
+    return [...itemMatches, ...masterOnly];
+  }, [bins, filterText, masterResults, onSearchMaster]);
 
   // Smart match: if customValue exactly equals a known bin, confirm it with green tick
   const matchedBin = useMemo(() => {
@@ -153,19 +162,25 @@ export default function BinSelector({
     const upper = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
     setFilterText(upper);
     setListOpen(true);
+    if (customError) setCustomError("");
     // Clear the selection when user modifies the filter text
     if (selectedBin && upper !== selectedBin.bin_code) {
       onSelectBin(null);
     }
-    // Shortcut: typing "IN" autocompletes to IN0001 — user still confirms via row tap or Enter
+    // Shortcut: typing "IN" → always auto-select IN0001 (pending-invoice rule)
     if (upper === "IN") {
       const in0001 = bins.find((b) => b.bin_code === "IN0001");
+      if (onSearchMaster) {
+        // From Bin: accept IN0001 regardless of stock — show 0 pcs if no stock
+        handleSelectBin(in0001 || { bin_code: "IN0001", qty: 0 });
+        return;
+      }
       if (in0001) {
         setFilterText("IN0001");
         setListOpen(true);
         return;
       }
-      // IN0001 not in suggest bins — switch to custom and fill value, no auto-advance
+      // Original path (To Bin): switch to custom for IN0001
       if (allowedCustomBins && allowedCustomBins.includes("IN0001")) {
         onModeChange("custom");
         if (onCustomChange) onCustomChange("IN0001");
@@ -174,23 +189,66 @@ export default function BinSelector({
         return;
       }
     }
-    // Shortcut: full "IN0001" typed → auto-select
+    // Shortcut: full "IN0001" typed → always auto-select (pending-invoice rule)
     if (upper === "IN0001") {
       const in0001 = bins.find((b) => b.bin_code === "IN0001");
+      if (onSearchMaster) {
+        // From Bin: accept IN0001 regardless of stock
+        handleSelectBin(in0001 || { bin_code: "IN0001", qty: 0 });
+        return;
+      }
       if (in0001) {
         handleSelectBin(in0001);
         return;
       }
     }
-    // Auto-switch to custom mode when typed text matches no bins
-    if (upper.length > 0) {
-      const matches = bins.filter((b) => b.bin_code.includes(upper));
-      if (matches.length === 0) {
-        onModeChange("custom");
-        if (onCustomChange) onCustomChange(upper);
-        setFilterText("");
-        setListOpen(false);
+    if (onSearchMaster) {
+      // Master-search mode: NEVER auto-switch to custom; search master on each keystroke
+      if (masterSearchTimer.current) clearTimeout(masterSearchTimer.current);
+      if (upper.length >= 1) {
+        masterSearchTimer.current = setTimeout(async () => {
+          const results = await onSearchMaster(upper, 30);
+          setMasterResults(results.map((r) => ({ bin_code: r.bin_code, qty: 0 })));
+        }, 150);
+      } else {
+        setMasterResults([]);
       }
+    } else {
+      // Original (To Bin): auto-switch to custom when typed text matches no item bins
+      if (upper.length > 0) {
+        const matches = bins.filter((b) => b.bin_code.includes(upper));
+        if (matches.length === 0) {
+          onModeChange("custom");
+          if (onCustomChange) onCustomChange(upper);
+          setFilterText("");
+          setListOpen(false);
+        }
+      }
+    }
+  };
+
+  // Suggest-mode submit when onSearchMaster is active — validates typed bin against master
+  const handleSuggestSubmit = async () => {
+    if (!onSearchMaster) {
+      onSubmitEditing?.();
+      return;
+    }
+    const code = filterText.trim().toUpperCase();
+    if (!code) return;
+    // Exact match in the currently shown list
+    const exactMatch = filteredBins.find((b) => b.bin_code === code);
+    if (exactMatch) {
+      handleSelectBin(exactMatch);
+      return;
+    }
+    // Validate against master before accepting a manually typed code
+    if (onBinValidate) {
+      const exists = await onBinValidate(code);
+      if (!exists) {
+        setCustomError(`"${code}" not found in bin master`);
+        return;
+      }
+      handleSelectBin({ bin_code: code, qty: 0 });
     }
   };
 
@@ -232,8 +290,8 @@ export default function BinSelector({
 
   // ─── Suggest mode ──────────────────────────────────────────────────────────
   if (mode === "suggest") {
-    // If no bins at all, show a non-blocking message and a Custom Bin shortcut
-    if (noBins) {
+    // If no bins at all and no master search → show static message + custom link
+    if (noBins && !onSearchMaster) {
       return (
         <View style={[styles.wrapper, isDisabled && styles.disabled]}>
           <View style={styles.headerRow}>
@@ -286,7 +344,7 @@ export default function BinSelector({
                   <Text style={styles.chipBinCode}>{selectedBin.bin_code}</Text>
                   {showQty && (
                     <Text style={styles.chipQty}>
-                      Available: {selectedBin.qty.toLocaleString()} pcs
+                      Available: {(selectedBin.qty ?? 0).toLocaleString()} pcs
                     </Text>
                   )}
                 </View>
@@ -327,7 +385,7 @@ export default function BinSelector({
                 style={styles.filterInput}
                 value={filterText}
                 onChangeText={handleFilterChange}
-                placeholder={`Search or type bin code (${bins.length} bins)`}
+                placeholder={onSearchMaster ? "Type to search all bins..." : `Search or type bin code (${bins.length} bins)`}
                 placeholderTextColor={Colors.textLight}
                 autoCapitalize="characters"
                 keyboardType="default"
@@ -343,7 +401,7 @@ export default function BinSelector({
                 onBlur={() => {
                   blurTimerRef.current = setTimeout(() => setListOpen(false), 300);
                 }}
-                onSubmitEditing={onSubmitEditing}
+                onSubmitEditing={onSearchMaster ? handleSuggestSubmit : onSubmitEditing}
                 editable={!isDisabled}
               />
               {filterText.length > 0 && (
@@ -395,7 +453,7 @@ export default function BinSelector({
                     {showQty && (
                       <View style={styles.qtyBadge}>
                         <Text style={styles.qtyBadgeText}>
-                          {b.qty.toLocaleString()} pcs
+                          {(b.qty ?? 0).toLocaleString()} pcs
                         </Text>
                       </View>
                     )}
@@ -406,8 +464,8 @@ export default function BinSelector({
           </View>
         )}
 
-        {/* Show bins button when dropdown closed */}
-        {!selectedBin && !listOpen && (
+        {/* Show bins button when dropdown closed — only when item bins exist */}
+        {!selectedBin && !listOpen && bins.length > 0 && (
           <TouchableOpacity
             style={styles.showListBtn}
             onPress={() => setListOpen(true)}
@@ -423,6 +481,13 @@ export default function BinSelector({
             </Text>
           </TouchableOpacity>
         )}
+        {/* Inline validation error for master-search mode */}
+        {customError ? (
+          <View style={[styles.binErrorRow, { marginLeft: 80 }]}>
+            <MaterialCommunityIcons name="alert-circle" size={14} color="#c62828" />
+            <Text style={styles.binErrorText}>{customError}</Text>
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -457,7 +522,7 @@ export default function BinSelector({
                 </Text>
                 {showQty && matchedBin && (
                   <Text style={styles.chipQty}>
-                    Available: {matchedBin.qty.toLocaleString()} pcs
+                    Available: {(matchedBin.qty ?? 0).toLocaleString()} pcs
                   </Text>
                 )}
               </View>

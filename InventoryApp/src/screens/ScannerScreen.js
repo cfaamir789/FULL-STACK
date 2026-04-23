@@ -28,6 +28,7 @@ import {
   getBinsForItem,
   checkBinExists,
   getBinMasterCount,
+  searchBinMaster,
 } from "../database/db";
 import { attemptSync } from "../services/syncService";
 import CalcInput from "../components/CalcInput";
@@ -365,11 +366,8 @@ export default function ScannerScreen({ role = "worker" }) {
       } else {
         setFromBinMode("custom");
         setToBinMode("custom");
-        // Auto-fill IN0001 as From Bin — it's the only allowed incoming bin
-        // when the item has no stock records yet (user is receiving new stock)
-        setFrombin("IN0001");
-        // IN0001 is already confirmed, jump straight to To Bin
-        setTimeout(() => toBinRef.current?.focus(), 400);
+        // No stock records — focus From Bin so user confirms/enters the source bin
+        focusFromBin();
       }
     } catch {
       setItemBins([]);
@@ -521,32 +519,6 @@ export default function ScannerScreen({ role = "worker" }) {
       );
       return;
     }
-    // Hard block: check From Bin exists in the bin master (if master has been downloaded)
-    const masterCount = await getBinMasterCount();
-    if (masterCount > 0) {
-      const fromExists = await checkBinExists(effectiveFromBin.trim());
-      if (!fromExists) {
-        Alert.alert(
-          "Invalid From Bin",
-          `❌ "${effectiveFromBin.trim().toUpperCase()}" does not exist in the bin master.\nPlease check the bin code and try again.`,
-        );
-        setFrombin("");
-        setSelectedFromBin(null);
-        setTimeout(() => fromBinRef.current?.focus(), 100);
-        return;
-      }
-      const toExists = await checkBinExists(effectiveToBin.trim());
-      if (!toExists) {
-        Alert.alert(
-          "Invalid To Bin",
-          `❌ "${effectiveToBin.trim().toUpperCase()}" does not exist in the bin master.\nPlease check the bin code and try again.`,
-        );
-        setTobin("");
-        setSelectedToBin(null);
-        setTimeout(() => toBinRef.current?.focus(), 100);
-        return;
-      }
-    }
     // Use directQty if it's a valid numeric string (from CalcInput), else fall back to state
     const qtyStr =
       typeof directQty === "string" && /^\d+(\.\d+)?$/.test(directQty)
@@ -560,22 +532,51 @@ export default function ScannerScreen({ role = "worker" }) {
       );
       return;
     }
-    // Hard block: qty cannot exceed available stock in the From Bin (suggest or matched custom)
+    // Hard block: qty cannot exceed available stock in the From Bin.
+    // Skip this check when stock qty is 0 — means pending invoice / unknown stock (e.g. IN0001).
     const fromBinStockCheck =
       fromBinMode === "suggest"
         ? selectedFromBin
         : itemBins.find(
             (b) => b.bin_code === effectiveFromBin.trim().toUpperCase(),
           ) || null;
-    if (fromBinStockCheck && qtyNum > fromBinStockCheck.qty) {
+    if (fromBinStockCheck && (fromBinStockCheck.qty ?? 0) > 0 && qtyNum > fromBinStockCheck.qty) {
       Alert.alert(
         "Quantity Exceeds Stock",
-        `❌ Cannot move ${qtyNum} pcs.\nOnly ${fromBinStockCheck.qty.toLocaleString()} pcs available in bin ${fromBinStockCheck.bin_code}.`,
+        `❌ Cannot move ${qtyNum} pcs.\nOnly ${(fromBinStockCheck.qty ?? 0).toLocaleString()} pcs available in bin ${fromBinStockCheck.bin_code}.`,
       );
       return;
     }
     setSaving(true);
     try {
+      // Hard block: check bins exist in master (if master has been downloaded)
+      const masterCount = await getBinMasterCount();
+      if (masterCount > 0) {
+        const fromExists = await checkBinExists(effectiveFromBin.trim());
+        if (!fromExists) {
+          Alert.alert(
+            "Invalid From Bin",
+            `❌ "${effectiveFromBin.trim().toUpperCase()}" does not exist in the bin master.\nPlease check the bin code and try again.`,
+          );
+          setFrombin("");
+          setSelectedFromBin(null);
+          setSaving(false);
+          setTimeout(() => fromBinRef.current?.focus(), 100);
+          return;
+        }
+        const toExists = await checkBinExists(effectiveToBin.trim());
+        if (!toExists) {
+          Alert.alert(
+            "Invalid To Bin",
+            `❌ "${effectiveToBin.trim().toUpperCase()}" does not exist in the bin master.\nPlease check the bin code and try again.`,
+          );
+          setTobin("");
+          setSelectedToBin(null);
+          setSaving(false);
+          setTimeout(() => toBinRef.current?.focus(), 100);
+          return;
+        }
+      }
       const workerName =
         (await AsyncStorage.getItem("workerName")) || "unknown";
       await insertTransaction({
@@ -1016,6 +1017,7 @@ export default function ScannerScreen({ role = "worker" }) {
     const qtyNum = parseInt(qty, 10);
     const exceedsStock =
       effectiveFromBinStock &&
+      (effectiveFromBinStock.qty ?? 0) > 0 &&
       qty &&
       !isNaN(qtyNum) &&
       qtyNum > effectiveFromBinStock.qty;
@@ -1068,6 +1070,7 @@ export default function ScannerScreen({ role = "worker" }) {
           onSubmitEditing={() => toBinRef.current?.focus()}
           editable={scanned}
           onBinValidate={checkBinExists}
+          onSearchMaster={searchBinMaster}
           allowedCustomBins={["IN0001"]}
           showQty={isAdmin}
         />

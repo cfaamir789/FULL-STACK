@@ -844,6 +844,15 @@ export const checkBinExists = async (binCode) => {
   return !!contentRow;
 };
 
+export const searchBinMaster = async (prefix, limit = 30) => {
+  const q = String(prefix || "").trim().toUpperCase();
+  if (!q) return [];
+  return await db.getAllAsync(
+    "SELECT bin_code FROM bin_master WHERE bin_code LIKE ? ORDER BY bin_code ASC LIMIT ?",
+    [`${q}%`, limit],
+  );
+};
+
 export const clearAndReplaceBinMaster = async (codes) => {
   if (!codes || codes.length === 0) return 0;
   const CHUNK_SIZE = 300;
