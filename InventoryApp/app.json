@@ -3,7 +3,7 @@
     "name": "Inventory Manager",
     "slug": "newfullstack",
     "owner": "aamirksa",
-    "version": "0.0.40",
+    "version": "0.0.41",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
       "bundleIdentifier": "com.inventory.manager"
     },
     "android": {
-      "versionCode": 49,
+      "versionCode": 50,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#D9D9D9"
