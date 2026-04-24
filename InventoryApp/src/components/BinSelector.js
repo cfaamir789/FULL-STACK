@@ -21,7 +21,13 @@
  *   onSubmitEditing   fn       — called when user presses enter/next
  *   editable          bool     — disable inputs when no item scanned yet
  */
-import React, { useState, useMemo, useEffect, useRef, useImperativeHandle } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useImperativeHandle,
+} from "react";
 import {
   View,
   Text,
@@ -50,6 +56,7 @@ export default function BinSelector({
   showQty = true, // false hides qty badges/counts (e.g. for workers)
   allowedCustomBins, // string[] — if set, only these bin codes are accepted in custom mode
   onSearchMaster, // async (prefix, limit) => [{bin_code}] — searches full bin master by prefix (From Bin only)
+  strictSuggest = false, // true — blocks typing anything not in the item’s stock bins; only allowedCustomBins (e.g. IN0001) bypass via custom mode
 }) {
   const [filterText, setFilterText] = useState("");
   const [listOpen, setListOpen] = useState(false);
@@ -61,6 +68,8 @@ export default function BinSelector({
   // Tracks the pending onBlur close-timer so it can be cancelled on re-focus
   const blurTimerRef = useRef(null);
   const masterSearchTimer = useRef(null); // debounce for master search
+  const masterValidationSeq = useRef(0); // prevents stale async results from overwriting newer input
+  const lastAcceptedFilterRef = useRef(""); // last filter value confirmed to exist in master
 
   // Intercept the external ref so ScannerScreen's programmatic .focus()
   // also opens the dropdown (Android doesn't fire onFocus on programmatic focus)
@@ -93,6 +102,7 @@ export default function BinSelector({
   useEffect(() => {
     if (bins.length === 0) {
       setFilterText("");
+      lastAcceptedFilterRef.current = "";
       setListOpen(false);
       setCustomError("");
       setMasterResults([]);
@@ -136,6 +146,7 @@ export default function BinSelector({
     }
     onSelectBin(bin);
     setFilterText(bin.bin_code);
+    lastAcceptedFilterRef.current = bin.bin_code;
     setListOpen(false);
     // NOTE: do NOT call onSubmitEditing here.
     // The parent's onSelectBin prop already handles focus-to-next-field.
@@ -155,6 +166,7 @@ export default function BinSelector({
   const handleSwitchToSuggest = () => {
     onModeChange("suggest");
     setFilterText(customValue || "");
+    lastAcceptedFilterRef.current = customValue || "";
     setListOpen(false);
   };
 
@@ -203,26 +215,51 @@ export default function BinSelector({
       }
     }
     if (onSearchMaster) {
-      // Master-search mode: NEVER auto-switch to custom; search master on each keystroke
+      // Master-search mode: validate prefix against bin master; block invalid codes
       if (masterSearchTimer.current) clearTimeout(masterSearchTimer.current);
       if (upper.length >= 1) {
+        const reqId = ++masterValidationSeq.current;
         masterSearchTimer.current = setTimeout(async () => {
           const results = await onSearchMaster(upper, 30);
+          if (reqId !== masterValidationSeq.current) return; // stale result — ignore
+          const isAllowed =
+            results.length > 0 ||
+            (allowedCustomBins && allowedCustomBins.some((c) => c.startsWith(upper)));
+          if (!isAllowed) {
+            // Typed prefix doesn't match any bin master entry — revert and show error
+            setCustomError(`"${upper}" not in bin master`);
+            setFilterText(lastAcceptedFilterRef.current);
+            return;
+          }
+          lastAcceptedFilterRef.current = upper;
+          setCustomError("");
           setMasterResults(results.map((r) => ({ bin_code: r.bin_code, qty: 0 })));
         }, 150);
       } else {
+        lastAcceptedFilterRef.current = "";
         setMasterResults([]);
       }
     } else {
-      // Original (To Bin): auto-switch to custom when typed text matches no item bins
+      // No-master path: To Bin auto-switches to custom; From Bin (strictSuggest) blocks.
       if (upper.length > 0) {
         const matches = bins.filter((b) => b.bin_code.includes(upper));
         if (matches.length === 0) {
-          onModeChange("custom");
-          if (onCustomChange) onCustomChange(upper);
-          setFilterText("");
-          setListOpen(false);
+          if (strictSuggest) {
+            // Hard block — only stock bins are allowed from this field
+            setCustomError("Only bins with stock for this item are allowed");
+            setFilterText(lastAcceptedFilterRef.current);
+          } else {
+            onModeChange("custom");
+            if (onCustomChange) onCustomChange(upper);
+            setFilterText("");
+            setListOpen(false);
+          }
+        } else if (strictSuggest) {
+          lastAcceptedFilterRef.current = upper;
+          if (customError) setCustomError("");
         }
+      } else if (strictSuggest) {
+        lastAcceptedFilterRef.current = "";
       }
     }
   };
@@ -273,16 +310,33 @@ export default function BinSelector({
     if (onSubmitEditing) onSubmitEditing();
   };
 
-  // Clear error as soon as user starts typing
+  // Custom mode typing — validate prefix against bin master when onSearchMaster is set
   const handleCustomChange = (text) => {
     if (customError) setCustomError("");
     const upper = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    // "IN" shortcut → auto-fill IN0001 (works in custom mode)
+    // "IN" shortcut → auto-fill IN0001
     if (upper === "IN") {
       onCustomChange("IN0001");
       return;
     }
-    onCustomChange(upper);
+    if (!onSearchMaster || !upper) {
+      onCustomChange(upper);
+      return;
+    }
+    // With bin master search: only accept if prefix exists in master
+    const reqId = ++masterValidationSeq.current;
+    onSearchMaster(upper, 1).then((results) => {
+      if (reqId !== masterValidationSeq.current) return;
+      const isAllowed =
+        results.length > 0 ||
+        (allowedCustomBins && allowedCustomBins.some((c) => c.startsWith(upper)));
+      if (!isAllowed) {
+        setCustomError(`"${upper}" not in bin master`);
+        return; // don't call onCustomChange — keeps previous value
+      }
+      setCustomError("");
+      onCustomChange(upper);
+    });
   };
 
   const isDisabled = !editable;
@@ -292,6 +346,98 @@ export default function BinSelector({
   if (mode === "suggest") {
     // If no bins at all and no master search → show static message + custom link
     if (noBins && !onSearchMaster) {
+      // strictSuggest (From Bin): no stock — show input locked to IN0001 only
+      if (strictSuggest) {
+        const in0001Selected = selectedBin?.bin_code === "IN0001";
+        return (
+          <View style={[styles.wrapper, isDisabled && styles.disabled]}>
+            <View style={styles.headerRow}>
+              <Text style={[styles.label, isDisabled && { opacity: 0.5 }]}>
+                {label}
+              </Text>
+              {in0001Selected ? (
+                <View style={[styles.selectedChip, { flex: 1 }]}>
+                  <TouchableOpacity
+                    style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+                    onPress={() => onSubmitEditing?.()}
+                    disabled={isDisabled}
+                  >
+                    <MaterialCommunityIcons name="check-circle" size={18} color={Colors.success} />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={styles.chipBinCode}>IN0001</Text>
+                      <Text style={styles.chipQty}>Pending invoice bin</Text>
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => { onSelectBin(null); setFilterText(""); setCustomError(""); }}
+                    disabled={isDisabled}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MaterialCommunityIcons name="close-circle" size={22} color={Colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={[styles.inputBox, listOpen && styles.inputBoxFocused, customError && styles.inputBoxError, isDisabled && { opacity: 0.5 }, { flex: 1 }]}>
+                  <MaterialCommunityIcons name="magnify" size={18} color={Colors.textSecondary} style={{ marginRight: 6 }} />
+                  <TextInput
+                    ref={internalInputRef}
+                    style={styles.filterInput}
+                    value={filterText}
+                    onChangeText={(text) => {
+                      const upper = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                      setFilterText(upper);
+                      if (customError) setCustomError("");
+                      // Accept only "IN" prefix or full "IN0001"
+                      if (upper === "IN0001") {
+                        handleSelectBin({ bin_code: "IN0001", qty: 0 });
+                        return;
+                      }
+                      if (upper.length > 0 && !"IN0001".startsWith(upper)) {
+                        setCustomError("No stock \u2014 only IN0001 allowed");
+                        setFilterText("");
+                      }
+                    }}
+                    placeholder="Only IN0001 allowed"
+                    placeholderTextColor={Colors.textLight}
+                    autoCapitalize="characters"
+                    keyboardType="default"
+                    returnKeyType="next"
+                    showSoftInputOnFocus={true}
+                    onFocus={() => { if (blurTimerRef.current) { clearTimeout(blurTimerRef.current); blurTimerRef.current = null; } }}
+                    onBlur={() => { blurTimerRef.current = setTimeout(() => {}, 300); }}
+                    onSubmitEditing={() => {
+                      const code = filterText.trim().toUpperCase();
+                      if (code === "IN0001" || code === "IN") {
+                        handleSelectBin({ bin_code: "IN0001", qty: 0 });
+                      } else if (code) {
+                        setCustomError("No stock \u2014 only IN0001 allowed");
+                        setFilterText("");
+                      }
+                    }}
+                    editable={!isDisabled}
+                  />
+                  {filterText.length > 0 && (
+                    <TouchableOpacity onPress={() => { setFilterText(""); setCustomError(""); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <MaterialCommunityIcons name="close-circle" size={20} color={Colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+            {customError ? (
+              <View style={[styles.binErrorRow, { marginLeft: 80 }]}>
+                <MaterialCommunityIcons name="alert-circle" size={14} color="#c62828" />
+                <Text style={styles.binErrorText}>{customError}</Text>
+              </View>
+            ) : (
+              <View style={[styles.binErrorRow, { marginLeft: 80 }]}>
+                <MaterialCommunityIcons name="information-outline" size={14} color={Colors.textSecondary} />
+                <Text style={[styles.binErrorText, { color: Colors.textSecondary }]}>No stock \u2014 only IN0001 accepted</Text>
+              </View>
+            )}
+          </View>
+        );
+      }
       return (
         <View style={[styles.wrapper, isDisabled && styles.disabled]}>
           <View style={styles.headerRow}>
@@ -385,7 +531,11 @@ export default function BinSelector({
                 style={styles.filterInput}
                 value={filterText}
                 onChangeText={handleFilterChange}
-                placeholder={onSearchMaster ? "Type to search all bins..." : `Search or type bin code (${bins.length} bins)`}
+                placeholder={
+                  onSearchMaster
+                    ? "Type to search all bins..."
+                    : `Search or type bin code (${bins.length} bins)`
+                }
                 placeholderTextColor={Colors.textLight}
                 autoCapitalize="characters"
                 keyboardType="default"
@@ -399,9 +549,14 @@ export default function BinSelector({
                   setListOpen(true);
                 }}
                 onBlur={() => {
-                  blurTimerRef.current = setTimeout(() => setListOpen(false), 300);
+                  blurTimerRef.current = setTimeout(
+                    () => setListOpen(false),
+                    300,
+                  );
                 }}
-                onSubmitEditing={onSearchMaster ? handleSuggestSubmit : onSubmitEditing}
+                onSubmitEditing={
+                  onSearchMaster ? handleSuggestSubmit : onSubmitEditing
+                }
                 editable={!isDisabled}
               />
               {filterText.length > 0 && (
@@ -433,9 +588,7 @@ export default function BinSelector({
               style={{ maxHeight: 132 }}
             >
               {filteredBins.length === 0 ? (
-                <Text style={styles.emptyMsg}>
-                  No matching bins.
-                </Text>
+                <Text style={styles.emptyMsg}>No matching bins.</Text>
               ) : (
                 filteredBins.map((b) => (
                   <TouchableOpacity
@@ -484,7 +637,11 @@ export default function BinSelector({
         {/* Inline validation error for master-search mode */}
         {customError ? (
           <View style={[styles.binErrorRow, { marginLeft: 80 }]}>
-            <MaterialCommunityIcons name="alert-circle" size={14} color="#c62828" />
+            <MaterialCommunityIcons
+              name="alert-circle"
+              size={14}
+              color="#c62828"
+            />
             <Text style={styles.binErrorText}>{customError}</Text>
           </View>
         ) : null}

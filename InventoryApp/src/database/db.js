@@ -829,16 +829,22 @@ export const getBinMasterCount = async () => {
   return row?.count ?? 0;
 };
 
-export const checkBinExists = async (binCode) => {
+export const checkBinExistsInMaster = async (binCode) => {
   const code = String(binCode).trim().toUpperCase();
-  const masterRow = await db.getFirstAsync(
-    "SELECT 1 as exists FROM bin_master WHERE bin_code = ? LIMIT 1",
+  if (!code) return false;
+  const row = await db.getFirstAsync(
+    "SELECT 1 as found FROM bin_master WHERE bin_code = ? LIMIT 1",
     [code],
   );
-  if (masterRow) return true;
+  return !!row;
+};
+
+export const checkBinExists = async (binCode) => {
+  const code = String(binCode).trim().toUpperCase();
+  if (await checkBinExistsInMaster(code)) return true;
   // Fallback: accept bin if it appears in bin_contents
   const contentRow = await db.getFirstAsync(
-    "SELECT 1 as exists FROM bin_contents WHERE bin_code = ? LIMIT 1",
+    "SELECT 1 as found FROM bin_contents WHERE bin_code = ? LIMIT 1",
     [code],
   );
   return !!contentRow;

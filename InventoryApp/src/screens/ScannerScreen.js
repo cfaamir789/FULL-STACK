@@ -332,8 +332,8 @@ export default function ScannerScreen({ role = "worker" }) {
       setFoundItem(null);
       setScanned(true);
       setItemBins([]);
-      setFromBinMode("custom");
-      setToBinMode("custom");
+      setFromBinMode("suggest");
+      setToBinMode("suggest");
       setSelectedFromBin(null);
       setSelectedToBin(null);
       focusFromBin();
@@ -364,14 +364,15 @@ export default function ScannerScreen({ role = "worker" }) {
         setToBinMode("suggest");
         focusFromBin();
       } else {
-        setFromBinMode("custom");
+        // No stock — From Bin stays in "suggest" so strictSuggest locks it to IN0001 only.
+        // To Bin uses custom (free entry for destination).
+        setFromBinMode("suggest");
         setToBinMode("custom");
-        // No stock records — focus From Bin so user confirms/enters the source bin
         focusFromBin();
       }
     } catch {
       setItemBins([]);
-      setFromBinMode("custom");
+      setFromBinMode("suggest");
       setToBinMode("custom");
       focusFromBin();
     }
@@ -1070,8 +1071,8 @@ export default function ScannerScreen({ role = "worker" }) {
           onSubmitEditing={() => toBinRef.current?.focus()}
           editable={scanned}
           onBinValidate={checkBinExists}
-          onSearchMaster={searchBinMaster}
           allowedCustomBins={["IN0001"]}
+          strictSuggest
           showQty={isAdmin}
         />
 
@@ -1102,6 +1103,7 @@ export default function ScannerScreen({ role = "worker" }) {
           onSubmitEditing={() => qtyRef.current?.focus()}
           editable={scanned}
           onBinValidate={checkBinExists}
+          onSearchMaster={searchBinMaster}
           allowedCustomBins={["IN0001"]}
           showQty={isAdmin}
         />
