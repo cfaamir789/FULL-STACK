@@ -182,35 +182,43 @@ export default function BinSelector({
     // Shortcut: typing "IN" → always auto-select IN0001 (pending-invoice rule)
     if (upper === "IN") {
       const in0001 = bins.find((b) => b.bin_code === "IN0001");
-      if (onSearchMaster) {
-        // From Bin: accept IN0001 regardless of stock — show 0 pcs if no stock
-        handleSelectBin(in0001 || { bin_code: "IN0001", qty: 0 });
-        return;
-      }
-      if (in0001) {
+            if (in0001) {
         setFilterText("IN0001");
         setListOpen(true);
         return;
       }
-      // Original path (To Bin): switch to custom for IN0001
       if (allowedCustomBins && allowedCustomBins.includes("IN0001")) {
-        onModeChange("custom");
-        if (onCustomChange) onCustomChange("IN0001");
-        setFilterText("");
-        setListOpen(false);
+        if (strictSuggest) {
+          // From Bin: accept IN0001 regardless of stock
+          handleSelectBin({ bin_code: "IN0001", qty: 0 });
+        } else {
+          // To Bin: switch to custom for IN0001
+          onModeChange("custom");
+          if (onCustomChange) onCustomChange("IN0001");
+          setFilterText("");
+          setListOpen(false);
+        }
         return;
       }
     }
     // Shortcut: full "IN0001" typed → always auto-select (pending-invoice rule)
     if (upper === "IN0001") {
       const in0001 = bins.find((b) => b.bin_code === "IN0001");
-      if (onSearchMaster) {
-        // From Bin: accept IN0001 regardless of stock
-        handleSelectBin(in0001 || { bin_code: "IN0001", qty: 0 });
+            if (in0001) {
+        handleSelectBin(in0001);
         return;
       }
-      if (in0001) {
-        handleSelectBin(in0001);
+      if (allowedCustomBins && allowedCustomBins.includes("IN0001")) {
+        if (strictSuggest) {
+          // From Bin: accept IN0001 regardless of stock
+          handleSelectBin({ bin_code: "IN0001", qty: 0 });
+        } else {
+          // To Bin: switch to custom for IN0001
+          onModeChange("custom");
+          if (onCustomChange) onCustomChange("IN0001");
+          setFilterText("");
+          setListOpen(false);
+        }
         return;
       }
     }
@@ -243,7 +251,9 @@ export default function BinSelector({
       // No-master path: To Bin auto-switches to custom; From Bin (strictSuggest) blocks.
       if (upper.length > 0) {
         const matches = bins.filter((b) => b.bin_code.includes(upper));
-        if (matches.length === 0) {
+        const isCustomPrefix = allowedCustomBins && allowedCustomBins.some((c) => c.startsWith(upper));
+        
+        if (matches.length === 0 && !isCustomPrefix) {
           if (strictSuggest) {
             // Hard block — only stock bins are allowed from this field
             setCustomError("Only bins with stock for this item are allowed");
@@ -260,6 +270,7 @@ export default function BinSelector({
         }
       } else if (strictSuggest) {
         lastAcceptedFilterRef.current = "";
+        if (customError) setCustomError("");
       }
     }
   };
