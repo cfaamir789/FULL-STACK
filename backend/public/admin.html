@@ -9069,7 +9069,9 @@
           const cur = sel.value;
           sel.innerHTML = '<option value="">All ' + label + '</option>' +
             values.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+          // keep current selection only if it still exists in new options
           if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+          else sel.value = '';
         }
         const uniq = arr => [...new Set(arr.filter(Boolean))].sort((a,b) => a.localeCompare(b));
         fillSel('catFilterBuyer',  uniq(_catData.map(c => c.buyer)),  'Buyers');
@@ -9098,20 +9100,44 @@
           if (el) el.innerHTML = _catSortCol === c ? (_catSortAsc ? "▲" : "▼") : "";
         });
 
-        let data = [..._catData];
         const q = (document.getElementById("catSearchBox")?.value || "").toLowerCase();
         const fBuyer  = document.getElementById('catFilterBuyer')?.value  || '';
         const fPicker = document.getElementById('catFilterPicker')?.value || '';
+
+        // Start with text-search filtered base
+        let base = [..._catData];
         if (q) {
-          data = data.filter(c => 
-            (c.categoryCode || "").toLowerCase().includes(q) || 
+          base = base.filter(c =>
+            (c.categoryCode || "").toLowerCase().includes(q) ||
             (c.categoryName || "").toLowerCase().includes(q) ||
             (c.buyer || "").toLowerCase().includes(q) ||
             (c.picker || "").toLowerCase().includes(q)
           );
         }
-        if (fBuyer)  data = data.filter(c => c.buyer  === fBuyer);
-        if (fPicker) data = data.filter(c => c.picker === fPicker);
+
+        // Cross-filter: Buyer dropdown shows only buyers available for selected picker
+        const uniq = arr => [...new Set(arr.filter(Boolean))].sort((a,b) => a.localeCompare(b));
+        const forBuyer = fPicker ? base.filter(c => c.picker === fPicker) : base;
+        const forPicker = fBuyer  ? base.filter(c => c.buyer  === fBuyer)  : base;
+
+        function crossFill(id, values, label, cur) {
+          const sel = document.getElementById(id);
+          if (!sel) return;
+          sel.innerHTML = '<option value="">All ' + label + '</option>' +
+            values.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+          if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+          else sel.value = '';
+        }
+        crossFill('catFilterBuyer',  uniq(forBuyer.map(c => c.buyer)),   'Buyers',  fBuyer);
+        crossFill('catFilterPicker', uniq(forPicker.map(c => c.picker)), 'Pickers', fPicker);
+
+        // Read updated values (may have been reset)
+        const activeBuyer  = document.getElementById('catFilterBuyer')?.value  || '';
+        const activePicker = document.getElementById('catFilterPicker')?.value || '';
+
+        let data = [...base];
+        if (activeBuyer)  data = data.filter(c => c.buyer  === activeBuyer);
+        if (activePicker) data = data.filter(c => c.picker === activePicker);
 
         data.sort((a, b) => {
           const va = a[_catSortCol] || "";
