@@ -6047,6 +6047,7 @@
         { key: "Frombin", label: "From Bin", vis: true },
         { key: "Tobin", label: "To Bin", vis: true },
         { key: "Qty", label: "Qty", vis: true },
+        { key: "diffQty", label: "Projected Qty", vis: true },
         { key: "UOM", label: "UOM", vis: true },
         { key: "employeeId", label: "Employee ID", vis: true },
         { key: "deviceModel", label: "Device Model", vis: true },
@@ -6066,14 +6067,15 @@
           const saved = localStorage.getItem("txColConfig");
           if (saved) {
             const parsed = JSON.parse(saved);
-            // Version check: reset if missing new columns (employeeId / deviceModel / separate date+time)
+            // Version check: reset if missing new columns (employeeId / deviceModel / separate date+time / diffQty)
             const hasNewCols = parsed.some(
               (c) => c.key === "employeeId" || c.key === "deviceModel",
             );
             const hasSeparateDateTime =
               parsed.some((c) => c.key === "Timestamp_date") &&
               parsed.some((c) => c.key === "Timestamp_time");
-            if (hasNewCols && hasSeparateDateTime) return parsed;
+            const hasDiffQty = parsed.some((c) => c.key === "diffQty");
+            if (hasNewCols && hasSeparateDateTime && hasDiffQty) return parsed;
           }
         } catch {}
         return DEFAULT_TX_COLS.map((c) => ({ ...c }));
@@ -6690,6 +6692,16 @@
             workerInfoMap[(tx.Worker_Name || "").toUpperCase()] || {};
           return "<td>" + esc(info.deviceModel || "") + "</td>";
         }
+        if (key === "diffQty") {
+          const diff = tx.diffQty ?? null;
+          if (diff !== null && diff < 0) {
+            return '<td style="color:#d32f2f;font-weight:700" title="Insufficient stock in Bin Content registry!">' + diff + "</td>";
+          } else if (diff !== null) {
+            return '<td style="color:#388e3c;font-weight:600">' + diff + "</td>";
+          } else {
+            return '<td style="color:#9e9e9e">-</td>';
+          }
+        }
         return "<td>" + esc(tx[key] || "") + "</td>";
       }
 
@@ -6748,7 +6760,6 @@
           visibleCols.forEach((c) => {
             html += "<th>" + esc(c.label) + "</th>";
           });
-          html += "<th>Projected Qty</th>";
           html +=
             "<th>Copy</th><th>Action</th><th>Delete</th></tr></thead><tbody>";
           slice.forEach((tx, i) => {
@@ -6767,15 +6778,6 @@
             visibleCols.forEach((c) => {
               html += txCellValue(tx, c.key);
             });
-            // Handle Projected Qty
-            const diff = tx.diffQty ?? null;
-            if (diff !== null && diff < 0) {
-              html += '<td style="color:#d32f2f;font-weight:700" title="Insufficient stock in Bin Content registry!">' + diff + "</td>";
-            } else if (diff !== null) {
-              html += '<td style="color:#388e3c;font-weight:600">' + diff + "</td>";
-            } else {
-              html += '<td style="color:#9e9e9e">-</td>';
-            }
 
             html +=
               '<td><button class="copy-icon-btn" onclick="copyRow(' +
@@ -7208,13 +7210,7 @@
 
         // Find visible columns explicitly defined in UI
         const visibleCols = txCols.filter((c) => c.vis);
-        const appendDiffQty = !visibleCols.some(c => c.key === "diffQty");
         const headers = visibleCols.map((c) => c.label);
-        
-        // Append Projected Qty manually if not implicitly visible
-        if (appendDiffQty) {
-          headers.push("Projected Qty");
-        }
 
         // Fetch JSON rows then build file client-side (respects visible columns)
         fetch(url + "&json=1", {
@@ -7236,13 +7232,7 @@
             
             const aoa = [
               headers,
-              ...rows.map((r) => {
-                const arr = visibleCols.map((c) => getExportCellValue(r, c.key));
-                if (appendDiffQty) {
-                  arr.push(r.diffQty !== undefined && r.diffQty !== null ? r.diffQty : "");
-                }
-                return arr;
-              }),
+              ...rows.map((r) => visibleCols.map((c) => getExportCellValue(r, c.key))),
             ];
             
             if (format === "xlsx" && typeof XLSX !== "undefined") {
