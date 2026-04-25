@@ -124,6 +124,34 @@ router.get("/stores", requireDB, requireAuth, requireAdmin, async (req, res) => 
   }
 });
 
+// POST /api/template/stores/import  (bulk upsert — registered BEFORE /:id)
+router.post("/stores/import", requireDB, requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const rows = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ success: false, error: "Array of stores required." });
+    }
+    let upserted = 0;
+    for (const row of rows) {
+      if (!row.storeCode) continue;
+      await StoreMaster.findOneAndUpdate(
+        { storeCode: row.storeCode.trim() },
+        {
+          $set: {
+            storeName: row.storeName ?? "",
+            updatedAt: new Date(),
+          },
+        },
+        { upsert: true }
+      );
+      upserted++;
+    }
+    res.json({ success: true, upserted });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/template/stores
 router.post("/stores", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {

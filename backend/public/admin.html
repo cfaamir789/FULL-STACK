@@ -4212,7 +4212,14 @@
           <div class="card">
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
               <h2 style="margin:0">&#127978; Stores</h2>
-              <button class="btn-sm" onclick="loadTemplateStores()" style="background:#333;color:#fff">&#8635; Refresh</button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn-sm" onclick="exportStoresCSV()" style="background:#1565c0;color:#fff">&#11015; CSV</button>
+                <label class="btn-sm" style="background:#37474f;color:#fff;cursor:pointer">
+                  &#11014; Import CSV
+                  <input type="file" accept=".csv" style="display:none" onchange="importStoresCSV(this)" />
+                </label>
+                <button class="btn-sm" onclick="loadTemplateStores()" style="background:#333;color:#fff">&#8635; Refresh</button>
+              </div>
             </div>
             <div id="storeTableWrap" style="overflow-x:auto">
               <table class="data-table" style="width:100%;min-width:360px">
@@ -4234,6 +4241,22 @@
 
         <!-- ── Bin Master (reuses existing functionality) ── -->
         <div id="tmplSectionBins" style="display:none">
+          <div class="card">
+            <h2>&#11014; Upload Bin List CSV</h2>
+            <p style="color:#888;font-size:13px;margin-bottom:12px">
+              <strong>Required columns:</strong> Bin Code, Bin Ranking, Zone Code<br>
+              Authoritative bin registry — enriches Bin Content with ranking &amp; zone.
+            </p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+              <label class="btn-sm" style="background:#37474f;color:#fff;cursor:pointer">
+                &#128194; Choose File
+                <input type="file" accept=".csv" id="tmplBinCsvInput" style="display:none" onchange="tmplBinFileChosen(this)" />
+              </label>
+              <span id="tmplBinFileName" style="font-size:13px;color:#aaa">No file chosen</span>
+              <button id="tmplBinUploadBtn" class="btn btn-primary" style="flex:0 0 auto" onclick="tmplUploadBinCSV()" disabled>&#128640; Upload</button>
+            </div>
+            <div id="tmplBinUploadResult"></div>
+          </div>
           <div class="card">
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
               <h2 style="margin:0">&#128230; Bin Master</h2>
@@ -9183,6 +9206,93 @@
           showMsg("storeCreateResult", "Store created.", "green");
         } catch (err) {
           showMsg("storeCreateResult", err.message, "red");
+        }
+      }
+
+      function exportStoresCSV() {
+        if (!_storeData.length) return;
+        const header = ["storeCode", "storeName"];
+        const rows = [header, ..._storeData.map((s) => header.map((h) => s[h] ?? ""))];
+        const csv = rows.map((r) => r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\r\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "stores.csv";
+        a.click();
+      }
+
+      async function importStoresCSV(input) {
+        const file = input.files[0];
+        if (!file) return;
+        input.value = "";
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter((l) => l.trim());
+        if (lines.length < 2) return showMsg("storeTableMsg", "Empty file.", "red");
+        const header = lines[0].split(",").map((h) => h.replace(/^"|"$/g, "").trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+        const rows = lines.slice(1).map((line) => {
+          const vals = line.split(",").map((v) => v.replace(/^"|"$/g, "").trim());
+          const obj = {};
+          header.forEach((h, i) => (obj[h] = vals[i] ?? ""));
+          // normalise header variants: "store code" / "storecode" → storeCode
+          return {
+            storeCode: obj["storecode"] || obj["store"] || "",
+            storeName: obj["storename"] || obj["name"] || "",
+          };
+        }).filter((r) => r.storeCode);
+        if (!rows.length) return showMsg("storeTableMsg", "No valid rows found.", "red");
+        try {
+          const res = await apiFetch("/template/stores/import", { method: "POST", body: JSON.stringify(rows) });
+          showMsg("storeTableMsg", "Imported " + res.upserted + " rows.", "green");
+          loadTemplateStores();
+        } catch (err) {
+          showMsg("storeTableMsg", err.message, "red");
+        }
+      }
+
+      // ── Bin Master upload (Template tab) ──
+      let _tmplBinFile = null;
+
+      function tmplBinFileChosen(input) {
+        _tmplBinFile = input.files[0] || null;
+        document.getElementById("tmplBinFileName").textContent = _tmplBinFile ? _tmplBinFile.name : "No file chosen";
+        document.getElementById("tmplBinUploadBtn").disabled = !_tmplBinFile;
+      }
+
+      async function tmplUploadBinCSV() {
+        if (!_tmplBinFile) return;
+        const btn = document.getElementById("tmplBinUploadBtn");
+        const resultDiv = document.getElementById("tmplBinUploadResult");
+        btn.disabled = true;
+        btn.textContent = "Uploading…";
+        resultDiv.innerHTML = "";
+        const formData = new FormData();
+        formData.append("file", _tmplBinFile);
+        formData.append("mode", "merge");
+        try {
+          const headers = {};
+          if (authToken) headers["Authorization"] = "Bearer " + authToken;
+          const res = await fetch(API + "/bin-master/upload-csv", {
+            method: "POST",
+            headers,
+            body: formData,
+          });
+          const raw = await res.text();
+          let data = {};
+          try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error("Server returned invalid response."); }
+          if (!res.ok) throw new Error(data.error || "Upload failed");
+          resultDiv.innerHTML =
+            '<div class="alert alert-success">&#10004; Done! Upserted: <strong>' + (data.upserted || 0) +
+            "</strong> &nbsp;|&nbsp; Bins updated in content: <strong>" + (data.cascaded || 0) + "</strong></div>";
+          _tmplBinFile = null;
+          document.getElementById("tmplBinFileName").textContent = "No file chosen";
+          document.getElementById("tmplBinCsvInput").value = "";
+          binMasterListLoaded = false;
+          loadBinMasterList(1);
+        } catch (err) {
+          resultDiv.innerHTML = '<div class="alert alert-error">&#10008; ' + esc(err.message) + "</div>";
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "&#128640; Upload";
         }
       }
 
