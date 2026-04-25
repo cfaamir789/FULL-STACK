@@ -3815,10 +3815,19 @@
           </div>
           <div class="card">
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-              <div style="display:flex;align-items:center;gap:12px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <h2 style="margin:0">&#128230; Categories</h2>
-                <input id="catSearchBox" type="text" class="search-box" style="margin:0;min-width:200px" placeholder="Search categories..." onkeyup="if(event.key==='Enter') renderCatTable()" />
-                <button class="btn-sm" style="background:#555;color:#fff" onclick="renderCatTable()">Search</button>
+                <input id="catSearchBox" type="text" class="search-box" style="margin:0;min-width:200px" placeholder="Search categories..." oninput="renderCatTable()" onkeyup="renderCatTable()" />
+                <select class="bin-sort-select" id="catSort" onchange="catSortFromDropdown()" style="min-width:190px;">
+                  <option value="categoryCode_asc">Code A &#8594; Z</option>
+                  <option value="categoryCode_desc">Code Z &#8594; A</option>
+                  <option value="categoryName_asc">Name A &#8594; Z</option>
+                  <option value="categoryName_desc">Name Z &#8594; A</option>
+                  <option value="buyer_asc">Buyer A &#8594; Z</option>
+                  <option value="buyer_desc">Buyer Z &#8594; A</option>
+                  <option value="picker_asc">Picker A &#8594; Z</option>
+                  <option value="picker_desc">Picker Z &#8594; A</option>
+                </select>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn-sm" onclick="exportCategoriesCSV()" style="background:#1565c0;color:#fff">&#11015; CSV</button>
@@ -3863,10 +3872,17 @@
           </div>
           <div class="card">
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-              <div style="display:flex;align-items:center;gap:12px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <h2 style="margin:0">&#127978; Stores</h2>
-                <input id="storeSearchBox" type="text" class="search-box" style="margin:0;min-width:200px" placeholder="Search stores..." onkeyup="if(event.key==='Enter') renderStoreTable()" />
-                <button class="btn-sm" style="background:#555;color:#fff" onclick="renderStoreTable()">Search</button>
+                <input id="storeSearchBox" type="text" class="search-box" style="margin:0;min-width:200px" placeholder="Search stores..." oninput="renderStoreTable()" onkeyup="renderStoreTable()" />
+                <select class="bin-sort-select" id="storeSort" onchange="storeSortFromDropdown()" style="min-width:175px;">
+                  <option value="storeCode_asc">Store Code A &#8594; Z</option>
+                  <option value="storeCode_desc">Store Code Z &#8594; A</option>
+                  <option value="storeName_asc">Name A &#8594; Z</option>
+                  <option value="storeName_desc">Name Z &#8594; A</option>
+                  <option value="pickingDay_asc">Picking Day A &#8594; Z</option>
+                  <option value="pickingDay_desc">Picking Day Z &#8594; A</option>
+                </select>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="btn-sm" onclick="exportStoresCSV()" style="background:#1565c0;color:#fff">&#11015; CSV</button>
@@ -4067,14 +4083,30 @@
                   id="binMasterListBody"
                   style="display: none; margin-top: 10px"
                 >
-                  <input
-                    type="text"
-                    class="search-box"
-                    id="binMasterSearch"
-                    placeholder="Filter by Code, Aisle, Chamber, Ranking, Zone..."
-                    oninput="debouncedBinMasterSearch()"
-                    style="width: 100%; margin-bottom: 8px"
-                  />
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+                    <input type="text" class="search-box" id="binMasterSearch" placeholder="Search by code, aisle, chamber, zone..." oninput="debouncedBinMasterSearch()" style="flex:1;min-width:180px;margin:0;" />
+                    <select class="bin-sort-select" id="bmFilterAisle" onchange="renderBinMasterTable(1)" style="min-width:130px;">
+                      <option value="">All Aisles</option>
+                    </select>
+                    <select class="bin-sort-select" id="bmFilterChamber" onchange="renderBinMasterTable(1)" style="min-width:150px;">
+                      <option value="">All Chambers</option>
+                    </select>
+                    <select class="bin-sort-select" id="bmFilterZoneCode" onchange="renderBinMasterTable(1)" style="min-width:150px;">
+                      <option value="">All Zone Codes</option>
+                    </select>
+                    <select class="bin-sort-select" id="bmFilterZone" onchange="renderBinMasterTable(1)" style="min-width:130px;">
+                      <option value="">All Zones</option>
+                    </select>
+                    <select class="bin-sort-select" id="bmSort" onchange="bmSortFromDropdown()" style="min-width:190px;">
+                      <option value="BinCode_asc">Bin Code A &#8594; Z</option>
+                      <option value="BinCode_desc">Bin Code Z &#8594; A</option>
+                      <option value="BinRanking_asc">Ranking Low &#8594; High</option>
+                      <option value="BinRanking_desc">Ranking High &#8594; Low</option>
+                      <option value="Aisle_asc">Aisle A &#8594; Z</option>
+                      <option value="ZoneCode_asc">Zone Code A &#8594; Z</option>
+                      <option value="Zone_asc">Zone A &#8594; Z</option>
+                    </select>
+                  </div>
                   <div id="binMasterListContainer"></div>
                 </div>
               </div>
@@ -8766,7 +8798,34 @@
         function sortBinMaster(col) {
           if (_bmSortCol === col) _bmSortAsc = !_bmSortAsc;
           else { _bmSortCol = col; _bmSortAsc = true; }
+          // Sync sort dropdown if exists
+          const bmSortSel = document.getElementById('bmSort');
+          if (bmSortSel) bmSortSel.value = _bmSortCol + '_' + (_bmSortAsc ? 'asc' : 'desc');
           renderBinMasterTable(1);
+        }
+
+        function bmSortFromDropdown() {
+          const val = (document.getElementById('bmSort')?.value) || 'BinCode_asc';
+          const parts = val.split('_');
+          _bmSortAsc = parts[parts.length - 1] === 'asc';
+          _bmSortCol = parts.slice(0, parts.length - 1).join('_');
+          renderBinMasterTable(1);
+        }
+
+        function populateBinMasterDropdowns() {
+          function fillSelect(id, values, label) {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const cur = sel.value;
+            sel.innerHTML = '<option value="">All ' + label + '</option>' +
+              values.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+            if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+          }
+          const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort((a,b) => String(a).localeCompare(String(b)));
+          fillSelect('bmFilterAisle',    uniq(_binMasterData.map(b => b.Aisle)),    'Aisles');
+          fillSelect('bmFilterChamber',  uniq(_binMasterData.map(b => b.Chamber)),  'Chambers');
+          fillSelect('bmFilterZoneCode', uniq(_binMasterData.map(b => b.ZoneCode)), 'Zone Codes');
+          fillSelect('bmFilterZone',     uniq(_binMasterData.map(b => b.Zone)),     'Zones');
         }
 
         async function loadBinMasterList(page) {
@@ -8777,6 +8836,7 @@
               const data = await apiFetch("/bin-master/all");
               _binMasterData = data.bins || [];
               _bmLoaded = true;
+              populateBinMasterDropdowns();
             }
             renderBinMasterTable(page || 1);
           } catch(err) {
@@ -8793,7 +8853,11 @@
           const q = (
             document.getElementById("binMasterSearch")?.value || ""
           ).toLowerCase().trim();
-          
+          const fAisle    = document.getElementById('bmFilterAisle')?.value    || '';
+          const fChamber  = document.getElementById('bmFilterChamber')?.value  || '';
+          const fZoneCode = document.getElementById('bmFilterZoneCode')?.value || '';
+          const fZone     = document.getElementById('bmFilterZone')?.value     || '';
+
           let data = [..._binMasterData];
           if (q) {
              data = data.filter(b => 
@@ -8805,6 +8869,10 @@
                 String(b.BinRanking || "").includes(q)
              );
           }
+          if (fAisle)    data = data.filter(b => b.Aisle    === fAisle);
+          if (fChamber)  data = data.filter(b => b.Chamber  === fChamber);
+          if (fZoneCode) data = data.filter(b => b.ZoneCode === fZoneCode);
+          if (fZone)     data = data.filter(b => b.Zone     === fZone);
 
           data.sort((a,b) => {
                let va = a[_bmSortCol] || "";
@@ -9000,6 +9068,16 @@
       function sortCategories(col) {
         if (_catSortCol === col) _catSortAsc = !_catSortAsc;
         else { _catSortCol = col; _catSortAsc = true; }
+        const sel = document.getElementById('catSort');
+        if (sel) sel.value = _catSortCol + '_' + (_catSortAsc ? 'asc' : 'desc');
+        renderCatTable();
+      }
+
+      function catSortFromDropdown() {
+        const val = (document.getElementById('catSort')?.value) || 'categoryCode_asc';
+        const parts = val.split('_');
+        _catSortAsc = parts[parts.length - 1] === 'asc';
+        _catSortCol = parts.slice(0, parts.length - 1).join('_');
         renderCatTable();
       }
 
@@ -9183,6 +9261,16 @@
       function sortStores(col) {
         if (_storeSortCol === col) _storeSortAsc = !_storeSortAsc;
         else { _storeSortCol = col; _storeSortAsc = true; }
+        const sel = document.getElementById('storeSort');
+        if (sel) sel.value = _storeSortCol + '_' + (_storeSortAsc ? 'asc' : 'desc');
+        renderStoreTable();
+      }
+
+      function storeSortFromDropdown() {
+        const val = (document.getElementById('storeSort')?.value) || 'storeCode_asc';
+        const parts = val.split('_');
+        _storeSortAsc = parts[parts.length - 1] === 'asc';
+        _storeSortCol = parts.slice(0, parts.length - 1).join('_');
         renderStoreTable();
       }
 
