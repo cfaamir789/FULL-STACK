@@ -17,7 +17,9 @@ const connectDB = async (retries = 5) => {
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 120000,
         connectTimeoutMS: 10000,
-        maxPoolSize: 20,
+        maxPoolSize: 10,
+        minPoolSize: 2,
+        heartbeatFrequencyMS: 10000,
         family: 4,
       });
       console.log("MongoDB Connected Successfully!");
@@ -47,7 +49,9 @@ const connectDB = async (retries = 5) => {
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 120000,
         connectTimeoutMS: 10000,
-        maxPoolSize: 20,
+        maxPoolSize: 10,
+        minPoolSize: 2,
+        heartbeatFrequencyMS: 10000,
         family: 4,
       });
       console.log("MongoDB background reconnect succeeded!");
