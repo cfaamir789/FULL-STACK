@@ -2632,189 +2632,6 @@
 
         <!-- Upload card -->
         <div class="master-grid">
-          <!-- BinMaster Upload Card -->
-          <div
-            class="card"
-            id="binMasterUploadBlock"
-            style="padding: 0; overflow: hidden"
-          >
-            <div
-              style="
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 12px 16px;
-                background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
-                border-radius: 10px 10px 0 0;
-                border-bottom: 1px solid #a5d6a7;
-              "
-            >
-              <span style="font-size: 22px">&#127968;</span>
-              <div>
-                <div style="font-weight: 700; font-size: 14px; color: #2e7d32">
-                  Upload Bin List CSV
-                </div>
-                <div style="font-size: 11px; color: #388e3c">
-                  Required columns:
-                  <code
-                    style="
-                      background: #e8f5e9;
-                      padding: 1px 4px;
-                      border-radius: 3px;
-                    "
-                    >Code, Bin Ranking, Zone Code</code
-                  >
-                </div>
-                <div style="font-size: 11px; color: #558b2f; margin-top: 2px">
-                  Authoritative bin registry &mdash; enriches Bin Content with
-                  ranking &amp; zone
-                </div>
-              </div>
-            </div>
-            <div style="padding: 12px 16px">
-              <div style="display: flex; gap: 10px; margin-bottom: 10px">
-                <div
-                  style="
-                    text-align: center;
-                    flex: 1;
-                    background: #e8f5e9;
-                    border-radius: 8px;
-                    padding: 5px 4px;
-                  "
-                >
-                  <div
-                    style="font-size: 18px; font-weight: 700; color: #2e7d32"
-                    id="binMasterTotal"
-                  >
-                    -
-                  </div>
-                  <div style="font-size: 10px; color: #388e3c">Total Bins</div>
-                </div>
-                <div
-                  style="
-                    text-align: center;
-                    flex: 1;
-                    background: #f1f8e9;
-                    border-radius: 8px;
-                    padding: 5px 4px;
-                  "
-                >
-                  <div
-                    style="font-size: 18px; font-weight: 700; color: #558b2f"
-                    id="binMasterZones"
-                  >
-                    -
-                  </div>
-                  <div style="font-size: 10px; color: #558b2f">
-                    Unique Zones
-                  </div>
-                </div>
-              </div>
-              <div
-                class="upload-area"
-                id="binMasterDropZone"
-                onclick="document.getElementById('binMasterCsvFile').click()"
-                style="padding: 14px 12px; min-height: 60px"
-              >
-                <input
-                  type="file"
-                  id="binMasterCsvFile"
-                  accept=".csv,text/csv"
-                />
-                <div class="icon" style="font-size: 28px; margin-bottom: 4px">
-                  &#128196;
-                </div>
-                <p style="margin: 0; font-size: 12px">
-                  Click or drag CSV file here
-                </p>
-                <div class="filename" id="binMasterFileName"></div>
-              </div>
-              <div
-                class="mode-toggle"
-                style="margin-top: 10px; margin-bottom: 6px"
-              >
-                <button
-                  id="binMasterModeReplace"
-                  class="active"
-                  onclick="setBinMasterMode('replace')"
-                >
-                  &#128260; Replace All
-                </button>
-                <button
-                  id="binMasterModeMerge"
-                  onclick="setBinMasterMode('merge')"
-                >
-                  &#128279; Merge (Add/Update)
-                </button>
-              </div>
-              <button
-                class="btn btn-primary"
-                id="binMasterUploadBtn"
-                onclick="uploadBinMasterCSV()"
-                disabled
-                style="
-                  margin-bottom: 6px;
-                  background: linear-gradient(135deg, #2e7d32, #388e3c);
-                "
-              >
-                &#128640; Upload Bin List
-              </button>
-              <div id="binMasterUploadResult"></div>
-
-              <!-- Bin Master Records (collapsed by default) -->
-              <div
-                style="
-                  border-top: 1px solid #c8e6c9;
-                  margin-top: 10px;
-                  padding-top: 10px;
-                "
-              >
-                <div
-                  style="
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    cursor: pointer;
-                  "
-                  onclick="toggleBinMasterList()"
-                >
-                  <span
-                    style="font-size: 13px; font-weight: 600; color: #2e7d32"
-                    >&#127968; View Bin Master Records</span
-                  >
-                  <button
-                    id="binMasterToggleBtn"
-                    style="
-                      background: none;
-                      border: 1px solid #a5d6a7;
-                      border-radius: 6px;
-                      padding: 3px 10px;
-                      font-size: 12px;
-                      color: #2e7d32;
-                      cursor: pointer;
-                    "
-                  >
-                    &#9660; Show
-                  </button>
-                </div>
-                <div
-                  id="binMasterListBody"
-                  style="display: none; margin-top: 10px"
-                >
-                  <input
-                    type="text"
-                    class="search-box"
-                    id="binMasterSearch"
-                    placeholder="Search by bin code or zone code..."
-                    oninput="debouncedBinMasterSearch()"
-                    style="width: 100%; margin-bottom: 8px"
-                  />
-                  <div id="binMasterListContainer"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- Bin Content Upload Card -->
           <div
             class="card"
@@ -4081,33 +3898,191 @@
 
         <!-- ── Bin Master (reuses existing functionality) ── -->
         <div id="tmplSectionBins" style="display:none">
-          <div class="card">
-            <h2>&#11014; Upload Bin List CSV</h2>
-            <p style="color:#888;font-size:13px;margin-bottom:12px">
-              <strong>Required columns:</strong> Bin Code, Bin Ranking, Zone Code<br>
-              Authoritative bin registry — enriches Bin Content with ranking &amp; zone.
-            </p>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-              <label class="btn-sm" style="background:#37474f;color:#fff;cursor:pointer">
-                &#128194; Choose File
-                <input type="file" accept=".csv" id="tmplBinCsvInput" style="display:none" onchange="tmplBinFileChosen(this)" />
-              </label>
-              <span id="tmplBinFileName" style="font-size:13px;color:#aaa">No file chosen</span>
-              <button id="tmplBinUploadBtn" class="btn btn-primary" style="flex:0 0 auto" onclick="tmplUploadBinCSV()" disabled>&#128640; Upload</button>
+          <!-- BinMaster Upload Card -->
+          <div
+            class="card"
+            id="binMasterUploadBlock"
+            style="padding: 0; overflow: hidden"
+          >
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 12px 16px;
+                background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+                border-radius: 10px 10px 0 0;
+                border-bottom: 1px solid #a5d6a7;
+              "
+            >
+              <span style="font-size: 22px">&#127968;</span>
+              <div>
+                <div style="font-weight: 700; font-size: 14px; color: #2e7d32">
+                  Upload Bin List CSV
+                </div>
+                <div style="font-size: 11px; color: #388e3c">
+                  Required columns:
+                  <code
+                    style="
+                      background: #e8f5e9;
+                      padding: 1px 4px;
+                      border-radius: 3px;
+                    "
+                    >Code, Bin Ranking, Zone Code</code
+                  >
+                </div>
+                <div style="font-size: 11px; color: #558b2f; margin-top: 2px">
+                  Authoritative bin registry &mdash; enriches Bin Content with
+                  ranking &amp; zone
+                </div>
+              </div>
             </div>
-            <div id="tmplBinUploadResult"></div>
+            <div style="padding: 12px 16px">
+              <div style="display: flex; gap: 10px; margin-bottom: 10px">
+                <div
+                  style="
+                    text-align: center;
+                    flex: 1;
+                    background: #e8f5e9;
+                    border-radius: 8px;
+                    padding: 5px 4px;
+                  "
+                >
+                  <div
+                    style="font-size: 18px; font-weight: 700; color: #2e7d32"
+                    id="binMasterTotal"
+                  >
+                    -
+                  </div>
+                  <div style="font-size: 10px; color: #388e3c">Total Bins</div>
+                </div>
+                <div
+                  style="
+                    text-align: center;
+                    flex: 1;
+                    background: #f1f8e9;
+                    border-radius: 8px;
+                    padding: 5px 4px;
+                  "
+                >
+                  <div
+                    style="font-size: 18px; font-weight: 700; color: #558b2f"
+                    id="binMasterZones"
+                  >
+                    -
+                  </div>
+                  <div style="font-size: 10px; color: #558b2f">
+                    Unique Zones
+                  </div>
+                </div>
+              </div>
+              <div
+                class="upload-area"
+                id="binMasterDropZone"
+                onclick="document.getElementById('binMasterCsvFile').click()"
+                style="padding: 14px 12px; min-height: 60px"
+              >
+                <input
+                  type="file"
+                  id="binMasterCsvFile"
+                  accept=".csv,text/csv"
+                />
+                <div class="icon" style="font-size: 28px; margin-bottom: 4px">
+                  &#128196;
+                </div>
+                <p style="margin: 0; font-size: 12px">
+                  Click or drag CSV file here
+                </p>
+                <div class="filename" id="binMasterFileName"></div>
+              </div>
+              <div
+                class="mode-toggle"
+                style="margin-top: 10px; margin-bottom: 6px"
+              >
+                <button
+                  id="binMasterModeReplace"
+                  class="active"
+                  onclick="setBinMasterMode('replace')"
+                >
+                  &#128260; Replace All
+                </button>
+                <button
+                  id="binMasterModeMerge"
+                  onclick="setBinMasterMode('merge')"
+                >
+                  &#128279; Merge (Add/Update)
+                </button>
+              </div>
+              <button
+                class="btn btn-primary"
+                id="binMasterUploadBtn"
+                onclick="uploadBinMasterCSV()"
+                disabled
+                style="
+                  margin-bottom: 6px;
+                  background: linear-gradient(135deg, #2e7d32, #388e3c);
+                "
+              >
+                &#128640; Upload Bin List
+              </button>
+              <div id="binMasterUploadResult"></div>
+
+              <!-- Bin Master Records (collapsed by default) -->
+              <div
+                style="
+                  border-top: 1px solid #c8e6c9;
+                  margin-top: 10px;
+                  padding-top: 10px;
+                "
+              >
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    cursor: pointer;
+                  "
+                  onclick="toggleBinMasterList()"
+                >
+                  <span
+                    style="font-size: 13px; font-weight: 600; color: #2e7d32"
+                    >&#127968; View Bin Master Records</span
+                  >
+                  <button
+                    id="binMasterToggleBtn"
+                    style="
+                      background: none;
+                      border: 1px solid #a5d6a7;
+                      border-radius: 6px;
+                      padding: 3px 10px;
+                      font-size: 12px;
+                      color: #2e7d32;
+                      cursor: pointer;
+                    "
+                  >
+                    &#9660; Show
+                  </button>
+                </div>
+                <div
+                  id="binMasterListBody"
+                  style="display: none; margin-top: 10px"
+                >
+                  <input
+                    type="text"
+                    class="search-box"
+                    id="binMasterSearch"
+                    placeholder="Filter by Code, Aisle, Chamber, Ranking, Zone..."
+                    oninput="debouncedBinMasterSearch()"
+                    style="width: 100%; margin-bottom: 8px"
+                  />
+                  <div id="binMasterListContainer"></div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="card">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-              <h2 style="margin:0">&#128230; Bin Master</h2>
-              <button class="btn-sm" onclick="loadBinMasterList(1)" style="background:#333;color:#fff">&#8635; Refresh</button>
-            </div>
-            <div id="tmplBinMasterWrap">
-              <p style="color:#888;font-size:13px">Loading bin master list…</p>
-            </div>
+
           </div>
         </div>
-      </div>
 
       <div style="text-align: center; padding: 16px">
         <button
@@ -8783,25 +8758,76 @@
         );
       }
 
-      async function loadBinMasterList(page) {
-        page = page || 1;
-        currentBinMasterPage = page;
-        const container = document.getElementById("binMasterListContainer");
-        if (!container) return;
-        const q = (
-          document.getElementById("binMasterSearch")?.value || ""
-        ).trim();
-        const params = new URLSearchParams({ page, limit: 50 });
-        if (q) params.set("q", q);
-        try {
-          const data = await apiFetch("/bin-master?" + params.toString());
-          const bins = data.bins || [];
-          const total = data.total || 0;
-          totalBinMasterPages = Math.ceil(total / 50) || 1;
+              let _binMasterData = [];
+        let _bmSortCol = "BinCode";
+        let _bmSortAsc = true;
+        let _bmLoaded = false;
+        
+        function sortBinMaster(col) {
+          if (_bmSortCol === col) _bmSortAsc = !_bmSortAsc;
+          else { _bmSortCol = col; _bmSortAsc = true; }
+          renderBinMasterTable(1);
+        }
 
-          if (bins.length === 0) {
-            container.innerHTML =
-              '<p style="color:#888;padding:12px;">No bin records found.</p>';
+        async function loadBinMasterList(page) {
+          try {
+            if (!_bmLoaded) {
+              const container = document.getElementById("binMasterListContainer");
+              if (container) container.innerHTML = '<p style="color:#888;padding:12px;">Loading ALL bins...</p>';
+              const data = await apiFetch("/bin-master/all");
+              _binMasterData = data.bins || [];
+              _bmLoaded = true;
+            }
+            renderBinMasterTable(page || 1);
+          } catch(err) {
+            const container = document.getElementById("binMasterListContainer");
+            if(container) container.innerHTML = '<p style="color:red;padding:12px;">Error: ' + esc(err.message) + '</p>';
+          }
+        }
+        
+        function renderBinMasterTable(page) {
+          page = page || 1;
+          const container = document.getElementById("binMasterListContainer");
+          if (!container) return;
+
+          const q = (
+            document.getElementById("binMasterSearch")?.value || ""
+          ).toLowerCase().trim();
+          
+          let data = [..._binMasterData];
+          if (q) {
+             data = data.filter(b => 
+                (b.BinCode || "").toLowerCase().includes(q) ||
+                (b.ZoneCode || "").toLowerCase().includes(q) ||
+                (b.Aisle || "").toLowerCase().includes(q) ||
+                (b.Chamber || "").toLowerCase().includes(q) ||
+                (b.Zone || "").toLowerCase().includes(q) ||
+                String(b.BinRanking || "").includes(q)
+             );
+          }
+
+          data.sort((a,b) => {
+               let va = a[_bmSortCol] || "";
+               let vb = b[_bmSortCol] || "";
+               if (_bmSortCol === 'BinRanking') {
+                   va = parseFloat(va) || 0;
+                   vb = parseFloat(vb) || 0;
+                   return _bmSortAsc ? va - vb : vb - va;
+               }
+               return _bmSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+          });
+
+          currentBinMasterPage = page;
+          const limit = 50;
+          const total = data.length;
+          totalBinMasterPages = Math.ceil(total / limit) || 1;
+          if (page > totalBinMasterPages) page = totalBinMasterPages;
+          const skip = (page - 1) * limit;
+
+          const paginated = data.slice(skip, skip + limit);
+
+          if (paginated.length === 0) {
+            container.innerHTML = '<p style="color:#888;padding:12px;">No bin records found.</p>';
             return;
           }
 
@@ -8829,72 +8855,78 @@
 
           var badge = function (text, color) {
             return (
-              '<span style="background:' +
-              color +
-              ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">' +
+              '<span style="background:' + color + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">' +
               esc(text) +
               "</span>"
             );
           };
 
+          function header(lbl, col) {
+             const ico = _bmSortCol === col ? (_bmSortAsc ? '&#9650;' : '&#9660;') : '';
+             return '<th style="cursor:pointer;-webkit-user-select:none;" onclick="sortBinMaster(\'' + col + '\')">' + lbl + ' ' + ico + '</th>';
+          }
+
           var html =
             '<p style="font-size:12px;color:#666;margin-bottom:6px;">Showing ' +
-            ((page - 1) * 50 + 1) +
+            (skip + 1) +
             "–" +
-            Math.min(page * 50, total) +
+            Math.min(skip + limit, total) +
             " of " +
             total.toLocaleString() +
             " bins</p>";
+
           html +=
-            '<div style="overflow-x:auto;"><table class="data-table"><thead><tr>' +
-            "<th>#</th><th>Bin Code</th><th>Aisle</th><th>Chamber</th><th>Bin Ranking</th><th>Zone Code</th><th>Zone</th>" +
+            '<table class="data-table" style="margin-top:10px;">' +
+            "<thead><tr>" +
+            '<th style="width:40px">#</th>' +
+            header('Bin Code', 'BinCode') +
+            header('Aisle', 'Aisle') +
+            header('Chamber', 'Chamber') +
+            header('Bin Ranking', 'BinRanking') +
+            header('Zone Code', 'ZoneCode') +
+            header('Zone', 'Zone') +
             "</tr></thead><tbody>";
 
-          bins.forEach(function (b, i) {
-            var ranking = b.BinRanking ?? 0;
-            var zone =
-              ranking > 0 ? "Display" : ranking < 0 ? "Upper" : "Floor";
-            var zc = esc(b.ZoneCode || "");
-            var aisleText = b.Aisle
-              ? b.Aisle
-              : '<span style="color:#bbb;">—</span>';
-            var chamberBadge = b.Chamber
-              ? badge(b.Chamber, chamberColor(b.Chamber))
-              : '<span style="color:#bbb;">—</span>';
+          for (var i = 0; i < paginated.length; i++) {
+            var b = paginated[i];
+            html += "<tr>";
+            html += "<td>" + (skip + i + 1) + "</td>";
             html +=
-              "<tr>" +
+              '<td style="font-weight:700;color:#2e7d32;white-space:nowrap;">' +
+              esc(b.BinCode || "") +
+              "</td>";
+            html +=
+              '<td style="color:#0d47a1;font-weight:600">' +
+              esc(b.Aisle || "") +
+              "</td>";
+            html +=
               "<td>" +
-              ((page - 1) * 50 + i + 1) +
-              "</td>" +
-              "<td><strong>" +
-              esc(b.BinCode) +
-              "</strong></td>" +
-              "<td style='font-weight:700;color:#1565c0;'>" +
-              aisleText +
-              "</td>" +
+              (b.Chamber
+                ? badge(b.Chamber, chamberColor(b.Chamber))
+                : "") +
+              "</td>";
+            html += "<td>" + (b.BinRanking || 0) + "</td>";
+            html +=
+              '<td style="font-weight:600;color:#1565c0">' +
+              esc(b.ZoneCode || "") +
+              "</td>";
+            html +=
               "<td>" +
-              chamberBadge +
-              "</td>" +
-              "<td>" +
-              ranking +
-              "</td>" +
-              '<td><span style="font-weight:600;color:#1565c0;">' +
-              zc +
-              "</span></td>" +
-              "<td>" +
-              badge(zone, zoneColor(zone)) +
-              "</td>" +
-              "</tr>";
-          });
-
-          html += "</tbody></table></div>";
+              (b.Zone
+                ? badge(b.Zone, zoneColor(b.Zone))
+                : "") +
+              "</td>";
+            html += "</tr>";
+          }
+          html += "</tbody></table>";
 
           if (totalBinMasterPages > 1) {
-            html += '<div class="pagination">';
+            html +=
+              '<div style="margin-top:12px;display:flex;gap:6px;justify-content:center;">';
             html +=
               "<button " +
               (page <= 1 ? "disabled" : "") +
-              ' onclick="loadBinMasterList(' +
+              ' onclick="renderBinMasterTable(' +
               (page - 1) +
               ')">Prev</button>';
             html +=
@@ -8906,20 +8938,14 @@
             html +=
               "<button " +
               (page >= totalBinMasterPages ? "disabled" : "") +
-              ' onclick="loadBinMasterList(' +
+              ' onclick="renderBinMasterTable(' +
               (page + 1) +
               ')">Next</button>';
             html += "</div>";
           }
 
           container.innerHTML = html;
-        } catch (err) {
-          container.innerHTML =
-            '<p style="color:red;padding:12px;">Error: ' +
-            esc(err.message) +
-            "</p>";
         }
-      }
 
       async function clearAllBinContent() {
         if (

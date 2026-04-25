@@ -131,6 +131,21 @@ function parseBinMasterCsv(csvText) {
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
+// GET /api/bin-master/all
+router.get("/all", async (req, res) => {
+  try {
+    const rawBins = await BinMaster.find({}, { _id: 0, BinCode: 1, BinRanking: 1, ZoneCode: 1 }).lean();
+    const bins = rawBins.map((b) => {
+      const { aisle, chamber } = deriveAisleAndChamber(b.BinCode);
+      const zone = rankingToZone(b.BinRanking || 0);
+      return { ...b, Aisle: aisle, Chamber: chamber, Zone: zone };
+    });
+    res.json({ success: true, bins });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/bin-master/stats
 router.get("/stats", async (req, res) => {
   try {
