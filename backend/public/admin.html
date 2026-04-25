@@ -3992,7 +3992,6 @@
               <input id="newCatName" class="search-box" style="margin:0;flex:2;min-width:140px" placeholder="Category Name" />
               <input id="newCatBuyer" class="search-box" style="margin:0;flex:1;min-width:100px" placeholder="Buyer" />
               <input id="newCatPicker" class="search-box" style="margin:0;flex:1;min-width:100px" placeholder="Picker" />
-              <input id="newCatStore" class="search-box" style="margin:0;flex:1;min-width:100px" placeholder="Store Code" />
               <button class="btn btn-primary" style="flex:0 0 auto" onclick="createCategory()">Add</button>
             </div>
             <div id="catCreateResult"></div>
@@ -4017,12 +4016,11 @@
                     <th>Category Name</th>
                     <th>Buyer</th>
                     <th>Picker</th>
-                    <th>Store Code</th>
                     <th style="width:120px">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="catTableBody">
-                  <tr><td colspan="6" style="text-align:center;color:#888">Loading…</td></tr>
+                  <tr><td colspan="5" style="text-align:center;color:#888">Loading…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -8969,7 +8967,7 @@
           _catData = res.data || [];
           renderCatTable();
         } catch (err) {
-          if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="color:#c62828;text-align:center">' + esc(err.message) + "</td></tr>";
+          if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="color:#c62828;text-align:center">' + esc(err.message) + "</td></tr>";
         }
       }
 
@@ -8977,7 +8975,7 @@
         const tbody = document.getElementById("catTableBody");
         if (!tbody) return;
         if (!_catData.length) {
-          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888">No categories yet.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888">No categories yet.</td></tr>';
           return;
         }
         tbody.innerHTML = _catData.map((c) => catRow(c, false)).join("");
@@ -8991,7 +8989,6 @@
             <td><input class="search-box" style="margin:0;width:100%" id="ced-name-${id}" value="${esc(c.categoryName)}" /></td>
             <td><input class="search-box" style="margin:0;width:100%" id="ced-buyer-${id}" value="${esc(c.buyer)}" /></td>
             <td><input class="search-box" style="margin:0;width:100%" id="ced-picker-${id}" value="${esc(c.picker)}" /></td>
-            <td><input class="search-box" style="margin:0;width:100%" id="ced-store-${id}" value="${esc(c.storeCode)}" /></td>
             <td>
               <button class="btn-sm" style="background:#2e7d32;color:#fff" onclick="saveCategoryEdit('${id}')">&#10003;</button>
               <button class="btn-sm" style="background:#555;color:#fff" onclick="renderCatTable()">&#10007;</button>
@@ -9003,7 +9000,6 @@
           <td>${esc(c.categoryName)}</td>
           <td>${esc(c.buyer)}</td>
           <td>${esc(c.picker)}</td>
-          <td>${esc(c.storeCode)}</td>
           <td>
             <button class="btn-sm" style="background:#1565c0;color:#fff" onclick="editCategoryRow('${id}')">&#9998;</button>
             <button class="btn-sm" style="background:#c62828;color:#fff" onclick="deleteCategory('${id}')">&#128465;</button>
@@ -9024,7 +9020,6 @@
           categoryName: document.getElementById("ced-name-" + id).value.trim(),
           buyer: document.getElementById("ced-buyer-" + id).value.trim(),
           picker: document.getElementById("ced-picker-" + id).value.trim(),
-          storeCode: document.getElementById("ced-store-" + id).value.trim(),
         };
         try {
           const res = await apiFetch("/template/categories/" + id, { method: "PUT", body: JSON.stringify(body) });
@@ -9057,14 +9052,13 @@
           categoryName: document.getElementById("newCatName").value.trim(),
           buyer: document.getElementById("newCatBuyer").value.trim(),
           picker: document.getElementById("newCatPicker").value.trim(),
-          storeCode: document.getElementById("newCatStore").value.trim(),
         };
         try {
           const res = await apiFetch("/template/categories", { method: "POST", body: JSON.stringify(body) });
           _catData.push(res.data);
           _catData.sort((a, b) => a.categoryCode.localeCompare(b.categoryCode));
           renderCatTable();
-          ["newCatCode", "newCatName", "newCatBuyer", "newCatPicker", "newCatStore"].forEach((id) => {
+          ["newCatCode", "newCatName", "newCatBuyer", "newCatPicker"].forEach((id) => {
             document.getElementById(id).value = "";
           });
           showMsg("catCreateResult", "Category created.", "green");
@@ -9075,7 +9069,7 @@
 
       function exportCategoriesCSV() {
         if (!_catData.length) return;
-        const header = ["categoryCode", "categoryName", "buyer", "picker", "storeCode"];
+        const header = ["categoryCode", "categoryName", "buyer", "picker"];
         const rows = [header, ..._catData.map((c) => header.map((h) => c[h] ?? ""))];
         const csv = rows.map((r) => r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\r\n");
         const blob = new Blob([csv], { type: "text/csv" });

@@ -45,8 +45,7 @@ router.post("/categories/import", requireDB, requireAuth, requireAdmin, async (r
             categoryName: row.categoryName ?? "",
             buyer: row.buyer ?? "",
             picker: row.picker ?? "",
-            storeCode: row.storeCode ?? "",
-            updatedAt: new Date(),
+                        updatedAt: new Date(),
           },
         },
         { upsert: true }
@@ -62,7 +61,7 @@ router.post("/categories/import", requireDB, requireAuth, requireAdmin, async (r
 // POST /api/template/categories
 router.post("/categories", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { categoryCode, categoryName, buyer, picker, storeCode } = req.body;
+    const { categoryCode, categoryName, buyer, picker } = req.body;
     if (!categoryCode) {
       return res.status(400).json({ success: false, error: "categoryCode is required." });
     }
@@ -71,8 +70,7 @@ router.post("/categories", requireDB, requireAuth, requireAdmin, async (req, res
       categoryName: categoryName ?? "",
       buyer: buyer ?? "",
       picker: picker ?? "",
-      storeCode: storeCode ?? "",
-    });
+          });
     res.json({ success: true, data: cat });
   } catch (err) {
     if (err.code === 11000) {
@@ -85,10 +83,10 @@ router.post("/categories", requireDB, requireAuth, requireAdmin, async (req, res
 // PUT /api/template/categories/:id
 router.put("/categories/:id", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { categoryCode, categoryName, buyer, picker, storeCode } = req.body;
+    const { categoryCode, categoryName, buyer, picker } = req.body;
     const cat = await CategoryMaster.findByIdAndUpdate(
       req.params.id,
-      { $set: { categoryCode, categoryName, buyer, picker, storeCode, updatedAt: new Date() } },
+      { $set: { categoryCode, categoryName, buyer, picker, updatedAt: new Date() } },
       { new: true, runValidators: true }
     );
     if (!cat) return res.status(404).json({ success: false, error: "Category not found." });
