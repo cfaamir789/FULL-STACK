@@ -185,8 +185,8 @@ server.listen(PORT, "0.0.0.0", () => {
     const selfUrl = process.env.RENDER_EXTERNAL_URL
       ? `${process.env.RENDER_EXTERNAL_URL}/api/health`
       : process.env.RAILWAY_PUBLIC_DOMAIN
-      ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/api/health`
-      : `https://fullstck-production.up.railway.app/api/health`;
+        ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/api/health`
+        : `https://fullstck-production.up.railway.app/api/health`;
 
     // Also ping the other deployment to keep it warm
     const otherUrl = selfUrl.includes("railway")
@@ -199,8 +199,17 @@ server.listen(PORT, "0.0.0.0", () => {
         .on("error", () => {});
     };
     // First ping after 30s, then every 4 minutes
-    setTimeout(() => { ping(selfUrl); ping(otherUrl); }, 30 * 1000);
-    setInterval(() => { ping(selfUrl); ping(otherUrl); }, 4 * 60 * 1000);
+    setTimeout(() => {
+      ping(selfUrl);
+      ping(otherUrl);
+    }, 30 * 1000);
+    setInterval(
+      () => {
+        ping(selfUrl);
+        ping(otherUrl);
+      },
+      4 * 60 * 1000,
+    );
     console.log("Keep-alive ping enabled (every 4 min) for self + partner");
   }
 });

@@ -134,7 +134,10 @@ function parseBinMasterCsv(csvText) {
 // GET /api/bin-master/all
 router.get("/all", async (req, res) => {
   try {
-    const rawBins = await BinMaster.find({}, { _id: 0, BinCode: 1, BinRanking: 1, ZoneCode: 1 }).lean();
+    const rawBins = await BinMaster.find(
+      {},
+      { _id: 0, BinCode: 1, BinRanking: 1, ZoneCode: 1 },
+    ).lean();
     const bins = rawBins.map((b) => {
       const { aisle, chamber } = deriveAisleAndChamber(b.BinCode);
       const zone = rankingToZone(b.BinRanking || 0);

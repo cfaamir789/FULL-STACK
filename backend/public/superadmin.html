@@ -844,12 +844,7 @@
               </div>
               <button
                 class="btn btn-outline btn-sm"
-                onclick="
-                  copyUrl(
-                    'https://fullstck.onrender.com/admin/',
-                    this,
-                  )
-                "
+                onclick="copyUrl('https://fullstck.onrender.com/admin/', this)"
                 style="flex-shrink: 0"
               >
                 &#128203; Copy
@@ -1320,7 +1315,7 @@
       const SERVERS = [
         window.location.origin,
         "https://fullstck-production.up.railway.app",
-        "https://fullstck.onrender.com"
+        "https://fullstck.onrender.com",
       ];
       const UNIQUE_SERVERS = [...new Set(SERVERS)];
       let API = window.location.origin + "/api";

@@ -1647,7 +1647,9 @@
           Bin Content
         </button>
         <button id="navUsers" onclick="switchPage('users')">Users</button>
-        <button id="navTemplate" onclick="switchPage('template')">Template</button>
+        <button id="navTemplate" onclick="switchPage('template')">
+          Template
+        </button>
       </div>
 
       <div id="pageDashboard" class="panel-page">
@@ -3795,116 +3797,341 @@
            ════════════════════════════════════════════════════════════════════ -->
       <div id="pageTemplate" class="panel-page hidden">
         <div class="section-rail">
-          <button class="section-chip active" id="tmplChipCategories" onclick="tmplShowSection('categories')">Categories</button>
-          <button class="section-chip" id="tmplChipStores" onclick="tmplShowSection('stores')">Stores</button>
-          <button class="section-chip" id="tmplChipBins" onclick="tmplShowSection('bins')">Bin Master</button>
+          <button
+            class="section-chip active"
+            id="tmplChipCategories"
+            onclick="tmplShowSection('categories')"
+          >
+            Categories
+          </button>
+          <button
+            class="section-chip"
+            id="tmplChipStores"
+            onclick="tmplShowSection('stores')"
+          >
+            Stores
+          </button>
+          <button
+            class="section-chip"
+            id="tmplChipBins"
+            onclick="tmplShowSection('bins')"
+          >
+            Bin Master
+          </button>
         </div>
 
         <!-- ── Categories ── -->
         <div id="tmplSectionCategories">
           <div class="card">
             <h2>&#10133; Add Category</h2>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-              <input id="newCatCode" class="search-box" style="margin:0;flex:1;min-width:120px" placeholder="Category Code *" />
-              <input id="newCatName" class="search-box" style="margin:0;flex:2;min-width:140px" placeholder="Category Name" />
-              <input id="newCatBuyer" class="search-box" style="margin:0;flex:1;min-width:100px" placeholder="Buyer" />
-              <input id="newCatPicker" class="search-box" style="margin:0;flex:1;min-width:140px" placeholder="Picker/Incharge" />
-              <button class="btn btn-primary" style="flex:0 0 auto" onclick="createCategory()">Add</button>
+            <div
+              style="
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                margin-bottom: 8px;
+              "
+            >
+              <input
+                id="newCatCode"
+                class="search-box"
+                style="margin: 0; flex: 1; min-width: 120px"
+                placeholder="Category Code *"
+              />
+              <input
+                id="newCatName"
+                class="search-box"
+                style="margin: 0; flex: 2; min-width: 140px"
+                placeholder="Category Name"
+              />
+              <input
+                id="newCatBuyer"
+                class="search-box"
+                style="margin: 0; flex: 1; min-width: 100px"
+                placeholder="Buyer"
+              />
+              <input
+                id="newCatPicker"
+                class="search-box"
+                style="margin: 0; flex: 1; min-width: 140px"
+                placeholder="Picker/Incharge"
+              />
+              <button
+                class="btn btn-primary"
+                style="flex: 0 0 auto"
+                onclick="createCategory()"
+              >
+                Add
+              </button>
             </div>
             <div id="catCreateResult"></div>
           </div>
           <div class="card">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <h2 style="margin:0">&#128230; Categories</h2>
-                <input id="catSearchBox" type="text" class="search-box" style="margin:0;min-width:200px" placeholder="Search categories..." oninput="renderCatTable()" onkeyup="renderCatTable()" />
-                <select class="bin-sort-select" id="catFilterBuyer" onchange="renderCatTable()" style="min-width:150px;">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-bottom: 12px;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  flex-wrap: wrap;
+                "
+              >
+                <h2 style="margin: 0">&#128230; Categories</h2>
+                <input
+                  id="catSearchBox"
+                  type="text"
+                  class="search-box"
+                  style="margin: 0; min-width: 200px"
+                  placeholder="Search categories..."
+                  oninput="renderCatTable()"
+                  onkeyup="renderCatTable()"
+                />
+                <select
+                  class="bin-sort-select"
+                  id="catFilterBuyer"
+                  onchange="renderCatTable()"
+                  style="min-width: 150px"
+                >
                   <option value="">All Buyers</option>
                 </select>
-                <select class="bin-sort-select" id="catFilterPicker" onchange="renderCatTable()" style="min-width:160px;">
+                <select
+                  class="bin-sort-select"
+                  id="catFilterPicker"
+                  onchange="renderCatTable()"
+                  style="min-width: 160px"
+                >
                   <option value="">All Pickers</option>
                 </select>
               </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button class="btn-sm" onclick="exportCategoriesCSV()" style="background:#1565c0;color:#fff">&#11015; CSV</button>
-                <label class="btn-sm" style="background:#37474f;color:#fff;cursor:pointer">
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button
+                  class="btn-sm"
+                  onclick="exportCategoriesCSV()"
+                  style="background: #1565c0; color: #fff"
+                >
+                  &#11015; CSV
+                </button>
+                <label
+                  class="btn-sm"
+                  style="background: #37474f; color: #fff; cursor: pointer"
+                >
                   &#11014; Import CSV
-                  <input type="file" accept=".csv" style="display:none" onchange="importCategoriesCSV(this)" />
+                  <input
+                    type="file"
+                    accept=".csv"
+                    style="display: none"
+                    onchange="importCategoriesCSV(this)"
+                  />
                 </label>
-                <button class="btn-sm" onclick="loadTemplateCategories()" style="background:#333;color:#fff">&#8635; Refresh</button>
+                <button
+                  class="btn-sm"
+                  onclick="loadTemplateCategories()"
+                  style="background: #333; color: #fff"
+                >
+                  &#8635; Refresh
+                </button>
               </div>
             </div>
-            <div id="catTableWrap" style="overflow-x:auto">
-              <table class="data-table" style="width:100%;min-width:600px">
+            <div id="catTableWrap" style="overflow-x: auto">
+              <table class="data-table" style="width: 100%; min-width: 600px">
                 <thead>
                   <tr>
-                    <th style="cursor:pointer" onclick="sortCategories('categoryCode')">Category Code <span id="sort-cat-categoryCode"></span></th>
-                    <th style="cursor:pointer" onclick="sortCategories('categoryName')">Category Name <span id="sort-cat-categoryName"></span></th>
-                    <th style="cursor:pointer" onclick="sortCategories('buyer')">Buyer <span id="sort-cat-buyer"></span></th>
-                    <th style="cursor:pointer" onclick="sortCategories('picker')">Picker / Incharge <span id="sort-cat-picker"></span></th>
-                    <th style="width:120px">Actions</th>
+                    <th
+                      style="cursor: pointer"
+                      onclick="sortCategories('categoryCode')"
+                    >
+                      Category Code <span id="sort-cat-categoryCode"></span>
+                    </th>
+                    <th
+                      style="cursor: pointer"
+                      onclick="sortCategories('categoryName')"
+                    >
+                      Category Name <span id="sort-cat-categoryName"></span>
+                    </th>
+                    <th
+                      style="cursor: pointer"
+                      onclick="sortCategories('buyer')"
+                    >
+                      Buyer <span id="sort-cat-buyer"></span>
+                    </th>
+                    <th
+                      style="cursor: pointer"
+                      onclick="sortCategories('picker')"
+                    >
+                      Picker / Incharge <span id="sort-cat-picker"></span>
+                    </th>
+                    <th style="width: 120px">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="catTableBody">
-                  <tr><td colspan="5" style="text-align:center;color:#888">Loading…</td></tr>
+                  <tr>
+                    <td colspan="5" style="text-align: center; color: #888">
+                      Loading…
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
-            <div id="catTableMsg" style="margin-top:8px"></div>
+            <div id="catTableMsg" style="margin-top: 8px"></div>
           </div>
         </div>
 
         <!-- ── Stores ── -->
-        <div id="tmplSectionStores" style="display:none">
+        <div id="tmplSectionStores" style="display: none">
           <div class="card">
             <h2>&#10133; Add Store</h2>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-              <input id="newStoreCode" class="search-box" style="margin:0;flex:1;min-width:120px" placeholder="Store Code *" />
-              <input id="newStoreName" class="search-box" style="margin:0;flex:2;min-width:160px" placeholder="Store Name" />
-              <input id="newPickingDay" class="search-box" style="margin:0;flex:1;min-width:120px" placeholder="Picking Day" />
-              <button class="btn btn-primary" style="flex:0 0 auto" onclick="createStore()">Add</button>
+            <div
+              style="
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+                margin-bottom: 8px;
+              "
+            >
+              <input
+                id="newStoreCode"
+                class="search-box"
+                style="margin: 0; flex: 1; min-width: 120px"
+                placeholder="Store Code *"
+              />
+              <input
+                id="newStoreName"
+                class="search-box"
+                style="margin: 0; flex: 2; min-width: 160px"
+                placeholder="Store Name"
+              />
+              <input
+                id="newPickingDay"
+                class="search-box"
+                style="margin: 0; flex: 1; min-width: 120px"
+                placeholder="Picking Day"
+              />
+              <button
+                class="btn btn-primary"
+                style="flex: 0 0 auto"
+                onclick="createStore()"
+              >
+                Add
+              </button>
             </div>
             <div id="storeCreateResult"></div>
           </div>
           <div class="card">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
-              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                <h2 style="margin:0">&#127978; Stores</h2>
-                <input id="storeSearchBox" type="text" class="search-box" style="margin:0;min-width:200px" placeholder="Search stores..." oninput="renderStoreTable()" onkeyup="renderStoreTable()" />
-                <select class="bin-sort-select" id="storeFilterPickingDay" onchange="renderStoreTable()" style="min-width:160px;">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-bottom: 12px;
+              "
+            >
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  gap: 10px;
+                  flex-wrap: wrap;
+                "
+              >
+                <h2 style="margin: 0">&#127978; Stores</h2>
+                <input
+                  id="storeSearchBox"
+                  type="text"
+                  class="search-box"
+                  style="margin: 0; min-width: 200px"
+                  placeholder="Search stores..."
+                  oninput="renderStoreTable()"
+                  onkeyup="renderStoreTable()"
+                />
+                <select
+                  class="bin-sort-select"
+                  id="storeFilterPickingDay"
+                  onchange="renderStoreTable()"
+                  style="min-width: 160px"
+                >
                   <option value="">All Picking Days</option>
                 </select>
               </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button class="btn-sm" onclick="exportStoresCSV()" style="background:#1565c0;color:#fff">&#11015; CSV</button>
-                <label class="btn-sm" style="background:#37474f;color:#fff;cursor:pointer">
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button
+                  class="btn-sm"
+                  onclick="exportStoresCSV()"
+                  style="background: #1565c0; color: #fff"
+                >
+                  &#11015; CSV
+                </button>
+                <label
+                  class="btn-sm"
+                  style="background: #37474f; color: #fff; cursor: pointer"
+                >
                   &#11014; Import CSV
-                  <input type="file" accept=".csv" style="display:none" onchange="importStoresCSV(this)" />
+                  <input
+                    type="file"
+                    accept=".csv"
+                    style="display: none"
+                    onchange="importStoresCSV(this)"
+                  />
                 </label>
-                <button class="btn-sm" onclick="loadTemplateStores()" style="background:#333;color:#fff">&#8635; Refresh</button>
+                <button
+                  class="btn-sm"
+                  onclick="loadTemplateStores()"
+                  style="background: #333; color: #fff"
+                >
+                  &#8635; Refresh
+                </button>
               </div>
             </div>
-            <div id="storeTableWrap" style="overflow-x:auto">
-              <table class="data-table" style="width:100%;min-width:360px">
+            <div id="storeTableWrap" style="overflow-x: auto">
+              <table class="data-table" style="width: 100%; min-width: 360px">
                 <thead>
                   <tr>
-                    <th style="cursor:pointer" onclick="sortStores('storeCode')">Store Code <span id="sort-store-storeCode"></span></th>
-                    <th style="cursor:pointer" onclick="sortStores('storeName')">Store Name <span id="sort-store-storeName"></span></th>
-                    <th style="cursor:pointer" onclick="sortStores('pickingDay')">Picking Day <span id="sort-store-pickingDay"></span></th>
-                    <th style="width:120px">Actions</th>
+                    <th
+                      style="cursor: pointer"
+                      onclick="sortStores('storeCode')"
+                    >
+                      Store Code <span id="sort-store-storeCode"></span>
+                    </th>
+                    <th
+                      style="cursor: pointer"
+                      onclick="sortStores('storeName')"
+                    >
+                      Store Name <span id="sort-store-storeName"></span>
+                    </th>
+                    <th
+                      style="cursor: pointer"
+                      onclick="sortStores('pickingDay')"
+                    >
+                      Picking Day <span id="sort-store-pickingDay"></span>
+                    </th>
+                    <th style="width: 120px">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="storeTableBody">
-                  <tr><td colspan="3" style="text-align:center;color:#888">Loading…</td></tr>
+                  <tr>
+                    <td colspan="3" style="text-align: center; color: #888">
+                      Loading…
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
-            <div id="storeTableMsg" style="margin-top:8px"></div>
+            <div id="storeTableMsg" style="margin-top: 8px"></div>
           </div>
         </div>
 
         <!-- ── Bin Master (reuses existing functionality) ── -->
-        <div id="tmplSectionBins" style="display:none">
+        <div id="tmplSectionBins" style="display: none">
           <!-- BinMaster Upload Card -->
           <div
             class="card"
@@ -4074,27 +4301,73 @@
                   id="binMasterListBody"
                   style="display: none; margin-top: 10px"
                 >
-                  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
-                    <input type="text" class="search-box" id="binMasterSearch" placeholder="Search by code, aisle, chamber, zone..." oninput="debouncedBinMasterSearch()" style="flex:1;min-width:180px;margin:0;" />
-                    <select class="bin-sort-select" id="bmFilterAisle" onchange="renderBinMasterTable(1)" style="min-width:130px;">
+                  <div
+                    style="
+                      display: flex;
+                      gap: 8px;
+                      flex-wrap: wrap;
+                      margin-bottom: 10px;
+                      align-items: center;
+                    "
+                  >
+                    <input
+                      type="text"
+                      class="search-box"
+                      id="binMasterSearch"
+                      placeholder="Search by code, aisle, chamber, zone..."
+                      oninput="debouncedBinMasterSearch()"
+                      style="flex: 1; min-width: 180px; margin: 0"
+                    />
+                    <select
+                      class="bin-sort-select"
+                      id="bmFilterAisle"
+                      onchange="renderBinMasterTable(1)"
+                      style="min-width: 130px"
+                    >
                       <option value="">All Aisles</option>
                     </select>
-                    <select class="bin-sort-select" id="bmFilterChamber" onchange="renderBinMasterTable(1)" style="min-width:150px;">
+                    <select
+                      class="bin-sort-select"
+                      id="bmFilterChamber"
+                      onchange="renderBinMasterTable(1)"
+                      style="min-width: 150px"
+                    >
                       <option value="">All Chambers</option>
                     </select>
-                    <select class="bin-sort-select" id="bmFilterZoneCode" onchange="renderBinMasterTable(1)" style="min-width:150px;">
+                    <select
+                      class="bin-sort-select"
+                      id="bmFilterZoneCode"
+                      onchange="renderBinMasterTable(1)"
+                      style="min-width: 150px"
+                    >
                       <option value="">All Zone Codes</option>
                     </select>
-                    <select class="bin-sort-select" id="bmFilterZone" onchange="renderBinMasterTable(1)" style="min-width:130px;">
+                    <select
+                      class="bin-sort-select"
+                      id="bmFilterZone"
+                      onchange="renderBinMasterTable(1)"
+                      style="min-width: 130px"
+                    >
                       <option value="">All Zones</option>
                     </select>
-                    <select class="bin-sort-select" id="bmSort" onchange="bmSortFromDropdown()" style="min-width:190px;">
+                    <select
+                      class="bin-sort-select"
+                      id="bmSort"
+                      onchange="bmSortFromDropdown()"
+                      style="min-width: 190px"
+                    >
                       <option value="BinCode_asc">Bin Code A &#8594; Z</option>
                       <option value="BinCode_desc">Bin Code Z &#8594; A</option>
-                      <option value="BinRanking_asc">Ranking Low &#8594; High</option>
-                      <option value="BinRanking_desc">Ranking High &#8594; Low</option>
+                      <option value="BinRanking_asc">
+                        Ranking Low &#8594; High
+                      </option>
+                      <option value="BinRanking_desc">
+                        Ranking High &#8594; Low
+                      </option>
                       <option value="Aisle_asc">Aisle A &#8594; Z</option>
-                      <option value="ZoneCode_asc">Zone Code A &#8594; Z</option>
+                      <option value="ZoneCode_asc">
+                        Zone Code A &#8594; Z
+                      </option>
                       <option value="Zone_asc">Zone A &#8594; Z</option>
                     </select>
                   </div>
@@ -4103,9 +4376,8 @@
               </div>
             </div>
           </div>
-
-          </div>
         </div>
+      </div>
 
       <div style="text-align: center; padding: 16px">
         <button
@@ -4273,7 +4545,6 @@
           </button>
         </div>
       </div>
-
     </div>
 
     <script>
@@ -4281,7 +4552,7 @@
       const SERVERS = [
         window.location.origin,
         "https://fullstck-production.up.railway.app",
-        "https://fullstck.onrender.com"
+        "https://fullstck.onrender.com",
       ];
       // Remove duplicates (if we're already on one of them)
       const UNIQUE_SERVERS = [...new Set(SERVERS)];
@@ -6100,7 +6371,9 @@
             body: JSON.stringify({ workers: [workerName] }),
           });
           alert(
-            "✅ Phone clear command sent to " + workerName + ".\nTheir app will wipe local history on next sync.\nServer data is untouched.",
+            "✅ Phone clear command sent to " +
+              workerName +
+              ".\nTheir app will wipe local history on next sync.\nServer data is untouched.",
           );
           // Refresh the sync status table
           if (typeof loadWorkerSyncStatus === "function")
@@ -6853,9 +7126,15 @@
         if (key === "diffQty") {
           const diff = tx.diffQty ?? null;
           if (diff !== null && diff < 0) {
-            return '<td style="color:#d32f2f;font-weight:700" title="Insufficient stock in Bin Content registry!">' + diff + "</td>";
+            return (
+              '<td style="color:#d32f2f;font-weight:700" title="Insufficient stock in Bin Content registry!">' +
+              diff +
+              "</td>"
+            );
           } else if (diff !== null) {
-            return '<td style="color:#388e3c;font-weight:600">' + diff + "</td>";
+            return (
+              '<td style="color:#388e3c;font-weight:600">' + diff + "</td>"
+            );
           } else {
             return '<td style="color:#9e9e9e">-</td>';
           }
@@ -6952,7 +7231,8 @@
               actionLabel +
               "</button></td>";
             const txStatus = String(tx.syncStatus || "pending").toLowerCase();
-            const isHistory = txStatus === "processed" || txStatus === "archived";
+            const isHistory =
+              txStatus === "processed" || txStatus === "archived";
             html += isHistory
               ? '<td><span style="color:#aaa;font-size:12px" title="Processed history cannot be deleted">&#128274; History</span></td>'
               : '<td><button class="copy-icon-btn" style="color:#c62828;border-color:#ef9a9a" onclick="deleteSingleTx(\'' +
@@ -7000,7 +7280,9 @@
         const tx = filteredTransactions.find((t) => String(t._id) === txId);
         const status = String(tx?.syncStatus || "pending").toLowerCase();
         if (status === "processed" || status === "archived") {
-          alert("❌ Processed and archived transactions cannot be deleted. They are permanent history.");
+          alert(
+            "❌ Processed and archived transactions cannot be deleted. They are permanent history.",
+          );
           return;
         }
         const label = tx
@@ -7387,12 +7669,14 @@
               alert("No transactions to export.");
               return;
             }
-            
+
             const aoa = [
               headers,
-              ...rows.map((r) => visibleCols.map((c) => getExportCellValue(r, c.key))),
+              ...rows.map((r) =>
+                visibleCols.map((c) => getExportCellValue(r, c.key)),
+              ),
             ];
-            
+
             if (format === "xlsx" && typeof XLSX !== "undefined") {
               const ws = XLSX.utils.aoa_to_sheet(aoa);
               const wb = XLSX.utils.book_new();
@@ -8781,230 +9065,277 @@
         );
       }
 
-              let _binMasterData = [];
-        let _bmSortCol = "BinCode";
-        let _bmSortAsc = true;
-        let _bmLoaded = false;
-        
-        function sortBinMaster(col) {
-          if (_bmSortCol === col) _bmSortAsc = !_bmSortAsc;
-          else { _bmSortCol = col; _bmSortAsc = true; }
-          // Sync sort dropdown if exists
-          const bmSortSel = document.getElementById('bmSort');
-          if (bmSortSel) bmSortSel.value = _bmSortCol + '_' + (_bmSortAsc ? 'asc' : 'desc');
-          renderBinMasterTable(1);
-        }
+      let _binMasterData = [];
+      let _bmSortCol = "BinCode";
+      let _bmSortAsc = true;
+      let _bmLoaded = false;
 
-        function bmSortFromDropdown() {
-          const val = (document.getElementById('bmSort')?.value) || 'BinCode_asc';
-          const parts = val.split('_');
-          _bmSortAsc = parts[parts.length - 1] === 'asc';
-          _bmSortCol = parts.slice(0, parts.length - 1).join('_');
-          renderBinMasterTable(1);
+      function sortBinMaster(col) {
+        if (_bmSortCol === col) _bmSortAsc = !_bmSortAsc;
+        else {
+          _bmSortCol = col;
+          _bmSortAsc = true;
         }
+        // Sync sort dropdown if exists
+        const bmSortSel = document.getElementById("bmSort");
+        if (bmSortSel)
+          bmSortSel.value = _bmSortCol + "_" + (_bmSortAsc ? "asc" : "desc");
+        renderBinMasterTable(1);
+      }
 
-        function populateBinMasterDropdowns() {
-          function fillSelect(id, values, label) {
-            const sel = document.getElementById(id);
-            if (!sel) return;
-            const cur = sel.value;
-            sel.innerHTML = '<option value="">All ' + label + '</option>' +
-              values.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
-            if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
-          }
-          const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort((a,b) => String(a).localeCompare(String(b)));
-          fillSelect('bmFilterAisle',    uniq(_binMasterData.map(b => b.Aisle)),    'Aisles');
-          fillSelect('bmFilterChamber',  uniq(_binMasterData.map(b => b.Chamber)),  'Chambers');
-          fillSelect('bmFilterZoneCode', uniq(_binMasterData.map(b => b.ZoneCode)), 'Zone Codes');
-          fillSelect('bmFilterZone',     uniq(_binMasterData.map(b => b.Zone)),     'Zones');
+      function bmSortFromDropdown() {
+        const val = document.getElementById("bmSort")?.value || "BinCode_asc";
+        const parts = val.split("_");
+        _bmSortAsc = parts[parts.length - 1] === "asc";
+        _bmSortCol = parts.slice(0, parts.length - 1).join("_");
+        renderBinMasterTable(1);
+      }
+
+      function populateBinMasterDropdowns() {
+        function fillSelect(id, values, label) {
+          const sel = document.getElementById(id);
+          if (!sel) return;
+          const cur = sel.value;
+          sel.innerHTML =
+            '<option value="">All ' +
+            label +
+            "</option>" +
+            values
+              .map(
+                (v) => '<option value="' + esc(v) + '">' + esc(v) + "</option>",
+              )
+              .join("");
+          if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
         }
+        const uniq = (arr) =>
+          [...new Set(arr.filter(Boolean))].sort((a, b) =>
+            String(a).localeCompare(String(b)),
+          );
+        fillSelect(
+          "bmFilterAisle",
+          uniq(_binMasterData.map((b) => b.Aisle)),
+          "Aisles",
+        );
+        fillSelect(
+          "bmFilterChamber",
+          uniq(_binMasterData.map((b) => b.Chamber)),
+          "Chambers",
+        );
+        fillSelect(
+          "bmFilterZoneCode",
+          uniq(_binMasterData.map((b) => b.ZoneCode)),
+          "Zone Codes",
+        );
+        fillSelect(
+          "bmFilterZone",
+          uniq(_binMasterData.map((b) => b.Zone)),
+          "Zones",
+        );
+      }
 
-        async function loadBinMasterList(page) {
-          try {
-            if (!_bmLoaded) {
-              const container = document.getElementById("binMasterListContainer");
-              if (container) container.innerHTML = '<p style="color:#888;padding:12px;">Loading ALL bins...</p>';
-              const data = await apiFetch("/bin-master/all");
-              _binMasterData = data.bins || [];
-              _bmLoaded = true;
-              populateBinMasterDropdowns();
-            }
-            renderBinMasterTable(page || 1);
-          } catch(err) {
+      async function loadBinMasterList(page) {
+        try {
+          if (!_bmLoaded) {
             const container = document.getElementById("binMasterListContainer");
-            if(container) container.innerHTML = '<p style="color:red;padding:12px;">Error: ' + esc(err.message) + '</p>';
+            if (container)
+              container.innerHTML =
+                '<p style="color:#888;padding:12px;">Loading ALL bins...</p>';
+            const data = await apiFetch("/bin-master/all");
+            _binMasterData = data.bins || [];
+            _bmLoaded = true;
+            populateBinMasterDropdowns();
           }
-        }
-        
-        function renderBinMasterTable(page) {
-          page = page || 1;
+          renderBinMasterTable(page || 1);
+        } catch (err) {
           const container = document.getElementById("binMasterListContainer");
-          if (!container) return;
-
-          const q = (
-            document.getElementById("binMasterSearch")?.value || ""
-          ).toLowerCase().trim();
-          const fAisle    = document.getElementById('bmFilterAisle')?.value    || '';
-          const fChamber  = document.getElementById('bmFilterChamber')?.value  || '';
-          const fZoneCode = document.getElementById('bmFilterZoneCode')?.value || '';
-          const fZone     = document.getElementById('bmFilterZone')?.value     || '';
-
-          let data = [..._binMasterData];
-          if (q) {
-             data = data.filter(b => 
-                (b.BinCode || "").toLowerCase().includes(q) ||
-                (b.ZoneCode || "").toLowerCase().includes(q) ||
-                (b.Aisle || "").toLowerCase().includes(q) ||
-                (b.Chamber || "").toLowerCase().includes(q) ||
-                (b.Zone || "").toLowerCase().includes(q) ||
-                String(b.BinRanking || "").includes(q)
-             );
-          }
-          if (fAisle)    data = data.filter(b => b.Aisle    === fAisle);
-          if (fChamber)  data = data.filter(b => b.Chamber  === fChamber);
-          if (fZoneCode) data = data.filter(b => b.ZoneCode === fZoneCode);
-          if (fZone)     data = data.filter(b => b.Zone     === fZone);
-
-          data.sort((a,b) => {
-               let va = a[_bmSortCol] || "";
-               let vb = b[_bmSortCol] || "";
-               if (_bmSortCol === 'BinRanking') {
-                   va = parseFloat(va) || 0;
-                   vb = parseFloat(vb) || 0;
-                   return _bmSortAsc ? va - vb : vb - va;
-               }
-               return _bmSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
-          });
-
-          currentBinMasterPage = page;
-          const limit = 50;
-          const total = data.length;
-          totalBinMasterPages = Math.ceil(total / limit) || 1;
-          if (page > totalBinMasterPages) page = totalBinMasterPages;
-          const skip = (page - 1) * limit;
-
-          const paginated = data.slice(skip, skip + limit);
-
-          if (paginated.length === 0) {
-            container.innerHTML = '<p style="color:#888;padding:12px;">No bin records found.</p>';
-            return;
-          }
-
-          // Zone badge color
-          var zoneColor = function (z) {
-            if (!z) return "#888";
-            var l = z.toLowerCase();
-            if (l === "display") return "#2e7d32";
-            if (l === "upper") return "#c62828";
-            if (l === "floor") return "#e65100";
-            return "#1565c0";
-          };
-
-          // Chamber badge color
-          var chamberColor = function (ch) {
-            if (!ch) return "#888";
-            var l = ch.toLowerCase();
-            if (l === "chamber a") return "#1b5e20";
-            if (l === "chamber b") return "#0d47a1";
-            if (l === "chamber c") return "#4a148c";
-            if (l === "high value") return "#e65100";
-            if (l === "bulk warehouse") return "#00695c";
-            return "#546e7a";
-          };
-
-          var badge = function (text, color) {
-            return (
-              '<span style="background:' + color + ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">' +
-              esc(text) +
-              "</span>"
-            );
-          };
-
-          function header(lbl, col) {
-             const ico = _bmSortCol === col ? (_bmSortAsc ? '&#9650;' : '&#9660;') : '';
-             return '<th style="cursor:pointer;-webkit-user-select:none;" onclick="sortBinMaster(\'' + col + '\')">' + lbl + ' ' + ico + '</th>';
-          }
-
-          var html =
-            '<p style="font-size:12px;color:#666;margin-bottom:6px;">Showing ' +
-            (skip + 1) +
-            "–" +
-            Math.min(skip + limit, total) +
-            " of " +
-            total.toLocaleString() +
-            " bins</p>";
-
-          html +=
-            '<table class="data-table" style="margin-top:10px;">' +
-            "<thead><tr>" +
-            '<th style="width:40px">#</th>' +
-            header('Bin Code', 'BinCode') +
-            header('Aisle', 'Aisle') +
-            header('Chamber', 'Chamber') +
-            header('Bin Ranking', 'BinRanking') +
-            header('Zone Code', 'ZoneCode') +
-            header('Zone', 'Zone') +
-            "</tr></thead><tbody>";
-
-          for (var i = 0; i < paginated.length; i++) {
-            var b = paginated[i];
-            html += "<tr>";
-            html += "<td>" + (skip + i + 1) + "</td>";
-            html +=
-              '<td style="font-weight:700;color:#2e7d32;white-space:nowrap;">' +
-              esc(b.BinCode || "") +
-              "</td>";
-            html +=
-              '<td style="color:#0d47a1;font-weight:600">' +
-              esc(b.Aisle || "") +
-              "</td>";
-            html +=
-              "<td>" +
-              (b.Chamber
-                ? badge(b.Chamber, chamberColor(b.Chamber))
-                : "") +
-              "</td>";
-            html += "<td>" + (b.BinRanking || 0) + "</td>";
-            html +=
-              '<td style="font-weight:600;color:#1565c0">' +
-              esc(b.ZoneCode || "") +
-              "</td>";
-            html +=
-              "<td>" +
-              (b.Zone
-                ? badge(b.Zone, zoneColor(b.Zone))
-                : "") +
-              "</td>";
-            html += "</tr>";
-          }
-          html += "</tbody></table>";
-
-          if (totalBinMasterPages > 1) {
-            html +=
-              '<div style="margin-top:12px;display:flex;gap:6px;justify-content:center;">';
-            html +=
-              "<button " +
-              (page <= 1 ? "disabled" : "") +
-              ' onclick="renderBinMasterTable(' +
-              (page - 1) +
-              ')">Prev</button>';
-            html +=
-              '<span style="padding:6px;">' +
-              page +
-              " / " +
-              totalBinMasterPages +
-              "</span>";
-            html +=
-              "<button " +
-              (page >= totalBinMasterPages ? "disabled" : "") +
-              ' onclick="renderBinMasterTable(' +
-              (page + 1) +
-              ')">Next</button>';
-            html += "</div>";
-          }
-
-          container.innerHTML = html;
+          if (container)
+            container.innerHTML =
+              '<p style="color:red;padding:12px;">Error: ' +
+              esc(err.message) +
+              "</p>";
         }
+      }
+
+      function renderBinMasterTable(page) {
+        page = page || 1;
+        const container = document.getElementById("binMasterListContainer");
+        if (!container) return;
+
+        const q = (document.getElementById("binMasterSearch")?.value || "")
+          .toLowerCase()
+          .trim();
+        const fAisle = document.getElementById("bmFilterAisle")?.value || "";
+        const fChamber =
+          document.getElementById("bmFilterChamber")?.value || "";
+        const fZoneCode =
+          document.getElementById("bmFilterZoneCode")?.value || "";
+        const fZone = document.getElementById("bmFilterZone")?.value || "";
+
+        let data = [..._binMasterData];
+        if (q) {
+          data = data.filter(
+            (b) =>
+              (b.BinCode || "").toLowerCase().includes(q) ||
+              (b.ZoneCode || "").toLowerCase().includes(q) ||
+              (b.Aisle || "").toLowerCase().includes(q) ||
+              (b.Chamber || "").toLowerCase().includes(q) ||
+              (b.Zone || "").toLowerCase().includes(q) ||
+              String(b.BinRanking || "").includes(q),
+          );
+        }
+        if (fAisle) data = data.filter((b) => b.Aisle === fAisle);
+        if (fChamber) data = data.filter((b) => b.Chamber === fChamber);
+        if (fZoneCode) data = data.filter((b) => b.ZoneCode === fZoneCode);
+        if (fZone) data = data.filter((b) => b.Zone === fZone);
+
+        data.sort((a, b) => {
+          let va = a[_bmSortCol] || "";
+          let vb = b[_bmSortCol] || "";
+          if (_bmSortCol === "BinRanking") {
+            va = parseFloat(va) || 0;
+            vb = parseFloat(vb) || 0;
+            return _bmSortAsc ? va - vb : vb - va;
+          }
+          return _bmSortAsc
+            ? String(va).localeCompare(String(vb))
+            : String(vb).localeCompare(String(va));
+        });
+
+        currentBinMasterPage = page;
+        const limit = 50;
+        const total = data.length;
+        totalBinMasterPages = Math.ceil(total / limit) || 1;
+        if (page > totalBinMasterPages) page = totalBinMasterPages;
+        const skip = (page - 1) * limit;
+
+        const paginated = data.slice(skip, skip + limit);
+
+        if (paginated.length === 0) {
+          container.innerHTML =
+            '<p style="color:#888;padding:12px;">No bin records found.</p>';
+          return;
+        }
+
+        // Zone badge color
+        var zoneColor = function (z) {
+          if (!z) return "#888";
+          var l = z.toLowerCase();
+          if (l === "display") return "#2e7d32";
+          if (l === "upper") return "#c62828";
+          if (l === "floor") return "#e65100";
+          return "#1565c0";
+        };
+
+        // Chamber badge color
+        var chamberColor = function (ch) {
+          if (!ch) return "#888";
+          var l = ch.toLowerCase();
+          if (l === "chamber a") return "#1b5e20";
+          if (l === "chamber b") return "#0d47a1";
+          if (l === "chamber c") return "#4a148c";
+          if (l === "high value") return "#e65100";
+          if (l === "bulk warehouse") return "#00695c";
+          return "#546e7a";
+        };
+
+        var badge = function (text, color) {
+          return (
+            '<span style="background:' +
+            color +
+            ';color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap;">' +
+            esc(text) +
+            "</span>"
+          );
+        };
+
+        function header(lbl, col) {
+          const ico =
+            _bmSortCol === col ? (_bmSortAsc ? "&#9650;" : "&#9660;") : "";
+          return (
+            '<th style="cursor:pointer;-webkit-user-select:none;" onclick="sortBinMaster(\'' +
+            col +
+            "')\">" +
+            lbl +
+            " " +
+            ico +
+            "</th>"
+          );
+        }
+
+        var html =
+          '<p style="font-size:12px;color:#666;margin-bottom:6px;">Showing ' +
+          (skip + 1) +
+          "–" +
+          Math.min(skip + limit, total) +
+          " of " +
+          total.toLocaleString() +
+          " bins</p>";
+
+        html +=
+          '<table class="data-table" style="margin-top:10px;">' +
+          "<thead><tr>" +
+          '<th style="width:40px">#</th>' +
+          header("Bin Code", "BinCode") +
+          header("Aisle", "Aisle") +
+          header("Chamber", "Chamber") +
+          header("Bin Ranking", "BinRanking") +
+          header("Zone Code", "ZoneCode") +
+          header("Zone", "Zone") +
+          "</tr></thead><tbody>";
+
+        for (var i = 0; i < paginated.length; i++) {
+          var b = paginated[i];
+          html += "<tr>";
+          html += "<td>" + (skip + i + 1) + "</td>";
+          html +=
+            '<td style="font-weight:700;color:#2e7d32;white-space:nowrap;">' +
+            esc(b.BinCode || "") +
+            "</td>";
+          html +=
+            '<td style="color:#0d47a1;font-weight:600">' +
+            esc(b.Aisle || "") +
+            "</td>";
+          html +=
+            "<td>" +
+            (b.Chamber ? badge(b.Chamber, chamberColor(b.Chamber)) : "") +
+            "</td>";
+          html += "<td>" + (b.BinRanking || 0) + "</td>";
+          html +=
+            '<td style="font-weight:600;color:#1565c0">' +
+            esc(b.ZoneCode || "") +
+            "</td>";
+          html +=
+            "<td>" + (b.Zone ? badge(b.Zone, zoneColor(b.Zone)) : "") + "</td>";
+          html += "</tr>";
+        }
+        html += "</tbody></table>";
+
+        if (totalBinMasterPages > 1) {
+          html +=
+            '<div style="margin-top:12px;display:flex;gap:6px;justify-content:center;">';
+          html +=
+            "<button " +
+            (page <= 1 ? "disabled" : "") +
+            ' onclick="renderBinMasterTable(' +
+            (page - 1) +
+            ')">Prev</button>';
+          html +=
+            '<span style="padding:6px;">' +
+            page +
+            " / " +
+            totalBinMasterPages +
+            "</span>";
+          html +=
+            "<button " +
+            (page >= totalBinMasterPages ? "disabled" : "") +
+            ' onclick="renderBinMasterTable(' +
+            (page + 1) +
+            ')">Next</button>';
+          html += "</div>";
+        }
+
+        container.innerHTML = html;
+      }
 
       async function clearAllBinContent() {
         if (
@@ -9035,9 +9366,12 @@
       function tmplShowSection(section) {
         tmplCurrentSection = section;
         ["categories", "stores", "bins"].forEach((s) => {
-          document.getElementById("tmplSection" + s.charAt(0).toUpperCase() + s.slice(1)).style.display =
-            s === section ? "" : "none";
-          const chip = document.getElementById("tmplChip" + s.charAt(0).toUpperCase() + s.slice(1));
+          document.getElementById(
+            "tmplSection" + s.charAt(0).toUpperCase() + s.slice(1),
+          ).style.display = s === section ? "" : "none";
+          const chip = document.getElementById(
+            "tmplChip" + s.charAt(0).toUpperCase() + s.slice(1),
+          );
           if (chip) chip.classList.toggle("active", s === section);
         });
         if (section === "categories") loadTemplateCategories();
@@ -9046,7 +9380,8 @@
       }
 
       async function tmplRefreshCurrentSection() {
-        if (tmplCurrentSection === "categories") return loadTemplateCategories();
+        if (tmplCurrentSection === "categories")
+          return loadTemplateCategories();
         if (tmplCurrentSection === "stores") return loadTemplateStores();
         if (tmplCurrentSection === "bins") return loadBinMasterList(1);
       }
@@ -9058,7 +9393,10 @@
 
       function sortCategories(col) {
         if (_catSortCol === col) _catSortAsc = !_catSortAsc;
-        else { _catSortCol = col; _catSortAsc = true; }
+        else {
+          _catSortCol = col;
+          _catSortAsc = true;
+        }
         renderCatTable();
       }
 
@@ -9067,27 +9405,45 @@
           const sel = document.getElementById(id);
           if (!sel) return;
           const cur = sel.value;
-          sel.innerHTML = '<option value="">All ' + label + '</option>' +
-            values.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+          sel.innerHTML =
+            '<option value="">All ' +
+            label +
+            "</option>" +
+            values
+              .map(
+                (v) => '<option value="' + esc(v) + '">' + esc(v) + "</option>",
+              )
+              .join("");
           // keep current selection only if it still exists in new options
-          if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
-          else sel.value = '';
+          if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
+          else sel.value = "";
         }
-        const uniq = arr => [...new Set(arr.filter(Boolean))].sort((a,b) => a.localeCompare(b));
-        fillSel('catFilterBuyer',  uniq(_catData.map(c => c.buyer)),  'Buyers');
-        fillSel('catFilterPicker', uniq(_catData.map(c => c.picker)), 'Pickers');
+        const uniq = (arr) =>
+          [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        fillSel("catFilterBuyer", uniq(_catData.map((c) => c.buyer)), "Buyers");
+        fillSel(
+          "catFilterPicker",
+          uniq(_catData.map((c) => c.picker)),
+          "Pickers",
+        );
       }
 
       async function loadTemplateCategories() {
         const tbody = document.getElementById("catTableBody");
-        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888">Loading…</td></tr>';
+        if (tbody)
+          tbody.innerHTML =
+            '<tr><td colspan="6" style="text-align:center;color:#888">Loading…</td></tr>';
         try {
           const res = await apiFetch("/template/categories");
           _catData = res.data || [];
           populateCatDropdowns();
           renderCatTable();
         } catch (err) {
-          if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="color:#c62828;text-align:center">' + esc(err.message) + "</td></tr>";
+          if (tbody)
+            tbody.innerHTML =
+              '<tr><td colspan="5" style="color:#c62828;text-align:center">' +
+              esc(err.message) +
+              "</td></tr>";
         }
       }
 
@@ -9095,49 +9451,77 @@
         const tbody = document.getElementById("catTableBody");
         if (!tbody) return;
 
-        ["categoryCode", "categoryName", "buyer", "picker"].forEach(c => {
+        ["categoryCode", "categoryName", "buyer", "picker"].forEach((c) => {
           const el = document.getElementById("sort-cat-" + c);
-          if (el) el.innerHTML = _catSortCol === c ? (_catSortAsc ? "▲" : "▼") : "";
+          if (el)
+            el.innerHTML = _catSortCol === c ? (_catSortAsc ? "▲" : "▼") : "";
         });
 
-        const q = (document.getElementById("catSearchBox")?.value || "").toLowerCase();
-        const fBuyer  = document.getElementById('catFilterBuyer')?.value  || '';
-        const fPicker = document.getElementById('catFilterPicker')?.value || '';
+        const q = (
+          document.getElementById("catSearchBox")?.value || ""
+        ).toLowerCase();
+        const fBuyer = document.getElementById("catFilterBuyer")?.value || "";
+        const fPicker = document.getElementById("catFilterPicker")?.value || "";
 
         // Start with text-search filtered base
         let base = [..._catData];
         if (q) {
-          base = base.filter(c =>
-            (c.categoryCode || "").toLowerCase().includes(q) ||
-            (c.categoryName || "").toLowerCase().includes(q) ||
-            (c.buyer || "").toLowerCase().includes(q) ||
-            (c.picker || "").toLowerCase().includes(q)
+          base = base.filter(
+            (c) =>
+              (c.categoryCode || "").toLowerCase().includes(q) ||
+              (c.categoryName || "").toLowerCase().includes(q) ||
+              (c.buyer || "").toLowerCase().includes(q) ||
+              (c.picker || "").toLowerCase().includes(q),
           );
         }
 
         // Cross-filter: Buyer dropdown shows only buyers available for selected picker
-        const uniq = arr => [...new Set(arr.filter(Boolean))].sort((a,b) => a.localeCompare(b));
-        const forBuyer = fPicker ? base.filter(c => c.picker === fPicker) : base;
-        const forPicker = fBuyer  ? base.filter(c => c.buyer  === fBuyer)  : base;
+        const uniq = (arr) =>
+          [...new Set(arr.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        const forBuyer = fPicker
+          ? base.filter((c) => c.picker === fPicker)
+          : base;
+        const forPicker = fBuyer
+          ? base.filter((c) => c.buyer === fBuyer)
+          : base;
 
         function crossFill(id, values, label, cur) {
           const sel = document.getElementById(id);
           if (!sel) return;
-          sel.innerHTML = '<option value="">All ' + label + '</option>' +
-            values.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
-          if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
-          else sel.value = '';
+          sel.innerHTML =
+            '<option value="">All ' +
+            label +
+            "</option>" +
+            values
+              .map(
+                (v) => '<option value="' + esc(v) + '">' + esc(v) + "</option>",
+              )
+              .join("");
+          if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
+          else sel.value = "";
         }
-        crossFill('catFilterBuyer',  uniq(forBuyer.map(c => c.buyer)),   'Buyers',  fBuyer);
-        crossFill('catFilterPicker', uniq(forPicker.map(c => c.picker)), 'Pickers', fPicker);
+        crossFill(
+          "catFilterBuyer",
+          uniq(forBuyer.map((c) => c.buyer)),
+          "Buyers",
+          fBuyer,
+        );
+        crossFill(
+          "catFilterPicker",
+          uniq(forPicker.map((c) => c.picker)),
+          "Pickers",
+          fPicker,
+        );
 
         // Read updated values (may have been reset)
-        const activeBuyer  = document.getElementById('catFilterBuyer')?.value  || '';
-        const activePicker = document.getElementById('catFilterPicker')?.value || '';
+        const activeBuyer =
+          document.getElementById("catFilterBuyer")?.value || "";
+        const activePicker =
+          document.getElementById("catFilterPicker")?.value || "";
 
         let data = [...base];
-        if (activeBuyer)  data = data.filter(c => c.buyer  === activeBuyer);
-        if (activePicker) data = data.filter(c => c.picker === activePicker);
+        if (activeBuyer) data = data.filter((c) => c.buyer === activeBuyer);
+        if (activePicker) data = data.filter((c) => c.picker === activePicker);
 
         data.sort((a, b) => {
           const va = a[_catSortCol] || "";
@@ -9146,7 +9530,8 @@
         });
 
         if (!data.length) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#888">No categories found.</td></tr>';
+          tbody.innerHTML =
+            '<tr><td colspan="5" style="text-align:center;color:#888">No categories found.</td></tr>';
           return;
         }
         tbody.innerHTML = data.map((c) => catRow(c, false)).join("");
@@ -9193,7 +9578,10 @@
           picker: document.getElementById("ced-picker-" + id).value.trim(),
         };
         try {
-          const res = await apiFetch("/template/categories/" + id, { method: "PUT", body: JSON.stringify(body) });
+          const res = await apiFetch("/template/categories/" + id, {
+            method: "PUT",
+            body: JSON.stringify(body),
+          });
           const idx = _catData.findIndex((x) => x._id === id);
           if (idx !== -1) _catData[idx] = res.data;
           renderCatTable();
@@ -9217,7 +9605,12 @@
 
       async function createCategory() {
         const code = document.getElementById("newCatCode").value.trim();
-        if (!code) return showMsg("catCreateResult", "Category Code is required.", "red");
+        if (!code)
+          return showMsg(
+            "catCreateResult",
+            "Category Code is required.",
+            "red",
+          );
         const body = {
           categoryCode: code,
           categoryName: document.getElementById("newCatName").value.trim(),
@@ -9225,13 +9618,18 @@
           picker: document.getElementById("newCatPicker").value.trim(),
         };
         try {
-          const res = await apiFetch("/template/categories", { method: "POST", body: JSON.stringify(body) });
+          const res = await apiFetch("/template/categories", {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
           _catData.push(res.data);
           _catData.sort((a, b) => a.categoryCode.localeCompare(b.categoryCode));
           renderCatTable();
-          ["newCatCode", "newCatName", "newCatBuyer", "newCatPicker"].forEach((id) => {
-            document.getElementById(id).value = "";
-          });
+          ["newCatCode", "newCatName", "newCatBuyer", "newCatPicker"].forEach(
+            (id) => {
+              document.getElementById(id).value = "";
+            },
+          );
           showMsg("catCreateResult", "Category created.", "green");
         } catch (err) {
           showMsg("catCreateResult", err.message, "red");
@@ -9241,8 +9639,15 @@
       function exportCategoriesCSV() {
         if (!_catData.length) return;
         const header = ["categoryCode", "categoryName", "buyer", "picker"];
-        const rows = [header, ..._catData.map((c) => header.map((h) => c[h] ?? ""))];
-        const csv = rows.map((r) => r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\r\n");
+        const rows = [
+          header,
+          ..._catData.map((c) => header.map((h) => c[h] ?? "")),
+        ];
+        const csv = rows
+          .map((r) =>
+            r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(","),
+          )
+          .join("\r\n");
         const blob = new Blob([csv], { type: "text/csv" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
@@ -9256,23 +9661,58 @@
         input.value = "";
         const text = await file.text();
         const lines = text.split(/\r?\n/).filter((l) => l.trim());
-        if (lines.length < 2) return showMsg("catTableMsg", "Empty file.", "red");
-        const header = lines[0].replace(/^\uFEFF/,"").split(",").map((h) => h.replace(/^"|"$/g, "").trim().toLowerCase());
-        const rows = lines.slice(1).map((line) => {
-          const vals = line.split(",").map((v) => v.replace(/^"|"$/g, "").trim());
-          const obj = {};
-          header.forEach((h, i) => (obj[h] = vals[i] ?? ""));
-          return {
-            categoryCode: obj["categorycode"] || obj["category code"] || obj["code"] || "",
-            categoryName: obj["categoryname"] || obj["category name"] || obj["name"] || "",
-            buyer: obj["buyer"] || "",
-            picker: obj["picker"] || obj["section incharge"] || obj["sectionincharge"] || obj["section"] || obj["incharge"] || ""
-          };
-        }).filter(r => r.categoryCode);
-        if (!rows.length) return showMsg("catTableMsg", "No valid rows found (missing category code).", "red");
+        if (lines.length < 2)
+          return showMsg("catTableMsg", "Empty file.", "red");
+        const header = lines[0]
+          .replace(/^\uFEFF/, "")
+          .split(",")
+          .map((h) => h.replace(/^"|"$/g, "").trim().toLowerCase());
+        const rows = lines
+          .slice(1)
+          .map((line) => {
+            const vals = line
+              .split(",")
+              .map((v) => v.replace(/^"|"$/g, "").trim());
+            const obj = {};
+            header.forEach((h, i) => (obj[h] = vals[i] ?? ""));
+            return {
+              categoryCode:
+                obj["categorycode"] ||
+                obj["category code"] ||
+                obj["code"] ||
+                "",
+              categoryName:
+                obj["categoryname"] ||
+                obj["category name"] ||
+                obj["name"] ||
+                "",
+              buyer: obj["buyer"] || "",
+              picker:
+                obj["picker"] ||
+                obj["section incharge"] ||
+                obj["sectionincharge"] ||
+                obj["section"] ||
+                obj["incharge"] ||
+                "",
+            };
+          })
+          .filter((r) => r.categoryCode);
+        if (!rows.length)
+          return showMsg(
+            "catTableMsg",
+            "No valid rows found (missing category code).",
+            "red",
+          );
         try {
-          const res = await apiFetch("/template/categories/import", { method: "POST", body: JSON.stringify(rows) });
-          showMsg("catTableMsg", "Imported " + res.upserted + " rows.", "green");
+          const res = await apiFetch("/template/categories/import", {
+            method: "POST",
+            body: JSON.stringify(rows),
+          });
+          showMsg(
+            "catTableMsg",
+            "Imported " + res.upserted + " rows.",
+            "green",
+          );
           loadTemplateCategories();
         } catch (err) {
           showMsg("catTableMsg", err.message, "red");
@@ -9286,30 +9726,46 @@
 
       function sortStores(col) {
         if (_storeSortCol === col) _storeSortAsc = !_storeSortAsc;
-        else { _storeSortCol = col; _storeSortAsc = true; }
+        else {
+          _storeSortCol = col;
+          _storeSortAsc = true;
+        }
         renderStoreTable();
       }
 
       function populateStoreDropdowns() {
-        const sel = document.getElementById('storeFilterPickingDay');
+        const sel = document.getElementById("storeFilterPickingDay");
         if (!sel) return;
         const cur = sel.value;
-        const uniq = [...new Set(_storeData.map(s => s.pickingDay).filter(Boolean))].sort((a,b) => a.localeCompare(b));
-        sel.innerHTML = '<option value="">All Picking Days</option>' +
-          uniq.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
-        if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+        const uniq = [
+          ...new Set(_storeData.map((s) => s.pickingDay).filter(Boolean)),
+        ].sort((a, b) => a.localeCompare(b));
+        sel.innerHTML =
+          '<option value="">All Picking Days</option>' +
+          uniq
+            .map(
+              (v) => '<option value="' + esc(v) + '">' + esc(v) + "</option>",
+            )
+            .join("");
+        if ([...sel.options].some((o) => o.value === cur)) sel.value = cur;
       }
 
       async function loadTemplateStores() {
         const tbody = document.getElementById("storeTableBody");
-        if (tbody) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#888">Loading…</td></tr>';
+        if (tbody)
+          tbody.innerHTML =
+            '<tr><td colspan="3" style="text-align:center;color:#888">Loading…</td></tr>';
         try {
           const res = await apiFetch("/template/stores");
           _storeData = res.data || [];
           populateStoreDropdowns();
           renderStoreTable();
         } catch (err) {
-          if (tbody) tbody.innerHTML = '<tr><td colspan="3" style="color:#c62828;text-align:center">' + esc(err.message) + "</td></tr>";
+          if (tbody)
+            tbody.innerHTML =
+              '<tr><td colspan="3" style="color:#c62828;text-align:center">' +
+              esc(err.message) +
+              "</td></tr>";
         }
       }
 
@@ -9317,22 +9773,28 @@
         const tbody = document.getElementById("storeTableBody");
         if (!tbody) return;
 
-        ["storeCode", "storeName", "pickingDay"].forEach(c => {
+        ["storeCode", "storeName", "pickingDay"].forEach((c) => {
           const el = document.getElementById("sort-store-" + c);
-          if (el) el.innerHTML = _storeSortCol === c ? (_storeSortAsc ? "▲" : "▼") : "";
+          if (el)
+            el.innerHTML =
+              _storeSortCol === c ? (_storeSortAsc ? "▲" : "▼") : "";
         });
 
         let data = [..._storeData];
-        const q = (document.getElementById("storeSearchBox")?.value || "").toLowerCase();
-        const fDay = document.getElementById('storeFilterPickingDay')?.value || '';
+        const q = (
+          document.getElementById("storeSearchBox")?.value || ""
+        ).toLowerCase();
+        const fDay =
+          document.getElementById("storeFilterPickingDay")?.value || "";
         if (q) {
-          data = data.filter(s => 
-            (s.storeCode || "").toLowerCase().includes(q) || 
-            (s.storeName || "").toLowerCase().includes(q) ||
-            (s.pickingDay || "").toLowerCase().includes(q)
+          data = data.filter(
+            (s) =>
+              (s.storeCode || "").toLowerCase().includes(q) ||
+              (s.storeName || "").toLowerCase().includes(q) ||
+              (s.pickingDay || "").toLowerCase().includes(q),
           );
         }
-        if (fDay) data = data.filter(s => s.pickingDay === fDay);
+        if (fDay) data = data.filter((s) => s.pickingDay === fDay);
 
         data.sort((a, b) => {
           const va = a[_storeSortCol] || "";
@@ -9341,7 +9803,8 @@
         });
 
         if (!data.length) {
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888">No stores found.</td></tr>';
+          tbody.innerHTML =
+            '<tr><td colspan="4" style="text-align:center;color:#888">No stores found.</td></tr>';
           return;
         }
         tbody.innerHTML = data.map((s) => storeRow(s, false)).join("");
@@ -9353,7 +9816,7 @@
           return `<tr id="storerow-${id}">
             <td><input class="search-box" style="margin:0;width:100%" id="sed-code-${id}" value="${esc(s.storeCode)}" /></td>
             <td><input class="search-box" style="margin:0;width:100%" id="sed-name-${id}" value="${esc(s.storeName)}" /></td>
-            <td><input class="search-box" style="margin:0;width:100%" id="sed-day-${id}" value="${esc(s.pickingDay || '')}" /></td>
+            <td><input class="search-box" style="margin:0;width:100%" id="sed-day-${id}" value="${esc(s.pickingDay || "")}" /></td>
             <td>
               <button class="btn-sm" style="background:#2e7d32;color:#fff" onclick="saveStoreEdit('${id}')">&#10003;</button>
               <button class="btn-sm" style="background:#555;color:#fff" onclick="renderStoreTable()">&#10007;</button>
@@ -9363,7 +9826,7 @@
         return `<tr id="storerow-${id}">
           <td>${esc(s.storeCode)}</td>
           <td>${esc(s.storeName)}</td>
-          <td>${esc(s.pickingDay || '')}</td>
+          <td>${esc(s.pickingDay || "")}</td>
           <td>
             <button class="btn-sm" style="background:#1565c0;color:#fff" onclick="editStoreRow('${id}')">&#9998;</button>
             <button class="btn-sm" style="background:#c62828;color:#fff" onclick="deleteStore('${id}')">&#128465;</button>
@@ -9385,7 +9848,10 @@
           pickingDay: document.getElementById("sed-day-" + id).value.trim(),
         };
         try {
-          const res = await apiFetch("/template/stores/" + id, { method: "PUT", body: JSON.stringify(body) });
+          const res = await apiFetch("/template/stores/" + id, {
+            method: "PUT",
+            body: JSON.stringify(body),
+          });
           const idx = _storeData.findIndex((x) => x._id === id);
           if (idx !== -1) _storeData[idx] = res.data;
           renderStoreTable();
@@ -9409,14 +9875,18 @@
 
       async function createStore() {
         const code = document.getElementById("newStoreCode").value.trim();
-        if (!code) return showMsg("storeCreateResult", "Store Code is required.", "red");
+        if (!code)
+          return showMsg("storeCreateResult", "Store Code is required.", "red");
         const body = {
           storeCode: code,
           storeName: document.getElementById("newStoreName").value.trim(),
           pickingDay: document.getElementById("newPickingDay").value.trim(),
         };
         try {
-          const res = await apiFetch("/template/stores", { method: "POST", body: JSON.stringify(body) });
+          const res = await apiFetch("/template/stores", {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
           _storeData.push(res.data);
           _storeData.sort((a, b) => a.storeCode.localeCompare(b.storeCode));
           renderStoreTable();
@@ -9432,8 +9902,15 @@
       function exportStoresCSV() {
         if (!_storeData.length) return;
         const header = ["storeCode", "storeName", "pickingDay"];
-        const rows = [header, ..._storeData.map((s) => header.map((h) => s[h] ?? ""))];
-        const csv = rows.map((r) => r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\r\n");
+        const rows = [
+          header,
+          ..._storeData.map((s) => header.map((h) => s[h] ?? "")),
+        ];
+        const csv = rows
+          .map((r) =>
+            r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(","),
+          )
+          .join("\r\n");
         const blob = new Blob([csv], { type: "text/csv" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
@@ -9447,23 +9924,47 @@
         input.value = "";
         const text = await file.text();
         const lines = text.split(/\r?\n/).filter((l) => l.trim());
-        if (lines.length < 2) return showMsg("storeTableMsg", "Empty file.", "red");
-        const header = lines[0].replace(/^\uFEFF/,"").split(",").map((h) => h.replace(/^"|"$/g, "").trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
-        const rows = lines.slice(1).map((line) => {
-          const vals = line.split(",").map((v) => v.replace(/^"|"$/g, "").trim());
-          const obj = {};
-          header.forEach((h, i) => (obj[h] = vals[i] ?? ""));
-          // normalise header variants: "store code" / "storecode" → storeCode
-          return {
-            storeCode: obj["storecode"] || obj["store"] || "",
-            storeName: obj["storename"] || obj["name"] || "",
-            pickingDay: obj["pickingday"] || obj["picking"] || obj["day"] || "",
-          };
-        }).filter((r) => r.storeCode);
-        if (!rows.length) return showMsg("storeTableMsg", "No valid rows found.", "red");
+        if (lines.length < 2)
+          return showMsg("storeTableMsg", "Empty file.", "red");
+        const header = lines[0]
+          .replace(/^\uFEFF/, "")
+          .split(",")
+          .map((h) =>
+            h
+              .replace(/^"|"$/g, "")
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, ""),
+          );
+        const rows = lines
+          .slice(1)
+          .map((line) => {
+            const vals = line
+              .split(",")
+              .map((v) => v.replace(/^"|"$/g, "").trim());
+            const obj = {};
+            header.forEach((h, i) => (obj[h] = vals[i] ?? ""));
+            // normalise header variants: "store code" / "storecode" → storeCode
+            return {
+              storeCode: obj["storecode"] || obj["store"] || "",
+              storeName: obj["storename"] || obj["name"] || "",
+              pickingDay:
+                obj["pickingday"] || obj["picking"] || obj["day"] || "",
+            };
+          })
+          .filter((r) => r.storeCode);
+        if (!rows.length)
+          return showMsg("storeTableMsg", "No valid rows found.", "red");
         try {
-          const res = await apiFetch("/template/stores/import", { method: "POST", body: JSON.stringify(rows) });
-          showMsg("storeTableMsg", "Imported " + res.upserted + " rows.", "green");
+          const res = await apiFetch("/template/stores/import", {
+            method: "POST",
+            body: JSON.stringify(rows),
+          });
+          showMsg(
+            "storeTableMsg",
+            "Imported " + res.upserted + " rows.",
+            "green",
+          );
           loadTemplateStores();
         } catch (err) {
           showMsg("storeTableMsg", err.message, "red");
@@ -9475,7 +9976,9 @@
 
       function tmplBinFileChosen(input) {
         _tmplBinFile = input.files[0] || null;
-        document.getElementById("tmplBinFileName").textContent = _tmplBinFile ? _tmplBinFile.name : "No file chosen";
+        document.getElementById("tmplBinFileName").textContent = _tmplBinFile
+          ? _tmplBinFile.name
+          : "No file chosen";
         document.getElementById("tmplBinUploadBtn").disabled = !_tmplBinFile;
       }
 
@@ -9499,18 +10002,29 @@
           });
           const raw = await res.text();
           let data = {};
-          try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error("Server returned invalid response."); }
+          try {
+            data = raw ? JSON.parse(raw) : {};
+          } catch {
+            throw new Error("Server returned invalid response.");
+          }
           if (!res.ok) throw new Error(data.error || "Upload failed");
           resultDiv.innerHTML =
-            '<div class="alert alert-success">&#10004; Done! Upserted: <strong>' + (data.upserted || 0) +
-            "</strong> &nbsp;|&nbsp; Bins updated in content: <strong>" + (data.cascaded || 0) + "</strong></div>";
+            '<div class="alert alert-success">&#10004; Done! Upserted: <strong>' +
+            (data.upserted || 0) +
+            "</strong> &nbsp;|&nbsp; Bins updated in content: <strong>" +
+            (data.cascaded || 0) +
+            "</strong></div>";
           _tmplBinFile = null;
-          document.getElementById("tmplBinFileName").textContent = "No file chosen";
+          document.getElementById("tmplBinFileName").textContent =
+            "No file chosen";
           document.getElementById("tmplBinCsvInput").value = "";
           binMasterListLoaded = false;
           loadBinMasterList(1);
         } catch (err) {
-          resultDiv.innerHTML = '<div class="alert alert-error">&#10008; ' + esc(err.message) + "</div>";
+          resultDiv.innerHTML =
+            '<div class="alert alert-error">&#10008; ' +
+            esc(err.message) +
+            "</div>";
         } finally {
           btn.disabled = false;
           btn.textContent = "&#128640; Upload";
@@ -9520,8 +10034,15 @@
       function showMsg(elId, msg, color) {
         const el = document.getElementById(elId);
         if (!el) return;
-        el.innerHTML = '<span style="color:' + (color === "green" ? "#2e7d32" : "#c62828") + '">' + esc(msg) + "</span>";
-        setTimeout(() => { if (el) el.innerHTML = ""; }, 4000);
+        el.innerHTML =
+          '<span style="color:' +
+          (color === "green" ? "#2e7d32" : "#c62828") +
+          '">' +
+          esc(msg) +
+          "</span>";
+        setTimeout(() => {
+          if (el) el.innerHTML = "";
+        }, 4000);
       }
 
       // ─── Init ────────────────────────────────────────────────────────────────────

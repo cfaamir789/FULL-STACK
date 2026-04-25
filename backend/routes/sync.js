@@ -628,7 +628,10 @@ router.post(
         let skipped = 0;
         for (const id of ids) {
           // Never delete processed or archived — they are permanent history
-          const tx = await Transaction.findOne({ _id: id }, { syncStatus: 1 }).lean();
+          const tx = await Transaction.findOne(
+            { _id: id },
+            { syncStatus: 1 },
+          ).lean();
           if (!tx) continue;
           if (["processed", "archived"].includes(tx.syncStatus)) {
             skipped++;
@@ -716,7 +719,8 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
     if (["processed", "archived"].includes(tx.syncStatus)) {
       return res.status(403).json({
         success: false,
-        error: "Processed and archived transactions cannot be deleted. They are permanent history.",
+        error:
+          "Processed and archived transactions cannot be deleted. They are permanent history.",
       });
     }
 
@@ -817,7 +821,10 @@ router.post(
       // clears its own local history on next sync. Nothing is deleted from the
       // server — all transactions (pending, processed, archived) remain intact.
       if (workers === "all") {
-        const wsResult = await WorkerSync.updateMany({}, { $set: { clearBefore } });
+        const wsResult = await WorkerSync.updateMany(
+          {},
+          { $set: { clearBefore } },
+        );
         updated = wsResult.modifiedCount || 0;
       } else if (Array.isArray(workers) && workers.length > 0) {
         const wsResult = await WorkerSync.updateMany(
