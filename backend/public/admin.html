@@ -4035,6 +4035,7 @@
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
               <input id="newStoreCode" class="search-box" style="margin:0;flex:1;min-width:120px" placeholder="Store Code *" />
               <input id="newStoreName" class="search-box" style="margin:0;flex:2;min-width:160px" placeholder="Store Name" />
+              <input id="newPickingDay" class="search-box" style="margin:0;flex:1;min-width:120px" placeholder="Picking Day" />
               <button class="btn btn-primary" style="flex:0 0 auto" onclick="createStore()">Add</button>
             </div>
             <div id="storeCreateResult"></div>
@@ -4057,6 +4058,7 @@
                   <tr>
                     <th>Store Code</th>
                     <th>Store Name</th>
+                    <th>Picking Day</th>
                     <th style="width:120px">Actions</th>
                   </tr>
                 </thead>
@@ -9139,6 +9141,7 @@
           return `<tr id="storerow-${id}">
             <td><input class="search-box" style="margin:0;width:100%" id="sed-code-${id}" value="${esc(s.storeCode)}" /></td>
             <td><input class="search-box" style="margin:0;width:100%" id="sed-name-${id}" value="${esc(s.storeName)}" /></td>
+            <td><input class="search-box" style="margin:0;width:100%" id="sed-day-${id}" value="${esc(s.pickingDay || '')}" /></td>
             <td>
               <button class="btn-sm" style="background:#2e7d32;color:#fff" onclick="saveStoreEdit('${id}')">&#10003;</button>
               <button class="btn-sm" style="background:#555;color:#fff" onclick="renderStoreTable()">&#10007;</button>
@@ -9148,6 +9151,7 @@
         return `<tr id="storerow-${id}">
           <td>${esc(s.storeCode)}</td>
           <td>${esc(s.storeName)}</td>
+          <td>${esc(s.pickingDay || '')}</td>
           <td>
             <button class="btn-sm" style="background:#1565c0;color:#fff" onclick="editStoreRow('${id}')">&#9998;</button>
             <button class="btn-sm" style="background:#c62828;color:#fff" onclick="deleteStore('${id}')">&#128465;</button>
@@ -9166,6 +9170,7 @@
         const body = {
           storeCode: document.getElementById("sed-code-" + id).value.trim(),
           storeName: document.getElementById("sed-name-" + id).value.trim(),
+          pickingDay: document.getElementById("sed-day-" + id).value.trim(),
         };
         try {
           const res = await apiFetch("/template/stores/" + id, { method: "PUT", body: JSON.stringify(body) });
@@ -9196,6 +9201,7 @@
         const body = {
           storeCode: code,
           storeName: document.getElementById("newStoreName").value.trim(),
+          pickingDay: document.getElementById("newPickingDay").value.trim(),
         };
         try {
           const res = await apiFetch("/template/stores", { method: "POST", body: JSON.stringify(body) });
@@ -9204,6 +9210,7 @@
           renderStoreTable();
           document.getElementById("newStoreCode").value = "";
           document.getElementById("newStoreName").value = "";
+          document.getElementById("newPickingDay").value = "";
           showMsg("storeCreateResult", "Store created.", "green");
         } catch (err) {
           showMsg("storeCreateResult", err.message, "red");
@@ -9212,7 +9219,7 @@
 
       function exportStoresCSV() {
         if (!_storeData.length) return;
-        const header = ["storeCode", "storeName"];
+        const header = ["storeCode", "storeName", "pickingDay"];
         const rows = [header, ..._storeData.map((s) => header.map((h) => s[h] ?? ""))];
         const csv = rows.map((r) => r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\r\n");
         const blob = new Blob([csv], { type: "text/csv" });
@@ -9238,6 +9245,7 @@
           return {
             storeCode: obj["storecode"] || obj["store"] || "",
             storeName: obj["storename"] || obj["name"] || "",
+            pickingDay: obj["pickingday"] || obj["picking"] || obj["day"] || "",
           };
         }).filter((r) => r.storeCode);
         if (!rows.length) return showMsg("storeTableMsg", "No valid rows found.", "red");

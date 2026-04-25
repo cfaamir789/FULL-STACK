@@ -137,6 +137,7 @@ router.post("/stores/import", requireDB, requireAuth, requireAdmin, async (req, 
         {
           $set: {
             storeName: row.storeName ?? "",
+            pickingDay: row.pickingDay ?? "",
             updatedAt: new Date(),
           },
         },
@@ -153,13 +154,14 @@ router.post("/stores/import", requireDB, requireAuth, requireAdmin, async (req, 
 // POST /api/template/stores
 router.post("/stores", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { storeCode, storeName } = req.body;
+    const { storeCode, storeName, pickingDay } = req.body;
     if (!storeCode) {
       return res.status(400).json({ success: false, error: "storeCode is required." });
     }
     const store = await StoreMaster.create({
       storeCode: storeCode.trim(),
       storeName: storeName ?? "",
+      pickingDay: pickingDay ?? "",
     });
     res.json({ success: true, data: store });
   } catch (err) {
@@ -173,10 +175,10 @@ router.post("/stores", requireDB, requireAuth, requireAdmin, async (req, res) =>
 // PUT /api/template/stores/:id
 router.put("/stores/:id", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { storeCode, storeName } = req.body;
+    const { storeCode, storeName, pickingDay } = req.body;
     const store = await StoreMaster.findByIdAndUpdate(
       req.params.id,
-      { $set: { storeCode, storeName, updatedAt: new Date() } },
+      { $set: { storeCode, storeName, pickingDay, updatedAt: new Date() } },
       { new: true, runValidators: true }
     );
     if (!store) return res.status(404).json({ success: false, error: "Store not found." });
