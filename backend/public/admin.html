@@ -1033,6 +1033,11 @@
         color: var(--brand);
         transform: translateY(-1px);
       }
+      .section-chip.active {
+        background: linear-gradient(135deg, #2e7d32, #43a047);
+        color: #fff;
+        border-color: #2e7d32;
+      }
       .dashboard-hero {
         padding: 28px;
         background:
@@ -1642,6 +1647,7 @@
           Bin Content
         </button>
         <button id="navUsers" onclick="switchPage('users')">Users</button>
+        <button id="navTemplate" onclick="switchPage('template')">Template</button>
       </div>
 
       <div id="pageDashboard" class="panel-page">
@@ -4135,6 +4141,111 @@
       </div>
     </div>
 
+      <!-- ════════════════════════════════════════════════════════════════════
+           TEMPLATE MASTER DATA PAGE
+           ════════════════════════════════════════════════════════════════════ -->
+      <div id="pageTemplate" class="panel-page hidden">
+        <div class="section-rail">
+          <button class="section-chip active" id="tmplChipCategories" onclick="tmplShowSection('categories')">Categories</button>
+          <button class="section-chip" id="tmplChipStores" onclick="tmplShowSection('stores')">Stores</button>
+          <button class="section-chip" id="tmplChipBins" onclick="tmplShowSection('bins')">Bin Master</button>
+        </div>
+
+        <!-- ── Categories ── -->
+        <div id="tmplSectionCategories">
+          <div class="card">
+            <h2>&#10133; Add Category</h2>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+              <input id="newCatCode" class="search-box" style="margin:0;flex:1;min-width:120px" placeholder="Category Code *" />
+              <input id="newCatName" class="search-box" style="margin:0;flex:2;min-width:140px" placeholder="Category Name" />
+              <input id="newCatBuyer" class="search-box" style="margin:0;flex:1;min-width:100px" placeholder="Buyer" />
+              <input id="newCatPicker" class="search-box" style="margin:0;flex:1;min-width:100px" placeholder="Picker" />
+              <input id="newCatStore" class="search-box" style="margin:0;flex:1;min-width:100px" placeholder="Store Code" />
+              <button class="btn btn-primary" style="flex:0 0 auto" onclick="createCategory()">Add</button>
+            </div>
+            <div id="catCreateResult"></div>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+              <h2 style="margin:0">&#128230; Categories</h2>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn-sm" onclick="exportCategoriesCSV()" style="background:#1565c0;color:#fff">&#11015; CSV</button>
+                <label class="btn-sm" style="background:#37474f;color:#fff;cursor:pointer">
+                  &#11014; Import CSV
+                  <input type="file" accept=".csv" style="display:none" onchange="importCategoriesCSV(this)" />
+                </label>
+                <button class="btn-sm" onclick="loadTemplateCategories()" style="background:#333;color:#fff">&#8635; Refresh</button>
+              </div>
+            </div>
+            <div id="catTableWrap" style="overflow-x:auto">
+              <table class="data-table" style="width:100%;min-width:600px">
+                <thead>
+                  <tr>
+                    <th>Category Code</th>
+                    <th>Category Name</th>
+                    <th>Buyer</th>
+                    <th>Picker</th>
+                    <th>Store Code</th>
+                    <th style="width:120px">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="catTableBody">
+                  <tr><td colspan="6" style="text-align:center;color:#888">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="catTableMsg" style="margin-top:8px"></div>
+          </div>
+        </div>
+
+        <!-- ── Stores ── -->
+        <div id="tmplSectionStores" style="display:none">
+          <div class="card">
+            <h2>&#10133; Add Store</h2>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+              <input id="newStoreCode" class="search-box" style="margin:0;flex:1;min-width:120px" placeholder="Store Code *" />
+              <input id="newStoreName" class="search-box" style="margin:0;flex:2;min-width:160px" placeholder="Store Name" />
+              <button class="btn btn-primary" style="flex:0 0 auto" onclick="createStore()">Add</button>
+            </div>
+            <div id="storeCreateResult"></div>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+              <h2 style="margin:0">&#127978; Stores</h2>
+              <button class="btn-sm" onclick="loadTemplateStores()" style="background:#333;color:#fff">&#8635; Refresh</button>
+            </div>
+            <div id="storeTableWrap" style="overflow-x:auto">
+              <table class="data-table" style="width:100%;min-width:360px">
+                <thead>
+                  <tr>
+                    <th>Store Code</th>
+                    <th>Store Name</th>
+                    <th style="width:120px">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="storeTableBody">
+                  <tr><td colspan="3" style="text-align:center;color:#888">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="storeTableMsg" style="margin-top:8px"></div>
+          </div>
+        </div>
+
+        <!-- ── Bin Master (reuses existing functionality) ── -->
+        <div id="tmplSectionBins" style="display:none">
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+              <h2 style="margin:0">&#128230; Bin Master</h2>
+              <button class="btn-sm" onclick="loadBinMasterList(1)" style="background:#333;color:#fff">&#8635; Refresh</button>
+            </div>
+            <div id="tmplBinMasterWrap">
+              <p style="color:#888;font-size:13px">Loading bin master list…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
     <script>
       // ─── Failover: list of backend servers (same MongoDB) ────────────────────
       const SERVERS = [
@@ -4180,6 +4291,7 @@
         binContent: false,
         workers: false,
         users: false,
+        template: false,
       };
       let currentItemsPage = 1;
       let currentItemsPages = 1;
@@ -4199,6 +4311,7 @@
         binContent: 0,
         workers: 0,
         users: 0,
+        template: 0,
       };
 
       function isPageStale(page) {
@@ -4219,6 +4332,7 @@
         "item-master": "master",
         "bin-content": "binContent",
         users: "users",
+        template: "template",
       };
       const PAGE_SLUGS = {
         dashboard: "",
@@ -4227,6 +4341,7 @@
         master: "item-master",
         binContent: "bin-content",
         users: "users",
+        template: "template",
       };
       function resolvePageFromPath() {
         const slug = window.location.pathname
@@ -4716,6 +4831,7 @@
           "binContent",
           "workers",
           "users",
+          "template",
         ];
         pages.forEach((p) => {
           document
@@ -4838,6 +4954,18 @@
           }
           await Promise.allSettled([loadStats(), loadUsers()]);
           markPageLoaded("users");
+        }
+        if (page === "template") {
+          if (pageLoaded.template) {
+            if (isPageStale("template")) {
+              tmplRefreshCurrentSection().finally(() => {
+                pageLastLoaded.template = Date.now();
+              });
+            }
+            return;
+          }
+          await tmplRefreshCurrentSection();
+          markPageLoaded("template");
         }
       }
 
@@ -8782,6 +8910,287 @@
         alert(
           "Hard delete is disabled for safety. Use Mark Done, Reopen, or Archive workflows instead.",
         );
+      }
+
+      // ─── Template Master Data ────────────────────────────────────────────────────
+      let tmplCurrentSection = "categories";
+
+      function tmplShowSection(section) {
+        tmplCurrentSection = section;
+        ["categories", "stores", "bins"].forEach((s) => {
+          document.getElementById("tmplSection" + s.charAt(0).toUpperCase() + s.slice(1)).style.display =
+            s === section ? "" : "none";
+          const chip = document.getElementById("tmplChip" + s.charAt(0).toUpperCase() + s.slice(1));
+          if (chip) chip.classList.toggle("active", s === section);
+        });
+        if (section === "categories") loadTemplateCategories();
+        else if (section === "stores") loadTemplateStores();
+        else if (section === "bins") loadBinMasterList(1);
+      }
+
+      async function tmplRefreshCurrentSection() {
+        if (tmplCurrentSection === "categories") return loadTemplateCategories();
+        if (tmplCurrentSection === "stores") return loadTemplateStores();
+        if (tmplCurrentSection === "bins") return loadBinMasterList(1);
+      }
+
+      // ── Categories ──
+      let _catData = [];
+
+      async function loadTemplateCategories() {
+        const tbody = document.getElementById("catTableBody");
+        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888">Loading…</td></tr>';
+        try {
+          const res = await apiFetch("/template/categories");
+          _catData = res.data || [];
+          renderCatTable();
+        } catch (err) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="color:#c62828;text-align:center">' + esc(err.message) + "</td></tr>";
+        }
+      }
+
+      function renderCatTable() {
+        const tbody = document.getElementById("catTableBody");
+        if (!tbody) return;
+        if (!_catData.length) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888">No categories yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = _catData.map((c) => catRow(c, false)).join("");
+      }
+
+      function catRow(c, editing) {
+        const id = c._id;
+        if (editing) {
+          return `<tr id="catrow-${id}">
+            <td><input class="search-box" style="margin:0;width:100%" id="ced-code-${id}" value="${esc(c.categoryCode)}" /></td>
+            <td><input class="search-box" style="margin:0;width:100%" id="ced-name-${id}" value="${esc(c.categoryName)}" /></td>
+            <td><input class="search-box" style="margin:0;width:100%" id="ced-buyer-${id}" value="${esc(c.buyer)}" /></td>
+            <td><input class="search-box" style="margin:0;width:100%" id="ced-picker-${id}" value="${esc(c.picker)}" /></td>
+            <td><input class="search-box" style="margin:0;width:100%" id="ced-store-${id}" value="${esc(c.storeCode)}" /></td>
+            <td>
+              <button class="btn-sm" style="background:#2e7d32;color:#fff" onclick="saveCategoryEdit('${id}')">&#10003;</button>
+              <button class="btn-sm" style="background:#555;color:#fff" onclick="renderCatTable()">&#10007;</button>
+            </td>
+          </tr>`;
+        }
+        return `<tr id="catrow-${id}">
+          <td>${esc(c.categoryCode)}</td>
+          <td>${esc(c.categoryName)}</td>
+          <td>${esc(c.buyer)}</td>
+          <td>${esc(c.picker)}</td>
+          <td>${esc(c.storeCode)}</td>
+          <td>
+            <button class="btn-sm" style="background:#1565c0;color:#fff" onclick="editCategoryRow('${id}')">&#9998;</button>
+            <button class="btn-sm" style="background:#c62828;color:#fff" onclick="deleteCategory('${id}')">&#128465;</button>
+          </td>
+        </tr>`;
+      }
+
+      function editCategoryRow(id) {
+        const c = _catData.find((x) => x._id === id);
+        if (!c) return;
+        const row = document.getElementById("catrow-" + id);
+        if (row) row.outerHTML = catRow(c, true);
+      }
+
+      async function saveCategoryEdit(id) {
+        const body = {
+          categoryCode: document.getElementById("ced-code-" + id).value.trim(),
+          categoryName: document.getElementById("ced-name-" + id).value.trim(),
+          buyer: document.getElementById("ced-buyer-" + id).value.trim(),
+          picker: document.getElementById("ced-picker-" + id).value.trim(),
+          storeCode: document.getElementById("ced-store-" + id).value.trim(),
+        };
+        try {
+          const res = await apiFetch("/template/categories/" + id, { method: "PUT", body: JSON.stringify(body) });
+          const idx = _catData.findIndex((x) => x._id === id);
+          if (idx !== -1) _catData[idx] = res.data;
+          renderCatTable();
+          showMsg("catTableMsg", "Saved.", "green");
+        } catch (err) {
+          showMsg("catTableMsg", err.message, "red");
+        }
+      }
+
+      async function deleteCategory(id) {
+        if (!confirm("Delete this category?")) return;
+        try {
+          await apiFetch("/template/categories/" + id, { method: "DELETE" });
+          _catData = _catData.filter((x) => x._id !== id);
+          renderCatTable();
+          showMsg("catTableMsg", "Deleted.", "green");
+        } catch (err) {
+          showMsg("catTableMsg", err.message, "red");
+        }
+      }
+
+      async function createCategory() {
+        const code = document.getElementById("newCatCode").value.trim();
+        if (!code) return showMsg("catCreateResult", "Category Code is required.", "red");
+        const body = {
+          categoryCode: code,
+          categoryName: document.getElementById("newCatName").value.trim(),
+          buyer: document.getElementById("newCatBuyer").value.trim(),
+          picker: document.getElementById("newCatPicker").value.trim(),
+          storeCode: document.getElementById("newCatStore").value.trim(),
+        };
+        try {
+          const res = await apiFetch("/template/categories", { method: "POST", body: JSON.stringify(body) });
+          _catData.push(res.data);
+          _catData.sort((a, b) => a.categoryCode.localeCompare(b.categoryCode));
+          renderCatTable();
+          ["newCatCode", "newCatName", "newCatBuyer", "newCatPicker", "newCatStore"].forEach((id) => {
+            document.getElementById(id).value = "";
+          });
+          showMsg("catCreateResult", "Category created.", "green");
+        } catch (err) {
+          showMsg("catCreateResult", err.message, "red");
+        }
+      }
+
+      function exportCategoriesCSV() {
+        if (!_catData.length) return;
+        const header = ["categoryCode", "categoryName", "buyer", "picker", "storeCode"];
+        const rows = [header, ..._catData.map((c) => header.map((h) => c[h] ?? ""))];
+        const csv = rows.map((r) => r.map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(",")).join("\r\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "categories.csv";
+        a.click();
+      }
+
+      async function importCategoriesCSV(input) {
+        const file = input.files[0];
+        if (!file) return;
+        input.value = "";
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter((l) => l.trim());
+        if (lines.length < 2) return showMsg("catTableMsg", "Empty file.", "red");
+        const header = lines[0].split(",").map((h) => h.replace(/^"|"$/g, "").trim().toLowerCase());
+        const rows = lines.slice(1).map((line) => {
+          const vals = line.split(",").map((v) => v.replace(/^"|"$/g, "").trim());
+          const obj = {};
+          header.forEach((h, i) => (obj[h] = vals[i] ?? ""));
+          return obj;
+        });
+        try {
+          const res = await apiFetch("/template/categories/import", { method: "POST", body: JSON.stringify(rows) });
+          showMsg("catTableMsg", "Imported " + res.upserted + " rows.", "green");
+          loadTemplateCategories();
+        } catch (err) {
+          showMsg("catTableMsg", err.message, "red");
+        }
+      }
+
+      // ── Stores ──
+      let _storeData = [];
+
+      async function loadTemplateStores() {
+        const tbody = document.getElementById("storeTableBody");
+        if (tbody) tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#888">Loading…</td></tr>';
+        try {
+          const res = await apiFetch("/template/stores");
+          _storeData = res.data || [];
+          renderStoreTable();
+        } catch (err) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="3" style="color:#c62828;text-align:center">' + esc(err.message) + "</td></tr>";
+        }
+      }
+
+      function renderStoreTable() {
+        const tbody = document.getElementById("storeTableBody");
+        if (!tbody) return;
+        if (!_storeData.length) {
+          tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#888">No stores yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = _storeData.map((s) => storeRow(s, false)).join("");
+      }
+
+      function storeRow(s, editing) {
+        const id = s._id;
+        if (editing) {
+          return `<tr id="storerow-${id}">
+            <td><input class="search-box" style="margin:0;width:100%" id="sed-code-${id}" value="${esc(s.storeCode)}" /></td>
+            <td><input class="search-box" style="margin:0;width:100%" id="sed-name-${id}" value="${esc(s.storeName)}" /></td>
+            <td>
+              <button class="btn-sm" style="background:#2e7d32;color:#fff" onclick="saveStoreEdit('${id}')">&#10003;</button>
+              <button class="btn-sm" style="background:#555;color:#fff" onclick="renderStoreTable()">&#10007;</button>
+            </td>
+          </tr>`;
+        }
+        return `<tr id="storerow-${id}">
+          <td>${esc(s.storeCode)}</td>
+          <td>${esc(s.storeName)}</td>
+          <td>
+            <button class="btn-sm" style="background:#1565c0;color:#fff" onclick="editStoreRow('${id}')">&#9998;</button>
+            <button class="btn-sm" style="background:#c62828;color:#fff" onclick="deleteStore('${id}')">&#128465;</button>
+          </td>
+        </tr>`;
+      }
+
+      function editStoreRow(id) {
+        const s = _storeData.find((x) => x._id === id);
+        if (!s) return;
+        const row = document.getElementById("storerow-" + id);
+        if (row) row.outerHTML = storeRow(s, true);
+      }
+
+      async function saveStoreEdit(id) {
+        const body = {
+          storeCode: document.getElementById("sed-code-" + id).value.trim(),
+          storeName: document.getElementById("sed-name-" + id).value.trim(),
+        };
+        try {
+          const res = await apiFetch("/template/stores/" + id, { method: "PUT", body: JSON.stringify(body) });
+          const idx = _storeData.findIndex((x) => x._id === id);
+          if (idx !== -1) _storeData[idx] = res.data;
+          renderStoreTable();
+          showMsg("storeTableMsg", "Saved.", "green");
+        } catch (err) {
+          showMsg("storeTableMsg", err.message, "red");
+        }
+      }
+
+      async function deleteStore(id) {
+        if (!confirm("Delete this store?")) return;
+        try {
+          await apiFetch("/template/stores/" + id, { method: "DELETE" });
+          _storeData = _storeData.filter((x) => x._id !== id);
+          renderStoreTable();
+          showMsg("storeTableMsg", "Deleted.", "green");
+        } catch (err) {
+          showMsg("storeTableMsg", err.message, "red");
+        }
+      }
+
+      async function createStore() {
+        const code = document.getElementById("newStoreCode").value.trim();
+        if (!code) return showMsg("storeCreateResult", "Store Code is required.", "red");
+        const body = {
+          storeCode: code,
+          storeName: document.getElementById("newStoreName").value.trim(),
+        };
+        try {
+          const res = await apiFetch("/template/stores", { method: "POST", body: JSON.stringify(body) });
+          _storeData.push(res.data);
+          _storeData.sort((a, b) => a.storeCode.localeCompare(b.storeCode));
+          renderStoreTable();
+          document.getElementById("newStoreCode").value = "";
+          document.getElementById("newStoreName").value = "";
+          showMsg("storeCreateResult", "Store created.", "green");
+        } catch (err) {
+          showMsg("storeCreateResult", err.message, "red");
+        }
+      }
+
+      function showMsg(elId, msg, color) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        el.innerHTML = '<span style="color:' + (color === "green" ? "#2e7d32" : "#c62828") + '">' + esc(msg) + "</span>";
+        setTimeout(() => { if (el) el.innerHTML = ""; }, 4000);
       }
 
       // ─── Init ────────────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ const syncRouter = require("./routes/sync");
 const authRouter = require("./routes/auth");
 const binContentRouter = require("./routes/binContent");
 const binMasterRouter = require("./routes/binMaster");
+const templateRouter = require("./routes/template");
 const connectDB = require("./config/database");
 
 const compression = require("compression");
@@ -156,6 +157,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/items", itemsRouter);
 app.use("/api/bin-content", binContentRouter);
 app.use("/api/bin-master", binMasterRouter);
+app.use("/api/template", templateRouter);
 app.use("/api/transactions", syncRouter);
 app.use("/api/sync", syncRouter);
 
