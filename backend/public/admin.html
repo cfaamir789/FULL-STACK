@@ -9086,13 +9086,19 @@
         const text = await file.text();
         const lines = text.split(/\r?\n/).filter((l) => l.trim());
         if (lines.length < 2) return showMsg("catTableMsg", "Empty file.", "red");
-        const header = lines[0].split(",").map((h) => h.replace(/^"|"$/g, "").trim().toLowerCase());
+        const header = lines[0].replace(/^\uFEFF/,"").split(",").map((h) => h.replace(/^"|"$/g, "").trim().toLowerCase());
         const rows = lines.slice(1).map((line) => {
           const vals = line.split(",").map((v) => v.replace(/^"|"$/g, "").trim());
           const obj = {};
           header.forEach((h, i) => (obj[h] = vals[i] ?? ""));
-          return obj;
-        });
+          return {
+            categoryCode: obj["categorycode"] || obj["category code"] || obj["code"] || "",
+            categoryName: obj["categoryname"] || obj["category name"] || obj["name"] || "",
+            buyer: obj["buyer"] || "",
+            picker: obj["picker"] || ""
+          };
+        }).filter(r => r.categoryCode);
+        if (!rows.length) return showMsg("catTableMsg", "No valid rows found (missing category code).", "red");
         try {
           const res = await apiFetch("/template/categories/import", { method: "POST", body: JSON.stringify(rows) });
           showMsg("catTableMsg", "Imported " + res.upserted + " rows.", "green");
@@ -9223,7 +9229,7 @@
         const text = await file.text();
         const lines = text.split(/\r?\n/).filter((l) => l.trim());
         if (lines.length < 2) return showMsg("storeTableMsg", "Empty file.", "red");
-        const header = lines[0].split(",").map((h) => h.replace(/^"|"$/g, "").trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+        const header = lines[0].replace(/^\uFEFF/,"").split(",").map((h) => h.replace(/^"|"$/g, "").trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
         const rows = lines.slice(1).map((line) => {
           const vals = line.split(",").map((v) => v.replace(/^"|"$/g, "").trim());
           const obj = {};
