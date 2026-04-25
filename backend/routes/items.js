@@ -21,6 +21,8 @@ const AuditLog = require("../models/AuditLog");
 // All concurrent cold-start requests coalesce on the single build promise.
 let _bulkCache = { version: null, gzBuf: null, etag: null };
 let _buildPromise = null;
+// Version endpoint cache — reset whenever items change
+let _versionCache = { data: null, ts: 0 };
 
 async function _buildBulkCache() {
   const [items, version] = await Promise.all([
@@ -70,6 +72,7 @@ async function getBulkCache() {
 function invalidateBulkCache() {
   _bulkCache = { version: null, gzBuf: null, etag: null };
   _buildPromise = null;
+  _versionCache = { data: null, ts: 0 }; // also invalidate version cache
 }
 
 // Warm the cache after server start (so first phone gets fast response too)
@@ -490,12 +493,20 @@ async function bumpItemsVersion(req, totalItemsHint) {
 }
 
 // GET /api/items/version — lightweight check for phones (no auth needed)
+const VERSION_CACHE_MS = 10000; // 10 seconds
+
 router.get("/version", async (req, res) => {
+  const now = Date.now();
+  if (_versionCache.data && now - _versionCache.ts < VERSION_CACHE_MS) {
+    return res.json(_versionCache.data);
+  }
   const [count, version] = await Promise.all([
     Item.countDocuments({}),
     getItemsVersion(),
   ]);
-  res.json({ success: true, version, totalItems: count });
+  const data = { success: true, version, totalItems: count };
+  _versionCache = { data, ts: now };
+  res.json(data);
 });
 
 // GET /api/items/bulk-page?page=1&limit=5000

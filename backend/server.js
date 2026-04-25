@@ -86,6 +86,12 @@ app.use(
   }),
 );
 app.use(cors());
+// Keep TCP connections alive to avoid per-request TLS handshake overhead
+app.use((req, res, next) => {
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Keep-Alive", "timeout=30");
+  next();
+});
 app.use(express.json({ limit: "50mb" }));
 
 // Serve admin web panel — cached for 1 hour
@@ -196,10 +202,10 @@ server.listen(PORT, "0.0.0.0", () => {
         .get(url, () => {})
         .on("error", () => {});
     };
-    // First ping after 30s, then every 4 minutes
+    // First ping after 30s, then every 3 minutes
     setTimeout(() => { ping(selfUrl); ping(otherUrl); }, 30 * 1000);
-    setInterval(() => { ping(selfUrl); ping(otherUrl); }, 4 * 60 * 1000);
-    console.log("Keep-alive ping enabled (every 4 min) for self + partner");
+    setInterval(() => { ping(selfUrl); ping(otherUrl); }, 3 * 60 * 1000);
+    console.log("Keep-alive ping enabled (every 3 min) for self + partner");
   }
 });
 

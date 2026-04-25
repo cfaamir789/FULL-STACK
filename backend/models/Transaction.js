@@ -39,5 +39,7 @@ transactionSchema.index({ syncStatus: 1, processedAt: -1 });
 // Worker-status today count — lastSyncedAt range scan
 transactionSchema.index({ lastSyncedAt: 1 });
 transactionSchema.index({ Worker_Name: 1, lastSyncedAt: 1 });
+// Compound index for worker-status dashboard aggregation
+transactionSchema.index({ lastSyncedAt: 1, syncStatus: 1 });
 
 module.exports = mongoose.model("Transaction", transactionSchema);

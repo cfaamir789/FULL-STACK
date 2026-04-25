@@ -585,18 +585,21 @@ router.post(
         : "";
 
       if (ids.length > 0) {
+        // Single query to check statuses of all IDs
+        const existing = await Transaction.find(
+          { _id: { $in: ids } },
+          { _id: 1, syncStatus: 1 }
+        ).lean();
+
+        const deletableIds = existing
+          .filter(tx => !["processed", "archived"].includes(tx.syncStatus))
+          .map(tx => tx._id);
+        const skipped = existing.length - deletableIds.length;
+
         let deleted = 0;
-        let skipped = 0;
-        for (const id of ids) {
-          // Never delete processed or archived — they are permanent history
-          const tx = await Transaction.findOne({ _id: id }, { syncStatus: 1 }).lean();
-          if (!tx) continue;
-          if (["processed", "archived"].includes(tx.syncStatus)) {
-            skipped++;
-            continue;
-          }
-          const delResult = await Transaction.deleteOne({ _id: id });
-          deleted += delResult.deletedCount;
+        if (deletableIds.length > 0) {
+          const delResult = await Transaction.deleteMany({ _id: { $in: deletableIds } });
+          deleted = delResult.deletedCount;
         }
         return res.json({ success: true, deleted, skipped });
       }
