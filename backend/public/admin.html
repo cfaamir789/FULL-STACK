@@ -3991,7 +3991,7 @@
               <input id="newCatCode" class="search-box" style="margin:0;flex:1;min-width:120px" placeholder="Category Code *" />
               <input id="newCatName" class="search-box" style="margin:0;flex:2;min-width:140px" placeholder="Category Name" />
               <input id="newCatBuyer" class="search-box" style="margin:0;flex:1;min-width:100px" placeholder="Buyer" />
-              <input id="newCatPicker" class="search-box" style="margin:0;flex:1;min-width:100px" placeholder="Picker" />
+              <input id="newCatPicker" class="search-box" style="margin:0;flex:1;min-width:140px" placeholder="Picker/Incharge" />
               <button class="btn btn-primary" style="flex:0 0 auto" onclick="createCategory()">Add</button>
             </div>
             <div id="catCreateResult"></div>
@@ -4015,7 +4015,7 @@
                     <th>Category Code</th>
                     <th>Category Name</th>
                     <th>Buyer</th>
-                    <th>Picker</th>
+                    <th>Picker / Incharge</th>
                     <th style="width:120px">Actions</th>
                   </tr>
                 </thead>
@@ -9095,7 +9095,7 @@
             categoryCode: obj["categorycode"] || obj["category code"] || obj["code"] || "",
             categoryName: obj["categoryname"] || obj["category name"] || obj["name"] || "",
             buyer: obj["buyer"] || "",
-            picker: obj["picker"] || ""
+            picker: obj["picker"] || obj["section incharge"] || obj["sectionincharge"] || obj["section"] || obj["incharge"] || ""
           };
         }).filter(r => r.categoryCode);
         if (!rows.length) return showMsg("catTableMsg", "No valid rows found (missing category code).", "red");
