@@ -4139,8 +4139,8 @@
       // ─── Failover: list of backend servers (same MongoDB) ────────────────────
       const SERVERS = [
         window.location.origin,
-        "https://fullstck.onrender.com",
-        "https://inventory-backend-fdex.onrender.com",
+        "https://fullstck-production.up.railway.app",
+        "https://fullstck.onrender.com"
       ];
       // Remove duplicates (if we're already on one of them)
       const UNIQUE_SERVERS = [...new Set(SERVERS)];
@@ -6356,6 +6356,7 @@
             "From",
             "To",
             "Qty",
+            "ProjectedQty",
             "Notes",
           ];
           const aoa = [
@@ -6369,6 +6370,7 @@
               r.Frombin || "",
               r.Tobin || "",
               r.Qty ?? "",
+              r.diffQty !== undefined && r.diffQty !== null ? r.diffQty : "",
               r.Notes || "",
             ]),
           ];
@@ -6746,6 +6748,7 @@
           visibleCols.forEach((c) => {
             html += "<th>" + esc(c.label) + "</th>";
           });
+          html += "<th>Projected Qty</th>";
           html +=
             "<th>Copy</th><th>Action</th><th>Delete</th></tr></thead><tbody>";
           slice.forEach((tx, i) => {
@@ -6764,6 +6767,16 @@
             visibleCols.forEach((c) => {
               html += txCellValue(tx, c.key);
             });
+            // Handle Projected Qty
+            const diff = tx.diffQty ?? null;
+            if (diff !== null && diff < 0) {
+              html += '<td style="color:#d32f2f;font-weight:700" title="Insufficient stock in Bin Content registry!">' + diff + "</td>";
+            } else if (diff !== null) {
+              html += '<td style="color:#388e3c;font-weight:600">' + diff + "</td>";
+            } else {
+              html += '<td style="color:#9e9e9e">-</td>';
+            }
+
             html +=
               '<td><button class="copy-icon-btn" onclick="copyRow(' +
               idx +
@@ -7193,8 +7206,15 @@
               : "";
         const filename = nextExportFilename(filenameLabel) + "." + format;
 
+        // Find visible columns explicitly defined in UI
         const visibleCols = txCols.filter((c) => c.vis);
+        const appendDiffQty = !visibleCols.some(c => c.key === "diffQty");
         const headers = visibleCols.map((c) => c.label);
+        
+        // Append Projected Qty manually if not implicitly visible
+        if (appendDiffQty) {
+          headers.push("Projected Qty");
+        }
 
         // Fetch JSON rows then build file client-side (respects visible columns)
         fetch(url + "&json=1", {
@@ -7213,12 +7233,18 @@
               alert("No transactions to export.");
               return;
             }
+            
             const aoa = [
               headers,
-              ...rows.map((r) =>
-                visibleCols.map((c) => getExportCellValue(r, c.key)),
-              ),
+              ...rows.map((r) => {
+                const arr = visibleCols.map((c) => getExportCellValue(r, c.key));
+                if (appendDiffQty) {
+                  arr.push(r.diffQty !== undefined && r.diffQty !== null ? r.diffQty : "");
+                }
+                return arr;
+              }),
             ];
+            
             if (format === "xlsx" && typeof XLSX !== "undefined") {
               const ws = XLSX.utils.aoa_to_sheet(aoa);
               const wb = XLSX.utils.book_new();

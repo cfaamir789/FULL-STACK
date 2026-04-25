@@ -568,31 +568,8 @@ router.get("/by-item/:itemCode", async (req, res) => {
 // GET /api/bin-content/stats — single $facet aggregation, one DB round-trip
 router.get("/stats", async (req, res) => {
   try {
-    const [result] = await BinContent.aggregate([
-      {
-        $facet: {
-          total: [{ $count: "n" }],
-          upper: [{ $match: { BinRanking: { $lt: 0 } } }, { $count: "n" }],
-          floor: [{ $match: { BinRanking: { $eq: 0 } } }, { $count: "n" }],
-          display: [{ $match: { BinRanking: { $gt: 0 } } }, { $count: "n" }],
-          unresolved: [{ $match: { notInMaster: true } }, { $count: "n" }],
-          uniqueBins: [{ $group: { _id: "$BinCode" } }, { $count: "n" }],
-          uniqueItems: [{ $group: { _id: "$ItemCode" } }, { $count: "n" }],
-          totalQty: [{ $group: { _id: null, sum: { $sum: "$Qty" } } }],
-        },
-      },
-    ]);
-    res.json({
-      success: true,
-      total: result.total[0]?.n ?? 0,
-      upper: result.upper[0]?.n ?? 0,
-      floor: result.floor[0]?.n ?? 0,
-      display: result.display[0]?.n ?? 0,
-      unresolved: result.unresolved[0]?.n ?? 0,
-      uniqueBins: result.uniqueBins[0]?.n ?? 0,
-      uniqueItems: result.uniqueItems[0]?.n ?? 0,
-      totalQty: result.totalQty[0]?.sum ?? 0,
-    });
+    const cache = await getBinMetaCache();
+    res.json(cache.data.stats);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -613,13 +590,8 @@ router.get("/meta", async (req, res) => {
 // GET /api/bin-content/categories — distinct sorted category codes (for dropdown)
 router.get("/categories", async (req, res) => {
   try {
-    const cats = await BinContent.distinct("CategoryCode");
-    const sorted = cats
-      .filter((c) => c && String(c).trim() !== "")
-      .sort((a, b) =>
-        String(a).localeCompare(String(b), undefined, { numeric: true }),
-      );
-    res.json({ success: true, categories: sorted });
+    const cache = await getBinMetaCache();
+    res.json({ success: true, categories: cache.data.categories });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -628,13 +600,8 @@ router.get("/categories", async (req, res) => {
 // GET /api/bin-content/zone-codes — distinct sorted zone codes (for dropdown)
 router.get("/zone-codes", async (req, res) => {
   try {
-    const codes = await BinContent.distinct("ZoneCode");
-    const sorted = codes
-      .filter((c) => c && String(c).trim() !== "")
-      .sort((a, b) =>
-        String(a).localeCompare(String(b), undefined, { numeric: true }),
-      );
-    res.json({ success: true, zoneCodes: sorted });
+    const cache = await getBinMetaCache();
+    res.json({ success: true, zoneCodes: cache.data.zoneCodes });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

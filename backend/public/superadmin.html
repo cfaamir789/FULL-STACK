@@ -823,7 +823,7 @@
               ></div>
               <div style="flex: 1; min-width: 0">
                 <div style="font-size: 13px; font-weight: 700; color: #e0e6ed">
-                  inventory-backend-fdex
+                  inventory-backend-render
                   <span
                     style="
                       font-size: 10px;
@@ -839,14 +839,14 @@
                 <div
                   style="font-size: 12px; color: #5a6a7a; word-break: break-all"
                 >
-                  https://inventory-backend-fdex.onrender.com/admin/
+                  https://fullstck.onrender.com/admin/
                 </div>
               </div>
               <button
                 class="btn btn-outline btn-sm"
                 onclick="
                   copyUrl(
-                    'https://inventory-backend-fdex.onrender.com/admin/',
+                    'https://fullstck.onrender.com/admin/',
                     this,
                   )
                 "
@@ -855,7 +855,7 @@
                 &#128203; Copy
               </button>
               <a
-                href="https://inventory-backend-fdex.onrender.com/admin/"
+                href="https://fullstck.onrender.com/admin/"
                 target="_blank"
                 class="btn btn-primary btn-sm"
                 style="flex-shrink: 0; text-decoration: none"
@@ -1319,8 +1319,8 @@
       // ─── Failover ──────────────────────────────────────────────────────
       const SERVERS = [
         window.location.origin,
-        "https://fullstck.onrender.com",
-        "https://inventory-backend-fdex.onrender.com",
+        "https://fullstck-production.up.railway.app",
+        "https://fullstck.onrender.com"
       ];
       const UNIQUE_SERVERS = [...new Set(SERVERS)];
       let API = window.location.origin + "/api";

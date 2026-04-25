@@ -477,7 +477,46 @@ router.get("/", requireDB, requireAuth, async (req, res) => {
     }
 
     const [transactions, total] = await Promise.all([
-      Transaction.find(query).sort(sort).skip(skip).limit(limit).lean(),
+      Transaction.aggregate([
+        { $match: query },
+        { $sort: sort },
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: "bincontents",
+            let: { itemCode: "$Item_Code", fromBin: "$Frombin" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ["$ItemCode", "$$itemCode"] },
+                      { $eq: ["$BinCode", "$$fromBin"] },
+                    ],
+                  },
+                },
+              },
+              { $limit: 1 },
+              { $project: { Qty: 1 } },
+            ],
+            as: "binData",
+          },
+        },
+        {
+          $addFields: {
+            diffQty: {
+              $subtract: [
+                {
+                  $ifNull: [{ $arrayElemAt: ["$binData.Qty", 0] }, 0],
+                },
+                "$Qty",
+              ],
+            },
+          },
+        },
+        { $project: { binData: 0 } },
+      ]),
       Transaction.countDocuments(query),
     ]);
 
@@ -688,8 +727,14 @@ router.delete("/:id", requireAuth, async (req, res, next) => {
   }
 });
 
+let _syncStatsCache = { data: null, expires: 0 };
+
 router.get("/stats", requireDB, requireAuth, requireAdmin, async (req, res) => {
   try {
+    const now = Date.now();
+    if (_syncStatsCache.data && now < _syncStatsCache.expires) {
+      return res.json(_syncStatsCache.data);
+    }
     // Single aggregation pass over the collection — no full document loads
     const [statusCounts, workerAgg] = await Promise.all([
       Transaction.aggregate([
@@ -730,7 +775,7 @@ router.get("/stats", requireDB, requireAuth, requireAdmin, async (req, res) => {
         : null,
     }));
 
-    res.json({
+    const responseData = {
       success: true,
       total: counts.pending,
       totalPending: counts.pending,
@@ -738,7 +783,11 @@ router.get("/stats", requireDB, requireAuth, requireAdmin, async (req, res) => {
       totalArchived: counts.archived,
       totalAll: counts.total,
       workers,
-    });
+    };
+    _syncStatsCache.data = responseData;
+    _syncStatsCache.expires = Date.now() + 5000; // cache for 5 seconds
+
+    res.json(responseData);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -852,14 +901,49 @@ router.get(
         ...buildStatusQuery(status || "all"),
       };
       const sort = buildStatusSort(status || "all");
-      const transactions = await Transaction.find(query).sort(sort).lean();
+      const transactions = await Transaction.aggregate([
+        { $match: query },
+        { $sort: sort },
+        {
+          $lookup: {
+            from: "bincontents",
+            let: { itemCode: "$Item_Code", fromBin: "$Frombin" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ["$ItemCode", "$$itemCode"] },
+                      { $eq: ["$BinCode", "$$fromBin"] },
+                    ],
+                  },
+                },
+              },
+              { $limit: 1 },
+              { $project: { Qty: 1 } },
+            ],
+            as: "binData",
+          },
+        },
+        {
+          $addFields: {
+            diffQty: {
+              $subtract: [
+                { $ifNull: [{ $arrayElemAt: ["$binData.Qty", 0] }, 0] },
+                "$Qty",
+              ],
+            },
+          },
+        },
+        { $project: { binData: 0 } },
+      ]);
 
       if (json === "1") {
         return res.json(transactions);
       }
 
       const header =
-        "Status,Processed_At,Processed_By,ERP_Document,ERP_Batch,Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Worker,Notes,Timestamp\n";
+        "Status,Processed_At,Processed_By,ERP_Document,ERP_Batch,Item_Barcode,Item_Code,Item_Name,From_Bin,To_Bin,Qty,Projected_Qty,Worker,Notes,Timestamp\n";
       const rows = transactions
         .map((tx) => {
           const escape = (value) =>
@@ -878,6 +962,7 @@ router.get(
             escape(tx.Frombin),
             escape(tx.Tobin),
             tx.Qty,
+            tx.diffQty !== undefined && tx.diffQty !== null ? tx.diffQty : "",
             escape(tx.Worker_Name),
             escape(tx.Notes),
             escape(tx.Timestamp ? new Date(tx.Timestamp).toISOString() : ""),

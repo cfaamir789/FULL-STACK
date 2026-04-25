@@ -1,8 +1,8 @@
 // --- Failover: list of backend servers (same MongoDB) --------------------
 const SERVERS = [
   window.location.origin,
+  "https://fullstck-production.up.railway.app",
   "https://fullstck.onrender.com",
-  "https://inventory-backend-fdex.onrender.com",
 ];
 // Remove duplicates (if we're already on one of them)
 const UNIQUE_SERVERS = [...new Set(SERVERS)];
