@@ -3818,15 +3818,11 @@
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <h2 style="margin:0">&#128230; Categories</h2>
                 <input id="catSearchBox" type="text" class="search-box" style="margin:0;min-width:200px" placeholder="Search categories..." oninput="renderCatTable()" onkeyup="renderCatTable()" />
-                <select class="bin-sort-select" id="catSort" onchange="catSortFromDropdown()" style="min-width:190px;">
-                  <option value="categoryCode_asc">Code A &#8594; Z</option>
-                  <option value="categoryCode_desc">Code Z &#8594; A</option>
-                  <option value="categoryName_asc">Name A &#8594; Z</option>
-                  <option value="categoryName_desc">Name Z &#8594; A</option>
-                  <option value="buyer_asc">Buyer A &#8594; Z</option>
-                  <option value="buyer_desc">Buyer Z &#8594; A</option>
-                  <option value="picker_asc">Picker A &#8594; Z</option>
-                  <option value="picker_desc">Picker Z &#8594; A</option>
+                <select class="bin-sort-select" id="catFilterBuyer" onchange="renderCatTable()" style="min-width:150px;">
+                  <option value="">All Buyers</option>
+                </select>
+                <select class="bin-sort-select" id="catFilterPicker" onchange="renderCatTable()" style="min-width:160px;">
+                  <option value="">All Pickers</option>
                 </select>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -3875,13 +3871,8 @@
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <h2 style="margin:0">&#127978; Stores</h2>
                 <input id="storeSearchBox" type="text" class="search-box" style="margin:0;min-width:200px" placeholder="Search stores..." oninput="renderStoreTable()" onkeyup="renderStoreTable()" />
-                <select class="bin-sort-select" id="storeSort" onchange="storeSortFromDropdown()" style="min-width:175px;">
-                  <option value="storeCode_asc">Store Code A &#8594; Z</option>
-                  <option value="storeCode_desc">Store Code Z &#8594; A</option>
-                  <option value="storeName_asc">Name A &#8594; Z</option>
-                  <option value="storeName_desc">Name Z &#8594; A</option>
-                  <option value="pickingDay_asc">Picking Day A &#8594; Z</option>
-                  <option value="pickingDay_desc">Picking Day Z &#8594; A</option>
+                <select class="bin-sort-select" id="storeFilterPickingDay" onchange="renderStoreTable()" style="min-width:160px;">
+                  <option value="">All Picking Days</option>
                 </select>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -9068,17 +9059,21 @@
       function sortCategories(col) {
         if (_catSortCol === col) _catSortAsc = !_catSortAsc;
         else { _catSortCol = col; _catSortAsc = true; }
-        const sel = document.getElementById('catSort');
-        if (sel) sel.value = _catSortCol + '_' + (_catSortAsc ? 'asc' : 'desc');
         renderCatTable();
       }
 
-      function catSortFromDropdown() {
-        const val = (document.getElementById('catSort')?.value) || 'categoryCode_asc';
-        const parts = val.split('_');
-        _catSortAsc = parts[parts.length - 1] === 'asc';
-        _catSortCol = parts.slice(0, parts.length - 1).join('_');
-        renderCatTable();
+      function populateCatDropdowns() {
+        function fillSel(id, values, label) {
+          const sel = document.getElementById(id);
+          if (!sel) return;
+          const cur = sel.value;
+          sel.innerHTML = '<option value="">All ' + label + '</option>' +
+            values.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+          if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+        }
+        const uniq = arr => [...new Set(arr.filter(Boolean))].sort((a,b) => a.localeCompare(b));
+        fillSel('catFilterBuyer',  uniq(_catData.map(c => c.buyer)),  'Buyers');
+        fillSel('catFilterPicker', uniq(_catData.map(c => c.picker)), 'Pickers');
       }
 
       async function loadTemplateCategories() {
@@ -9087,6 +9082,7 @@
         try {
           const res = await apiFetch("/template/categories");
           _catData = res.data || [];
+          populateCatDropdowns();
           renderCatTable();
         } catch (err) {
           if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="color:#c62828;text-align:center">' + esc(err.message) + "</td></tr>";
@@ -9104,6 +9100,8 @@
 
         let data = [..._catData];
         const q = (document.getElementById("catSearchBox")?.value || "").toLowerCase();
+        const fBuyer  = document.getElementById('catFilterBuyer')?.value  || '';
+        const fPicker = document.getElementById('catFilterPicker')?.value || '';
         if (q) {
           data = data.filter(c => 
             (c.categoryCode || "").toLowerCase().includes(q) || 
@@ -9112,6 +9110,8 @@
             (c.picker || "").toLowerCase().includes(q)
           );
         }
+        if (fBuyer)  data = data.filter(c => c.buyer  === fBuyer);
+        if (fPicker) data = data.filter(c => c.picker === fPicker);
 
         data.sort((a, b) => {
           const va = a[_catSortCol] || "";
@@ -9261,17 +9261,17 @@
       function sortStores(col) {
         if (_storeSortCol === col) _storeSortAsc = !_storeSortAsc;
         else { _storeSortCol = col; _storeSortAsc = true; }
-        const sel = document.getElementById('storeSort');
-        if (sel) sel.value = _storeSortCol + '_' + (_storeSortAsc ? 'asc' : 'desc');
         renderStoreTable();
       }
 
-      function storeSortFromDropdown() {
-        const val = (document.getElementById('storeSort')?.value) || 'storeCode_asc';
-        const parts = val.split('_');
-        _storeSortAsc = parts[parts.length - 1] === 'asc';
-        _storeSortCol = parts.slice(0, parts.length - 1).join('_');
-        renderStoreTable();
+      function populateStoreDropdowns() {
+        const sel = document.getElementById('storeFilterPickingDay');
+        if (!sel) return;
+        const cur = sel.value;
+        const uniq = [...new Set(_storeData.map(s => s.pickingDay).filter(Boolean))].sort((a,b) => a.localeCompare(b));
+        sel.innerHTML = '<option value="">All Picking Days</option>' +
+          uniq.map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+        if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
       }
 
       async function loadTemplateStores() {
@@ -9280,6 +9280,7 @@
         try {
           const res = await apiFetch("/template/stores");
           _storeData = res.data || [];
+          populateStoreDropdowns();
           renderStoreTable();
         } catch (err) {
           if (tbody) tbody.innerHTML = '<tr><td colspan="3" style="color:#c62828;text-align:center">' + esc(err.message) + "</td></tr>";
@@ -9297,6 +9298,7 @@
 
         let data = [..._storeData];
         const q = (document.getElementById("storeSearchBox")?.value || "").toLowerCase();
+        const fDay = document.getElementById('storeFilterPickingDay')?.value || '';
         if (q) {
           data = data.filter(s => 
             (s.storeCode || "").toLowerCase().includes(q) || 
@@ -9304,6 +9306,7 @@
             (s.pickingDay || "").toLowerCase().includes(q)
           );
         }
+        if (fDay) data = data.filter(s => s.pickingDay === fDay);
 
         data.sort((a, b) => {
           const va = a[_storeSortCol] || "";
