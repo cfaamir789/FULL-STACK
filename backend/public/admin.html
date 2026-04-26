@@ -32,6 +32,9 @@
     />
     <!-- SheetJS for XLSX export -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF + autotable for Reports PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <style>
       * {
         box-sizing: border-box;
@@ -1484,6 +1487,95 @@
           padding: 22px;
         }
       }
+
+      /* ── REPORTS PAGE ──────────────────────────────────────── */
+      /* ═══ Reports v2 ════════════════════════════════════════════════════════ */
+      .report-kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+      .report-kpi-card { background: #fff; border: 1px solid #e4e4e4; border-radius: 10px; padding: 18px 16px 14px; border-left: 5px solid #2e7d32; }
+      .report-kpi-card.red    { border-left-color: #c62828; }
+      .report-kpi-card.orange { border-left-color: #c2410c; }
+      .report-kpi-card.amber  { border-left-color: #b45309; }
+      .report-kpi-card.blue   { border-left-color: #1565c0; }
+      .report-kpi-card.green  { border-left-color: #2e7d32; }
+      .report-kpi-card.purple { border-left-color: #6a1b9a; }
+      .report-kpi-label { font-size: 10px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+      .report-kpi-val   { font-size: 32px; font-weight: 900; color: #111; line-height: 1; }
+      .report-kpi-sub   { font-size: 11px; color: #aaa; margin-top: 5px; }
+      /* Picker overview table */
+      .rpt-overview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .rpt-overview-table thead tr { background: #1e3a5f !important; }
+      .rpt-overview-table th { background: #1e3a5f !important; padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: rgba(255,255,255,.9) !important; white-space: nowrap; }
+      .rpt-overview-table th.r { text-align: right; }
+      .rpt-overview-table td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+      .rpt-overview-table td.r { text-align: right; }
+      .rpt-overview-table tr:nth-child(even) td { background: #f9f9f9; }
+      .rpt-overview-table tr:hover td { background: #eef4ff; }
+      .rpt-overview-table tfoot td { font-weight: 800; background: #f0f4fa; border-top: 2px solid #d0d8e8; padding: 10px 14px; }
+      .rpt-overview-table tfoot td.r { text-align: right; }
+      /* Badges */
+      .rpt-badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 12px; white-space: nowrap; }
+      .rpt-badge.red    { background: #fde8e8; color: #c62828; }
+      .rpt-badge.orange { background: #fff0e0; color: #c2410c; }
+      .rpt-badge.green  { background: #e8f5e9; color: #2e7d32; }
+      .rpt-badge.amber  { background: #fff8e1; color: #92400e; }
+      .rpt-badge.blue   { background: #e3f2fd; color: #1565c0; }
+      .rpt-badge.dark   { background: #37474f; color: #fff; }
+      /* Picker cards */
+      .report-picker-card { background: #fff; border: 1px solid #e4e4e4; border-radius: 10px; overflow: hidden; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+      .report-picker-head { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #eee; background: #fafafa; }
+      .report-picker-head.red    { background: #fff5f5; border-left: 5px solid #c62828; }
+      .report-picker-head.orange { background: #fff8f0; border-left: 5px solid #c2410c; }
+      .report-picker-head.amber  { background: #fffbf0; border-left: 5px solid #b45309; }
+      .report-picker-name { font-size: 15px; font-weight: 800; color: #1a1a1a; letter-spacing: .3px; }
+      .report-picker-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+      /* Item table */
+      .report-item-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .report-item-table thead tr { background: #fafafa; }
+      .report-item-table th { padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #888; border-bottom: 2px solid #eee; white-space: nowrap; }
+      .report-item-table th.r { text-align: right; }
+      .report-item-table td { padding: 8px 12px; border-bottom: 1px solid #f4f4f4; vertical-align: middle; }
+      .report-item-table td.r { text-align: right; }
+      .report-item-table tr:last-child td { border-bottom: none; }
+      .report-item-table tr:nth-child(even) td { background: #fafafa; }
+      .report-item-table tr:hover td { background: #f5f9ff; }
+      /* Bin tags */
+      .report-bin-tag { display: inline-block; border-radius: 4px; font-size: 11px; font-weight: 600; padding: 2px 7px; margin: 1px 2px; white-space: nowrap; }
+      .report-bin-tag.upper   { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+      .report-bin-tag.display { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+      .report-bin-tag.amber   { background: #fff8e1; color: #92400e; border: 1px solid #fde68a; }
+      /* Card footer */
+      .report-card-footer { padding: 10px 16px; border-top: 1px solid #f0f0f0; background: #fafafa; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      /* Download buttons */
+      .report-dl-btn { font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 6px; border: 1px solid; cursor: pointer; transition: opacity .15s; display: inline-flex; align-items: center; gap: 4px; }
+      .report-dl-btn:disabled { opacity: .4; cursor: not-allowed; }
+      .report-dl-xlsx { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
+      .report-dl-xlsx:hover:not(:disabled) { background: #c8e6c9; }
+      .report-dl-pdf  { background: #fce4ec; color: #c62828; border-color: #ef9a9a; }
+      .report-dl-pdf:hover:not(:disabled)  { background: #ffcdd2; }
+      /* Bulk bar */
+      .report-bulk-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 14px; background: #f5f5f5; border: 1px solid #e8e8e8; border-radius: 8px; }
+      .report-bulk-label { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #888; }
+      /* WhatsApp box */
+      .report-wa-box { background: #f0faf2; border: 1px solid #a5d6a7; border-radius: 8px; padding: 14px 14px 10px; margin-bottom: 14px; position: relative; }
+      .report-wa-box textarea { width: 100%; background: transparent; border: none; resize: none; outline: none; font-family: monospace; font-size: 12px; color: #1a1a1a; line-height: 1.6; min-height: 140px; }
+      .report-wa-copy { position: absolute; top: 10px; right: 10px; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: 5px; border: 1px solid #a5d6a7; background: #e8f5e9; color: #2e7d32; cursor: pointer; }
+      .report-wa-copy.copied { background: #2e7d32; color: #fff; }
+      /* Generate button — navy/blue for professionalism */
+      .report-generate-btn { font-size: 15px; font-weight: 800; letter-spacing: .8px; padding: 12px 36px; border-radius: 8px; border: none; cursor: pointer; background: linear-gradient(135deg, #1e3a5f, #2563eb); color: #fff; box-shadow: 0 3px 14px rgba(37,99,235,.35); transition: all .2s; }
+      .report-generate-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,.45); }
+      .report-generate-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+      /* Spinner */
+      .report-spinner { display: inline-block; width: 16px; height: 16px; border: 3px solid rgba(37,99,235,.2); border-top-color: #2563eb; border-radius: 50%; animation: rptSpin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+      @keyframes rptSpin { to { transform: rotate(360deg); } }
+      /* Task block headers */
+      .report-section-hdr { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #fff; padding: 11px 16px; display: flex; align-items: center; gap: 8px; }
+      .report-task-block { border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 24px; }
+      .report-task-inner { padding: 16px; }
+      /* Threshold row */
+      .rpt-threshold-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+      .rpt-threshold-input { width: 65px; padding: 6px 10px; border: 1.5px solid #d0d0d0; border-radius: 6px; font-size: 14px; font-weight: 700; text-align: center; color: #1a1a1a; }
+      /* Empty state */
+      .report-empty { text-align: center; padding: 36px; color: #bbb; font-size: 14px; background: #fafafa; border-radius: 8px; }
     </style>
   </head>
   <body>
@@ -1649,6 +1741,9 @@
         <button id="navUsers" onclick="switchPage('users')">Users</button>
         <button id="navTemplate" onclick="switchPage('template')">
           Template
+        </button>
+        <button id="navReports" onclick="switchPage('reports')">
+          📊 Reports
         </button>
       </div>
 
@@ -4379,6 +4474,225 @@
         </div>
       </div>
 
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <!-- REPORTS PAGE                                                  -->
+      <!-- ══════════════════════════════════════════════════════════════ -->
+      <div id="pageReports" class="panel-page hidden">
+        <div class="section-rail">
+          <button class="section-chip" onclick="scrollToBlock('rptControlBlock')">⚙ Generate</button>
+          <button class="section-chip" onclick="scrollToBlock('rptOverviewBlock')">📋 Overview</button>
+          <button class="section-chip" onclick="scrollToBlock('rptTask1aBlock')">🔴 No Display</button>
+          <button class="section-chip" onclick="scrollToBlock('rptTask1bBlock')">🟠 Low Stock</button>
+          <button class="section-chip" onclick="scrollToBlock('rptTask2Block')">🟡 Consolidation</button>
+        </div>
+
+        <!-- Control Card -->
+        <div class="card" id="rptControlBlock" style="padding:20px 24px;margin-bottom:20px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <h2 style="margin:0 0 4px;font-size:20px;font-weight:900">📊 Daily Refill &amp; Consolidation Report</h2>
+              <p style="margin:0;font-size:13px;color:#666;max-width:580px;line-height:1.6">
+                Identifies items needing restocking: <strong>No Display</strong> (upper stock, zero shelf presence) and
+                <strong>Low Stock</strong> (display qty below threshold). Also flags bins for <strong>Consolidation</strong>.
+                Excludes Category 900, deleted/blocked items, floor bins.
+              </p>
+            </div>
+            <span id="rptTimestamp" style="font-size:11px;color:#aaa;white-space:nowrap;padding-top:4px;flex-shrink:0"></span>
+          </div>
+          <div class="rpt-threshold-row">
+            <button id="rptGenerateBtn" class="report-generate-btn" onclick="fetchRefillReport()">
+              ▶ Generate Report
+            </button>
+            <span id="rptSpinner" style="display:none;align-items:center;gap:6px">
+              <span class="report-spinner"></span>
+              <span style="font-size:13px;color:#666">Running aggregations…</span>
+            </span>
+            <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+              <select id="rptDisplayOp" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:12px; outline:none; cursor:pointer;">
+                <option value="lt">&lt; Less Than</option>
+                <option value="gt">&gt; Greater Than</option>
+              </select>
+              <label style="font-size:11px;font-weight:700;color:#777;letter-spacing:.5px;text-transform:uppercase">Disp Qty</label>
+              <input id="rptDisplayThreshold" class="rpt-threshold-input" type="number" value="12" min="0" max="9999">
+              
+              <div style="width: 1px; height: 20px; background: #d0d0d0; margin: 0 4px;"></div>
+
+              <select id="rptUpperOp" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:12px; outline:none; cursor:pointer;">
+                <option value="gt">&gt; Greater Than</option>
+                <option value="lt">&lt; Less Than</option>
+              </select>
+              <label style="font-size:11px;font-weight:700;color:#777;letter-spacing:.5px;text-transform:uppercase">Upper Qty</label>
+              <input id="rptUpperThreshold" class="rpt-threshold-input" type="number" value="0" min="0" max="9999">
+
+              <div style="width: 1px; height: 20px; background: #d0d0d0; margin: 0 4px;"></div>
+
+              <label style="font-size:11px;font-weight:700;color:#777;letter-spacing:.5px;text-transform:uppercase">Upper Bins</label>
+              <select id="rptUpperBinsLimit" style="padding:4px 8px; border-radius:4px; border:1px solid #ccc; font-size:12px; outline:none; cursor:pointer;">
+                <option value="0">All</option>
+                <option value="1">Top 1 (Highest Qty)</option>
+                <option value="2">Top 2 Bins</option>
+                <option value="3">Top 3 Bins</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPI Summary (hidden until generated) -->
+        <div id="rptSummaryBlock" class="hidden">
+          <div class="report-kpi-grid">
+            <div class="report-kpi-card red">
+              <div class="report-kpi-label">🔴 No Display</div>
+              <div class="report-kpi-val" id="rptKpi1a">—</div>
+              <div class="report-kpi-sub">Upper stock · zero shelf presence</div>
+            </div>
+            <div class="report-kpi-card orange">
+              <div class="report-kpi-label">🟠 Low Stock</div>
+              <div class="report-kpi-val" id="rptKpi1b">—</div>
+              <div class="report-kpi-sub" id="rptKpi1bSub">Display qty below threshold</div>
+            </div>
+            <div class="report-kpi-card green">
+              <div class="report-kpi-label">✅ Total Refill</div>
+              <div class="report-kpi-val" id="rptKpiTotal">—</div>
+              <div class="report-kpi-sub">No Display + Low Stock</div>
+            </div>
+            <div class="report-kpi-card amber">
+              <div class="report-kpi-label">🟡 Consolidation</div>
+              <div class="report-kpi-val" id="rptKpi2">—</div>
+              <div class="report-kpi-sub">Items in 2+ display bins</div>
+            </div>
+            <div class="report-kpi-card blue">
+              <div class="report-kpi-label">👤 Pickers</div>
+              <div class="report-kpi-val" id="rptKpiPickers">—</div>
+              <div class="report-kpi-sub">Involved across all tasks</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Picker Overview + WA + Bulk Downloads (hidden until generated) -->
+        <div id="rptOverviewBlock" class="hidden">
+          <div class="report-task-block">
+            <div class="report-section-hdr" style="background:#1e3a5f; display:flex; justify-content:space-between;">
+              <span>📋 PICKER OVERVIEW</span>
+              <div>
+                <button id="btnPublish" class="btn" style="background:#ff9800; color:#fff; font-size:12px; padding:4px 10px; border-radius:4px; border:none; cursor:pointer;" onclick="publishActiveTarget()">🎯 Publish as Today's Target</button>
+                <button id="btnProgress" class="btn" style="background:#4caf50; color:#fff; font-size:12px; padding:4px 10px; border-radius:4px; border:none; cursor:pointer;" onclick="fetchKPIProgress()">🔄 Refresh KPI Progress</button>
+              </div>
+            </div>
+            <div class="report-task-inner">
+              <div id="activeTargetBadge" style="margin-bottom:12px; font-weight:bold; color:#1e3a5f; align-items:center; display:none;">
+                🎯 ACTIVE TARGET PLAN <span id="activeTargetTimestamp" style="font-weight:normal; color:#666; margin-left:4px;"></span>
+              </div>
+              <div id="clearFilterCont" style="margin-bottom:12px; display:none;">
+                <button id="btnClearFilter" class="btn" style="background:#e0e0e0; color:#333; font-size:12px; padding:4px 10px; border-radius:4px; border:1px solid #ccc; cursor:pointer;" onclick="clearPickerFilter()">❌ Clear User Filter</button>
+                 <span id="filteredPickerName" style="margin-left:10px; font-weight:bold; color:#c62828;"></span>
+              </div>
+              <div style="overflow-x:auto">
+                <table class="rpt-overview-table">
+                  <thead>
+                    <tr>
+                      <th>Picker / Incharge</th>
+                      <th class="r">🎯 KPI Progress</th>
+                      <th class="r">🔴 No Display</th>
+                      <th class="r">🟠 Low Stock</th>
+                      <th class="r">Total Refill</th>
+                      <th class="r">🟡 Consolidation</th>
+                      <th class="r">All Tasks</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rptOverviewBody"></tbody>
+                  <tfoot id="rptOverviewFoot"></tfoot>
+                </table>
+              </div>
+
+              <div style="margin-top:20px">
+                <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#777;margin-bottom:8px">
+                  📲 WhatsApp Summary — Copy &amp; Forward to Team
+                </div>
+                <div class="report-wa-box">
+                  <textarea id="rptWaText" readonly></textarea>
+                  <button class="report-wa-copy" id="rptWaCopyBtn" onclick="copyRefillWA()">Copy</button>
+                </div>
+              </div>
+
+              <div class="report-bulk-bar">
+                <span class="report-bulk-label">Bulk:</span>
+                <button class="report-dl-btn report-dl-xlsx" onclick="downloadAllRefillExcel()">⬇ Combined Refill — XLSX</button>
+                <button class="report-dl-btn report-dl-pdf"  onclick="downloadAllRefillPDF()">⬇ Combined Refill — PDF</button>
+                <button class="report-dl-btn report-dl-xlsx" onclick="downloadAllTask2Excel()">⬇ Consolidation — XLSX</button>
+                <button class="report-dl-btn report-dl-pdf"  onclick="downloadAllTask2PDF()">⬇ Consolidation — PDF</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Task 1A — No Display (hidden until generated) -->
+        <div id="rptTask1aBlock" class="hidden">
+          <div class="report-task-block">
+            <div class="report-section-hdr" style="background:#c62828">
+              🔴 TASK 1A — NO DISPLAY
+              <span id="rptTask1aCountBadge" style="font-weight:400;font-size:12px;opacity:.85"></span>
+            </div>
+            <div class="report-task-inner">
+              <p style="font-size:12px;color:#555;margin:0 0 14px;line-height:1.6">
+                Items present in <strong>upper bins</strong> but <strong>absent from all display bins</strong>.
+                Move to the display shelf immediately — highest priority.
+              </p>
+              <div class="report-bulk-bar">
+                <span class="report-bulk-label">Download:</span>
+                <button class="report-dl-btn report-dl-xlsx" onclick="downloadAllTask1aExcel()">⬇ All Pickers — XLSX</button>
+                <button class="report-dl-btn report-dl-pdf"  onclick="downloadAllTask1aPDF()">⬇ All Pickers — PDF</button>
+              </div>
+              <div id="rptTask1aCards"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Task 1B — Low Stock (hidden until generated) -->
+        <div id="rptTask1bBlock" class="hidden">
+          <div class="report-task-block">
+            <div class="report-section-hdr" style="background:#c2410c">
+              🟠 TASK 1B — LOW DISPLAY STOCK
+              <span id="rptTask1bCountBadge" style="font-weight:400;font-size:12px;opacity:.85"></span>
+            </div>
+            <div class="report-task-inner">
+              <p style="font-size:12px;color:#555;margin:0 0 14px;line-height:1.6">
+                Items with display presence but total qty below threshold
+                (<strong id="rptTask1bThresholdLabel"></strong> pcs). Top up from upper bins.
+              </p>
+              <div class="report-bulk-bar">
+                <span class="report-bulk-label">Download:</span>
+                <button class="report-dl-btn report-dl-xlsx" onclick="downloadAllTask1bExcel()">⬇ All Pickers — XLSX</button>
+                <button class="report-dl-btn report-dl-pdf"  onclick="downloadAllTask1bPDF()">⬇ All Pickers — PDF</button>
+              </div>
+              <div id="rptTask1bCards"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Task 2 — Consolidation (hidden until generated) -->
+        <div id="rptTask2Block" class="hidden">
+          <div class="report-task-block">
+            <div class="report-section-hdr" style="background:#92400e">
+              🟡 TASK 2 — CONSOLIDATION
+              <span id="rptTask2CountBadge" style="font-weight:400;font-size:12px;opacity:.85"></span>
+            </div>
+            <div class="report-task-inner">
+              <p style="font-size:12px;color:#555;margin:0 0 14px;line-height:1.6">
+                Items appearing in <strong>2 or more display bins</strong> simultaneously.
+                Merge all stock into a single display bin to free up shelf space.
+              </p>
+              <div class="report-bulk-bar">
+                <span class="report-bulk-label">Download:</span>
+                <button class="report-dl-btn report-dl-xlsx" onclick="downloadAllTask2Excel()">⬇ All Pickers — XLSX</button>
+                <button class="report-dl-btn report-dl-pdf"  onclick="downloadAllTask2PDF()">⬇ All Pickers — PDF</button>
+              </div>
+              <div id="rptTask2Cards"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- end pageReports -->
+
       <div style="text-align: center; padding: 16px">
         <button
           class="btn"
@@ -4593,6 +4907,7 @@
         workers: false,
         users: false,
         template: false,
+        reports: false,
       };
       let currentItemsPage = 1;
       let currentItemsPages = 1;
@@ -4613,6 +4928,7 @@
         workers: 0,
         users: 0,
         template: 0,
+        reports: 0,
       };
 
       function isPageStale(page) {
@@ -4634,6 +4950,7 @@
         "bin-content": "binContent",
         users: "users",
         template: "template",
+        reports: "reports",
       };
       const PAGE_SLUGS = {
         dashboard: "",
@@ -4643,6 +4960,7 @@
         binContent: "bin-content",
         users: "users",
         template: "template",
+        reports: "reports",
       };
       function resolvePageFromPath() {
         const slug = window.location.pathname
@@ -5133,6 +5451,7 @@
           "workers",
           "users",
           "template",
+          "reports",
         ];
         pages.forEach((p) => {
           document
@@ -5267,6 +5586,12 @@
           }
           await tmplRefreshCurrentSection();
           markPageLoaded("template");
+        }
+        if (page === "reports") {
+          // Reports are on-demand only (user clicks "Generate" button).
+          // Just mark the page as loaded so tab switching is instant.
+          if (!pageLoaded.reports) markPageLoaded("reports");
+          return;
         }
       }
 
@@ -10058,6 +10383,640 @@
         checkSetup();
       }
       init();
+
+      // ════════════════════════════════════════════════════════════════════════
+      // REPORTS — Refill & Consolidation  (v2: task1a / task1b / task2)
+      // ════════════════════════════════════════════════════════════════════════
+
+      window._reportData = null;
+
+      function rptEl(id) { return document.getElementById(id); }
+      function rptShowHide(id, v) { const el = rptEl(id); if (el) el.classList.toggle("hidden", !v); }
+
+      function rptFmtDate(iso) {
+        const d = new Date(iso);
+        return {
+          date: `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`,
+          time: `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`,
+        };
+      }
+
+      function rptSafeFilename(s) { return String(s).replace(/[^\w\-]/g,"_").replace(/_+/g,"_"); }
+      function rptGetDateStr() {
+        const d = new Date();
+        return `${String(d.getDate()).padStart(2,"0")}-${String(d.getMonth()+1).padStart(2,"0")}-${d.getFullYear()}`;
+      }
+
+      function escHtml(s) {
+        return String(s ?? "")
+          .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      }
+
+      // ── Fetch ──────────────────────────────────────────────────────────────
+      async function fetchRefillReport() {
+        const btn       = rptEl("rptGenerateBtn");
+        const spinner   = rptEl("rptSpinner");
+        const displayThreshold = Math.max(0, parseInt(rptEl("rptDisplayThreshold").value) || 0);
+        const displayOp        = rptEl("rptDisplayOp").value;
+        const upperThreshold   = Math.max(0, parseInt(rptEl("rptUpperThreshold").value) || 0);
+        const upperOp          = rptEl("rptUpperOp").value;
+        const upperLimit       = parseInt(rptEl("rptUpperBinsLimit").value) || 0;
+
+        btn.disabled = true;
+        spinner.style.display = "inline-flex";
+        try {
+          const resp = await fetch(`/api/reports/refill?displayThreshold=${displayThreshold}&displayOp=${displayOp}&upperThreshold=${upperThreshold}&upperOp=${upperOp}&upperLimit=${upperLimit}`, {
+            headers: { Authorization: "Bearer " + authToken },
+          });
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          const data = await resp.json();
+          window._reportData = data;
+          renderReportSummary(data);
+          renderTask1a(data.task1a);
+          renderTask1b(data.task1b, data.displayOp, data.displayThreshold, data.upperOp, data.upperThreshold, data.upperLimit);
+          renderTask2(data.task2);
+          const fmt = rptFmtDate(data.generatedAt);
+          const dopStr = data.displayOp === 'gt' ? '>' : '<';
+          const uopStr = data.upperOp === 'gt' ? '>' : '<';
+          rptEl("rptTimestamp").textContent = `Generated: ${fmt.date} ${fmt.time}  ·  Disp ${dopStr} ${data.displayThreshold} pcs  ·  Upper ${uopStr} ${data.upperThreshold} pcs`;
+        } catch (err) {
+          alert("Failed to generate report: " + err.message);
+        } finally {
+          btn.disabled = false;
+          spinner.style.display = "none";
+        }
+      }
+
+      // ── Summary KPIs + Picker Overview ────────────────────────────────────
+      function renderReportSummary(data) {
+        const { task1a, task1b, task2, pickerSummary, displayThreshold, displayOp } = data;
+        const totalRefill  = task1a.total + task1b.total;
+        const totalPickers = Object.keys(pickerSummary).length;
+        const dopStr = displayOp === 'gt' ? '>' : '<';
+
+        rptEl("rptKpi1a").textContent     = task1a.total;
+        rptEl("rptKpi1b").textContent     = task1b.total;
+        rptEl("rptKpi1bSub").textContent  = `Display qty ${dopStr} ${displayThreshold} pcs`;
+        rptEl("rptKpiTotal").textContent  = totalRefill;
+        rptEl("rptKpi2").textContent      = task2.total;
+        rptEl("rptKpiPickers").textContent = totalPickers;
+
+        rptShowHide("rptSummaryBlock",  true);
+        rptShowHide("rptOverviewBlock", true);
+        rptShowHide("rptTask1aBlock",   true);
+        rptShowHide("rptTask1bBlock",   true);
+        rptShowHide("rptTask2Block",    true);
+
+        // WA message
+        const fmt = rptFmtDate(data.generatedAt);
+        rptEl("rptWaText").value = buildRefillWAMessage(data, fmt);
+
+        // Picker overview table
+        const pickers = Object.keys(pickerSummary).sort();
+        let totND = 0, totLow = 0, totCons = 0;
+
+        rptEl("rptOverviewBody").innerHTML = pickers.map(p => {
+          const s = pickerSummary[p];
+          const refill = s.noDisplay + s.lowDisplay;
+          totND   += s.noDisplay;
+          totLow  += s.lowDisplay;
+          totCons += s.consolidation;
+          return `<tr style="cursor:pointer;" onclick="filterReportByPicker('${escHtml(p)}')">
+            <td><strong>${escHtml(p)}</strong></td>
+            <td class="r" id="kpi-cell-${escHtml(p)}"><span style="color:#ccc">Refresh to load</span></td>
+            <td class="r">${s.noDisplay   ? `<span class="rpt-badge red">${s.noDisplay}</span>`      : `<span style="color:#ccc">—</span>`}</td>
+            <td class="r">${s.lowDisplay  ? `<span class="rpt-badge orange">${s.lowDisplay}</span>`  : `<span style="color:#ccc">—</span>`}</td>
+            <td class="r"><span class="rpt-badge green">${refill}</span></td>
+            <td class="r">${s.consolidation ? `<span class="rpt-badge amber">${s.consolidation}</span>` : `<span style="color:#ccc">—</span>`}</td>
+            <td class="r" id="all-tasks-cell-${escHtml(p)}"><span class="rpt-badge dark">${refill + s.consolidation}</span></td>
+          </tr>`;
+        }).join("");
+
+        const totRefill = totND + totLow;
+        rptEl("rptOverviewFoot").innerHTML = `<tr>
+          <td>TOTAL</td>
+          <td></td>
+          <td class="r">${totND}</td>
+          <td class="r">${totLow}</td>
+          <td class="r">${totRefill}</td>
+          <td class="r">${totCons}</td>
+          <td class="r">${totRefill + totCons}</td>
+        </tr>`;
+      }
+
+      // ── Task 1A — No Display ───────────────────────────────────────────────
+      function renderTask1a(task1a) {
+        rptEl("rptTask1aCountBadge").textContent = `(${task1a.total} items)`;
+        const container = rptEl("rptTask1aCards");
+        if (!task1a.total) {
+          container.innerHTML = `<div class="report-empty">✅ All items have display shelf presence — no immediate refill needed.</div>`;
+          return;
+        }
+        container.innerHTML = Object.entries(task1a.byPicker).map(([picker, items]) => `
+          <div class="report-picker-card">
+            <div class="report-picker-head red">
+              <span class="report-picker-name">👤 ${escHtml(picker)}</span>
+              <div class="report-picker-meta">
+                <span class="rpt-badge red">${items.length} item${items.length !== 1 ? "s" : ""}</span>
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="report-item-table">
+                <thead><tr>
+                  <th>#</th><th>Item Code</th><th>Item Name</th><th>Category</th>
+                  <th>Upper Bins (Source)</th><th class="r">Upper Qty</th>
+                </tr></thead>
+                <tbody>
+                  ${items.map((item, i) => `<tr>
+                    <td style="color:#bbb;font-size:11px">${i + 1}</td>
+                    <td><strong>${escHtml(item.ItemCode)}</strong></td>
+                    <td>${escHtml(item.Item_Name)}</td>
+                    <td style="font-size:11px;color:#777">${escHtml(item.categoryName || item.CategoryCode)}</td>
+                    <td>${(item.upperBins||[]).map(b=>`<span class="report-bin-tag upper">${escHtml(b.BinCode)} <em style="font-style:normal;opacity:.65;font-size:10px">×${b.Qty}</em></span>`).join("")}</td>
+                    <td class="r" style="color:#2e7d32;font-weight:800;font-size:14px">${item.totalUpperQty}</td>
+                  </tr>`).join("")}
+                </tbody>
+              </table>
+            </div>
+            <div class="report-card-footer">
+              <button class="report-dl-btn report-dl-xlsx" onclick="downloadTask1aExcelForPicker(${JSON.stringify(picker)})">⬇ XLSX</button>
+              <button class="report-dl-btn report-dl-pdf"  onclick="downloadTask1aPDFForPicker(${JSON.stringify(picker)})">⬇ PDF</button>
+            </div>
+          </div>`).join("");
+      }
+
+      // ── Task 1B — Low Stock ────────────────────────────────────────────────
+      function renderTask1b(task1b, displayOp, displayThreshold, upperOp, upperThreshold, upperLimit) {
+        const dopStr = displayOp === 'gt' ? '>' : '<';
+        const uopStr = upperOp === 'gt' ? '>' : '<';
+        rptEl("rptTask1bCountBadge").textContent = `(${task1b.total} items)`;
+        rptEl("rptTask1bThresholdLabel").textContent = `Disp ${dopStr} ${displayThreshold} | Upper ${uopStr} ${upperThreshold}`;
+        const container = rptEl("rptTask1bCards");
+        if (!task1b.total) {
+          container.innerHTML = `<div class="report-empty">✅ All display bins meet the stock threshold — no top-up required.</div>`;
+          return;
+        }
+        container.innerHTML = Object.entries(task1b.byPicker).map(([picker, items]) => `
+          <div class="report-picker-card">
+            <div class="report-picker-head orange">
+              <span class="report-picker-name">👤 ${escHtml(picker)}</span>
+              <div class="report-picker-meta">
+                <span class="rpt-badge orange">${items.length} item${items.length !== 1 ? "s" : ""}</span>
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="report-item-table">
+                <thead><tr>
+                  <th>#</th><th>Item Code</th><th>Item Name</th><th>Category</th>
+                  <th>Display Bins (Current)</th><th class="r">Disp Qty</th>
+                  <th>Upper Bins (Source)</th><th class="r">Upper Qty</th>
+                </tr></thead>
+                <tbody>
+                  ${items.map((item, i) => `<tr>
+                    <td style="color:#bbb;font-size:11px">${i + 1}</td>
+                    <td><strong>${escHtml(item.ItemCode)}</strong></td>
+                    <td>${escHtml(item.Item_Name)}</td>
+                    <td style="font-size:11px;color:#777">${escHtml(item.categoryName || item.CategoryCode)}</td>
+                    <td>${(item.displayBins||[]).map(b=>`<span class="report-bin-tag display">${escHtml(b.BinCode)} <em style="font-style:normal;opacity:.65;font-size:10px">×${b.Qty}</em></span>`).join("")}</td>
+                    <td class="r" style="color:#c2410c;font-weight:800">${item.totalDisplayQty}</td>
+                    <td>${(item.upperBins||[]).map(b=>`<span class="report-bin-tag upper">${escHtml(b.BinCode)} <em style="font-style:normal;opacity:.65;font-size:10px">×${b.Qty}</em></span>`).join("")}</td>
+                    <td class="r" style="color:#2e7d32;font-weight:800">${item.totalUpperQty}</td>
+                  </tr>`).join("")}
+                </tbody>
+              </table>
+            </div>
+            <div class="report-card-footer">
+              <button class="report-dl-btn report-dl-xlsx" onclick="downloadTask1bExcelForPicker(${JSON.stringify(picker)})">⬇ XLSX</button>
+              <button class="report-dl-btn report-dl-pdf"  onclick="downloadTask1bPDFForPicker(${JSON.stringify(picker)})">⬇ PDF</button>
+            </div>
+          </div>`).join("");
+      }
+
+      // ── Task 2 — Consolidation ─────────────────────────────────────────────
+      function renderTask2(task2) {
+        rptEl("rptTask2CountBadge").textContent = `(${task2.total} items)`;
+        const container = rptEl("rptTask2Cards");
+        if (!task2.total) {
+          container.innerHTML = `<div class="report-empty">✅ No consolidation needed — no item occupies more than one display bin.</div>`;
+          return;
+        }
+        container.innerHTML = Object.entries(task2.byPicker).map(([picker, items]) => `
+          <div class="report-picker-card">
+            <div class="report-picker-head amber">
+              <span class="report-picker-name">👤 ${escHtml(picker)}</span>
+              <div class="report-picker-meta">
+                <span class="rpt-badge amber">${items.length} item${items.length !== 1 ? "s" : ""}</span>
+              </div>
+            </div>
+            <div style="overflow-x:auto">
+              <table class="report-item-table">
+                <thead><tr>
+                  <th>#</th><th>Item Code</th><th>Item Name</th><th>Category</th>
+                  <th>Display Bins</th><th class="r">Bins</th><th class="r">Total Qty</th>
+                </tr></thead>
+                <tbody>
+                  ${items.map((item, i) => `<tr>
+                    <td style="color:#bbb;font-size:11px">${i + 1}</td>
+                    <td><strong>${escHtml(item.ItemCode)}</strong></td>
+                    <td>${escHtml(item.Item_Name)}</td>
+                    <td style="font-size:11px;color:#777">${escHtml(item.categoryName || item.CategoryCode)}</td>
+                    <td>${(item.displayBins||[]).map(b=>`<span class="report-bin-tag amber">${escHtml(b.BinCode)} <em style="font-style:normal;opacity:.65;font-size:10px">×${b.Qty}</em></span>`).join("")}</td>
+                    <td class="r" style="color:#92400e;font-weight:800">${item.binCount}</td>
+                    <td class="r" style="color:#1565c0;font-weight:800;font-size:14px">${item.totalDisplayQty}</td>
+                  </tr>`).join("")}
+                </tbody>
+              </table>
+            </div>
+            <div class="report-card-footer">
+              <button class="report-dl-btn report-dl-xlsx" onclick="downloadTask2ExcelForPicker(${JSON.stringify(picker)})">⬇ XLSX</button>
+              <button class="report-dl-btn report-dl-pdf"  onclick="downloadTask2PDFForPicker(${JSON.stringify(picker)})">⬇ PDF</button>
+            </div>
+          </div>`).join("");
+      }
+
+      // ── WhatsApp message ───────────────────────────────────────────────────
+      function buildRefillWAMessage(data, fmt) {
+        const { task1a, task1b, task2, pickerSummary, displayThreshold, displayOp, upperThreshold, upperOp } = data;
+        const totalRefill = task1a.total + task1b.total;
+        const pickers = Object.keys(pickerSummary).sort();
+        const sep = "━━━━━━━━━━━━━━━━━━━━";
+        const dopStr = displayOp === 'gt' ? '>' : '<';
+        const uopStr = upperOp === 'gt' ? '>' : '<';
+
+        const refillLines = pickers
+          .filter(p => pickerSummary[p].noDisplay + pickerSummary[p].lowDisplay > 0)
+          .map((p, i) => {
+            const s = pickerSummary[p];
+            const parts = [];
+            if (s.noDisplay)  parts.push(`${s.noDisplay} no display`);
+            if (s.lowDisplay) parts.push(`${s.lowDisplay} low stock`);
+            return `${i + 1}. *${p}* → ${parts.join(" + ")} = *${s.noDisplay + s.lowDisplay}*`;
+          }).join("\n");
+
+        const consLines = pickers
+          .filter(p => pickerSummary[p].consolidation > 0)
+          .map((p, i) => `${i + 1}. *${p}* → ${pickerSummary[p].consolidation} items`)
+          .join("\n");
+
+        return (
+          `📦 *DAILY REFILL REPORT — ${fmt.date} · ${fmt.time}*\n` +
+          `Threshold: Disp ${dopStr} ${displayThreshold} pcs, Upper ${uopStr} ${upperThreshold} pcs\n\n` +
+          `${sep}\n*SUMMARY*\n` +
+          `🔴 No Display:    *${task1a.total}* items\n` +
+          `🟠 Low Stock:     *${task1b.total}* items\n` +
+          `✅ Total Refill:  *${totalRefill}* items\n` +
+          `🟡 Consolidation: *${task2.total}* items\n\n` +
+          `${sep}\n*REFILL — BY PICKER*\n${refillLines || "None"}` +
+          (consLines ? `\n\n${sep}\n*CONSOLIDATION — BY PICKER*\n${consLines}` : "") +
+          `\n\n⚡ _Priority: No Display first · Low Stock next · Then Consolidation_`
+        );
+      }
+
+      async function copyRefillWA() {
+        const ta  = rptEl("rptWaText");
+        const btn = rptEl("rptWaCopyBtn");
+        try { await navigator.clipboard.writeText(ta.value); } catch { ta.select(); document.execCommand("copy"); }
+        btn.textContent = "Copied!"; btn.classList.add("copied");
+        setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("copied"); }, 2000);
+      }
+
+      // ── XLSX helpers ───────────────────────────────────────────────────────
+      function applyXlsxColWidths(ws, widths) { ws["!cols"] = widths.map(w => ({ wch: w })); }
+
+      function buildTask1aSheet(items) {
+        const h = ["#","Item Code","Barcode","Item Name","Category Code","Category Name","Upper Bins","Upper Qty"];
+        const rows = items.map((item, i) => [
+          i+1, item.ItemCode, item.Barcode||"", item.Item_Name,
+          item.CategoryCode, item.categoryName||item.CategoryCode,
+          (item.upperBins||[]).map(b=>`${b.BinCode}(${b.Qty})`).join(", "), item.totalUpperQty,
+        ]);
+        return XLSX.utils.aoa_to_sheet([h, ...rows]);
+      }
+
+      function buildTask1bSheet(items) {
+        const h = ["#","Item Code","Barcode","Item Name","Category Code","Category Name","Display Bins","Disp Qty","Upper Bins","Upper Qty"];
+        const rows = items.map((item, i) => [
+          i+1, item.ItemCode, item.Barcode||"", item.Item_Name,
+          item.CategoryCode, item.categoryName||item.CategoryCode,
+          (item.displayBins||[]).map(b=>`${b.BinCode}(${b.Qty})`).join(", "), item.totalDisplayQty,
+          (item.upperBins||[]).map(b=>`${b.BinCode}(${b.Qty})`).join(", "), item.totalUpperQty,
+        ]);
+        return XLSX.utils.aoa_to_sheet([h, ...rows]);
+      }
+
+      function buildTask2Sheet(items) {
+        const h = ["#","Item Code","Barcode","Item Name","Category Code","Category Name","Display Bins","Bin Count","Total Disp Qty"];
+        const rows = items.map((item, i) => [
+          i+1, item.ItemCode, item.Barcode||"", item.Item_Name,
+          item.CategoryCode, item.categoryName||item.CategoryCode,
+          (item.displayBins||[]).map(b=>`${b.BinCode}(${b.Qty})`).join(", "), item.binCount, item.totalDisplayQty,
+        ]);
+        return XLSX.utils.aoa_to_sheet([h, ...rows]);
+      }
+
+      function _makeSummarySheet(data) {
+        const pickers = Object.keys(data.pickerSummary).sort();
+        const h = ["Picker","No Display","Low Stock","Total Refill","Consolidation","All Tasks"];
+        const rows = pickers.map(p => {
+          const s = data.pickerSummary[p]; const r = s.noDisplay + s.lowDisplay;
+          return [p, s.noDisplay, s.lowDisplay, r, s.consolidation, r + s.consolidation];
+        });
+        const ws = XLSX.utils.aoa_to_sheet([h, ...rows]);
+        ws["!cols"] = [{wch:24},{wch:12},{wch:10},{wch:12},{wch:14},{wch:10}];
+        return ws;
+      }
+
+      // ── Per-picker XLSX ────────────────────────────────────────────────────
+      function downloadTask1aExcelForPicker(picker) {
+        const d = window._reportData; if (!d) return;
+        const ws = buildTask1aSheet(d.task1a.byPicker[picker]||[]);
+        applyXlsxColWidths(ws, [4,12,14,32,10,22,28,10]);
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "No Display");
+        XLSX.writeFile(wb, `NoDisplay_${rptSafeFilename(picker)}_${rptGetDateStr()}.xlsx`);
+      }
+      function downloadTask1bExcelForPicker(picker) {
+        const d = window._reportData; if (!d) return;
+        const ws = buildTask1bSheet(d.task1b.byPicker[picker]||[]);
+        applyXlsxColWidths(ws, [4,12,14,32,10,22,28,8,28,8]);
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Low Stock");
+        XLSX.writeFile(wb, `LowStock_${rptSafeFilename(picker)}_${rptGetDateStr()}.xlsx`);
+      }
+      function downloadTask2ExcelForPicker(picker) {
+        const d = window._reportData; if (!d) return;
+        const ws = buildTask2Sheet(d.task2.byPicker[picker]||[]);
+        applyXlsxColWidths(ws, [4,12,14,32,10,22,36,6,10]);
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Consolidation");
+        XLSX.writeFile(wb, `Consolidation_${rptSafeFilename(picker)}_${rptGetDateStr()}.xlsx`);
+      }
+
+      // ── Bulk XLSX ──────────────────────────────────────────────────────────
+      function downloadAllRefillExcel() {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, _makeSummarySheet(d), "Summary");
+        const allPickers = [...new Set([...Object.keys(d.task1a.byPicker), ...Object.keys(d.task1b.byPicker)])].sort();
+        for (const picker of allPickers) {
+          const a = (d.task1a.byPicker[picker]||[]).map(i=>({...i,_type:"No Display"}));
+          const b = (d.task1b.byPicker[picker]||[]).map(i=>({...i,_type:"Low Stock"}));
+          const combined = [...a,...b];
+          const h = ["#","Type","Item Code","Item Name","Category","Display Bins","Disp Qty","Upper Bins","Upper Qty"];
+          const rows = combined.map((item,i) => [
+            i+1, item._type, item.ItemCode, item.Item_Name,
+            item.categoryName||item.CategoryCode,
+            (item.displayBins||[]).map(b=>`${b.BinCode}(${b.Qty})`).join(", "), item.totalDisplayQty||"",
+            (item.upperBins||[]).map(b=>`${b.BinCode}(${b.Qty})`).join(", "), item.totalUpperQty,
+          ]);
+          const ws = XLSX.utils.aoa_to_sheet([h,...rows]);
+          ws["!cols"] = [{wch:4},{wch:12},{wch:14},{wch:32},{wch:20},{wch:24},{wch:8},{wch:24},{wch:8}];
+          XLSX.utils.book_append_sheet(wb, ws, rptSafeFilename(picker).slice(0,31));
+        }
+        XLSX.writeFile(wb, `Refill_ALL_${rptGetDateStr()}.xlsx`);
+      }
+      function downloadAllTask1aExcel() {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, _makeSummarySheet(d), "Summary");
+        for (const [picker,items] of Object.entries(d.task1a.byPicker)) {
+          const ws = buildTask1aSheet(items); applyXlsxColWidths(ws,[4,12,14,32,10,22,28,10]);
+          XLSX.utils.book_append_sheet(wb, ws, rptSafeFilename(picker).slice(0,31));
+        }
+        XLSX.writeFile(wb, `NoDisplay_ALL_${rptGetDateStr()}.xlsx`);
+      }
+      function downloadAllTask1bExcel() {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, _makeSummarySheet(d), "Summary");
+        for (const [picker,items] of Object.entries(d.task1b.byPicker)) {
+          const ws = buildTask1bSheet(items); applyXlsxColWidths(ws,[4,12,14,32,10,22,28,8,28,8]);
+          XLSX.utils.book_append_sheet(wb, ws, rptSafeFilename(picker).slice(0,31));
+        }
+        XLSX.writeFile(wb, `LowStock_ALL_${rptGetDateStr()}.xlsx`);
+      }
+      function downloadAllTask2Excel() {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, _makeSummarySheet(d), "Summary");
+        for (const [picker,items] of Object.entries(d.task2.byPicker)) {
+          const ws = buildTask2Sheet(items); applyXlsxColWidths(ws,[4,12,14,32,10,22,36,6,10]);
+          XLSX.utils.book_append_sheet(wb, ws, rptSafeFilename(picker).slice(0,31));
+        }
+        XLSX.writeFile(wb, `Consolidation_ALL_${rptGetDateStr()}.xlsx`);
+      }
+
+      // ── PDF helpers ────────────────────────────────────────────────────────
+      function rptJsPDF() {
+        if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+        if (window.jsPDF) return window.jsPDF;
+        throw new Error("jsPDF not loaded");
+      }
+
+      function _pdfDoc(title, subtitle) {
+        const doc = new (rptJsPDF())({ orientation:"landscape", unit:"mm", format:"a4" });
+        doc.setFontSize(14); doc.setFont("helvetica","bold"); doc.text(title, 14, 16);
+        doc.setFontSize(9);  doc.setFont("helvetica","normal"); doc.setTextColor(100);
+        doc.text(subtitle, 14, 23); doc.setTextColor(0);
+        return doc;
+      }
+
+      // ── Per-picker PDF ─────────────────────────────────────────────────────
+      function downloadTask1aPDFForPicker(picker) {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        const items = d.task1a.byPicker[picker]||[]; const ds = rptGetDateStr();
+        try {
+          const doc = _pdfDoc(`NO DISPLAY REFILL — ${picker}`, `Generated: ${ds}   |   ${items.length} items`);
+          doc.autoTable({
+            startY:28,
+            head:[["#","Item Code","Item Name","Category","Upper Bins (Source)","Upper Qty"]],
+            body: items.map((item,i)=>[i+1,item.ItemCode,item.Item_Name,item.categoryName||item.CategoryCode,(item.upperBins||[]).map(b=>`${b.BinCode}(${b.Qty})`).join(", "),item.totalUpperQty]),
+            styles:{fontSize:8,cellPadding:2.5},
+            headStyles:{fillColor:[198,40,40],textColor:255,fontStyle:"bold"},
+            alternateRowStyles:{fillColor:[255,245,245]},
+            columnStyles:{0:{cellWidth:8},1:{cellWidth:24},2:{cellWidth:72},3:{cellWidth:40},4:{cellWidth:100},5:{cellWidth:14,halign:"right"}},
+          });
+          doc.save(`NoDisplay_${rptSafeFilename(picker)}_${ds}.pdf`);
+        } catch(e){ alert("PDF error: "+e.message); }
+      }
+
+      function downloadTask1bPDFForPicker(picker) {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        const items = d.task1b.byPicker[picker]||[]; const ds = rptGetDateStr();
+        const dopStr = d.displayOp === 'gt' ? '>' : '<';
+        const uopStr = d.upperOp === 'gt' ? '>' : '<';
+        try {
+          const doc = _pdfDoc(`LOW STOCK REFILL — ${picker}`, `Generated: ${ds}   |   ${items.length} items   |   Threshold: Disp ${dopStr}${d.displayThreshold}, Upper ${uopStr}${d.upperThreshold}`);
+          doc.autoTable({
+            startY:28,
+            head:[["#","Item Code","Item Name","Category","Display Bins","Disp Qty","Upper Bins","Upper Qty"]],
+            body: items.map((item,i)=>[i+1,item.ItemCode,item.Item_Name,item.categoryName||item.CategoryCode,(item.displayBins||[]).map(b=>`${b.BinCode}(${b.Qty})`).join(", "),item.totalDisplayQty,(item.upperBins||[]).map(b=>`${b.BinCode}(${b.Qty})`).join(", "),item.totalUpperQty]),
+            styles:{fontSize:8,cellPadding:2.5},
+            headStyles:{fillColor:[194,65,12],textColor:255,fontStyle:"bold"},
+            alternateRowStyles:{fillColor:[255,248,240]},
+            columnStyles:{0:{cellWidth:7},1:{cellWidth:20},2:{cellWidth:58},3:{cellWidth:34},4:{cellWidth:54},5:{cellWidth:12,halign:"right"},6:{cellWidth:54},7:{cellWidth:12,halign:"right"}},
+          });
+          doc.save(`LowStock_${rptSafeFilename(picker)}_${ds}.pdf`);
+        } catch(e){ alert("PDF error: "+e.message); }
+      }
+
+      function downloadTask2PDFForPicker(picker) {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        const items = d.task2.byPicker[picker]||[]; const ds = rptGetDateStr();
+        try {
+          const doc = _pdfDoc(`CONSOLIDATION — ${picker}`, `Generated: ${ds}   |   ${items.length} items`);
+          doc.autoTable({
+            startY:28,
+            head:[["#","Item Code","Item Name","Category","Display Bins","Bins","Total Qty"]],
+            body: items.map((item,i)=>[i+1,item.ItemCode,item.Item_Name,item.categoryName||item.CategoryCode,(item.displayBins||[]).map(b=>`${b.BinCode}(${b.Qty})`).join(", "),item.binCount,item.totalDisplayQty]),
+            styles:{fontSize:8,cellPadding:2.5},
+            headStyles:{fillColor:[146,64,14],textColor:255,fontStyle:"bold"},
+            alternateRowStyles:{fillColor:[255,251,235]},
+            columnStyles:{0:{cellWidth:8},1:{cellWidth:24},2:{cellWidth:70},3:{cellWidth:40},4:{cellWidth:100},5:{cellWidth:10,halign:"right"},6:{cellWidth:14,halign:"right"}},
+          });
+          doc.save(`Consolidation_${rptSafeFilename(picker)}_${ds}.pdf`);
+        } catch(e){ alert("PDF error: "+e.message); }
+      }
+
+      // ── Bulk PDF ───────────────────────────────────────────────────────────
+      async function downloadAllRefillPDF() {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        const all = [...new Set([...Object.keys(d.task1a.byPicker),...Object.keys(d.task1b.byPicker)])].sort();
+        for (const p of all) {
+          if (d.task1a.byPicker[p]) { downloadTask1aPDFForPicker(p); await new Promise(r=>setTimeout(r,80)); }
+          if (d.task1b.byPicker[p]) { downloadTask1bPDFForPicker(p); await new Promise(r=>setTimeout(r,80)); }
+        }
+      }
+      async function downloadAllTask1aPDF() {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        for (const p of Object.keys(d.task1a.byPicker)) { downloadTask1aPDFForPicker(p); await new Promise(r=>setTimeout(r,80)); }
+      }
+      async function downloadAllTask1bPDF() {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        for (const p of Object.keys(d.task1b.byPicker)) { downloadTask1bPDFForPicker(p); await new Promise(r=>setTimeout(r,80)); }
+      }
+      async function downloadAllTask2PDF() {
+        const d = window._reportData; if (!d) { alert("Generate a report first."); return; }
+        for (const p of Object.keys(d.task2.byPicker)) { downloadTask2PDFForPicker(p); await new Promise(r=>setTimeout(r,80)); }
+      }
+
+      // ── KPI & Persistent Reports ──────────────────────────────────────────
+      async function publishActiveTarget() {
+        if (!window._reportData) return alert("Generate a report first.");
+        const btn = document.getElementById("btnPublish");
+        btn.disabled = true;
+        btn.innerText = "Publishing...";
+        try {
+           const res = await fetch("/api/reports/publish", {
+             method: "POST",
+             headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+             body: JSON.stringify({
+               reportData: window._reportData,
+               filtersUsed: {
+                 displayThreshold: rptEl("rptDisplayThresh").value,
+                 displayOp: rptEl("rptDisplayOp").value,
+                 upperThreshold: rptEl("rptUpperThresh").value,
+                 upperOp: rptEl("rptUpperOp").value,
+                 upperLimit: rptEl("rptUpperLimit").value
+               },
+               pickerSummary: window._reportData.pickerSummary
+             })
+           });
+           const data = await res.json();
+           if(data.success) {
+              alert("Target Published Successfully!");
+              loadActiveTarget();
+           } else {
+              alert("Error publishing: " + data.error);
+           }
+        } catch(e) {
+           alert("Network error: " + e.message);
+        }
+        btn.disabled = false;
+        btn.innerText = "🎯 Publish as Today's Target";
+      }
+
+      async function loadActiveTarget() {
+        try {
+           const res = await fetch("/api/reports/active-plan", {
+             headers: { "Authorization": "Bearer " + token }
+           });
+           const data = await res.json();
+           if(data.success && data.target) {
+              window._reportData = data.target.reportData;
+              rptEl("activeTargetBadge").style.display = "flex";
+              rptEl("activeTargetTimestamp").innerText = "- " + new Date(data.target.publishedAt).toLocaleString();
+              document.getElementById("btnPublish").style.display = "none";
+              
+              // Force render the UI from saved Target Plan
+              renderReportSummary(window._reportData);
+              renderTask1a(window._reportData);
+              renderTask1b(window._reportData);
+              renderTask2(window._reportData);
+              
+              // Immediately fetch KPI progress
+              fetchKPIProgress();
+           }
+        } catch(e) {
+           console.error("Error loading active target:", e);
+        }
+      }
+
+      async function fetchKPIProgress() {
+         if(!window._reportData) return;
+         try {
+           const res = await fetch("/api/reports/kpi-progress", {
+             headers: { "Authorization": "Bearer " + token }
+           });
+           const data = await res.json();
+           if(data.success) {
+              const p = data.progress;
+              // update inside Picker Overview Table
+              Object.keys(window._reportData.pickerSummary).forEach(picker => {
+                 const cell = document.getElementById("all-tasks-cell-" + escHtml(picker));
+                 const kpiCell = document.getElementById("kpi-cell-" + escHtml(picker));
+                 if(!cell || !kpiCell) return;
+                 const allTasks = parseInt(cell.innerText) || 0;
+                 if(allTasks === 0) {
+                     kpiCell.innerHTML = `<span style="color:#ccc;">—</span>`;
+                     return;
+                 }
+                 const done = (p[picker] && p[picker].totalCompleted) ? p[picker].totalCompleted : 0;
+                 const pct = Math.min(100, Math.round((done / allTasks) * 100));
+                 
+                 let color = pct < 25 ? '#c62828' : pct < 75 ? '#b45309' : '#2e7d32';
+                 kpiCell.innerHTML = `<div style="display:flex; flex-direction:column; align-items:flex-end;">
+                    <span style="font-weight:bold;font-size:14px;color:${color}">${pct}%</span>
+                    <span style="font-size:10px;color:#777;">${done} / ${allTasks}</span>
+                 </div>`;
+              });
+           }
+         } catch(e) {
+           console.error("Error fetching progress:", e);
+         }
+      }
+
+      function filterReportByPicker(picker) {
+         rptEl("clearFilterCont").style.display = "flex";
+         rptEl("filteredPickerName").innerText = "FILTER: " + picker;
+         
+         const cards = document.querySelectorAll(".report-picker-card");
+         cards.forEach(c => {
+             const nameEl = c.querySelector(".report-picker-name");
+             if(nameEl && nameEl.innerText.trim() === picker) {
+                 c.style.display = "block";
+             } else {
+                 c.style.display = "none";
+             }
+         });
+         window.scrollTo(0, rptEl("rptOverviewBlock").offsetTop);
+      }
+
+      function clearPickerFilter() {
+         rptEl("clearFilterCont").style.display = "none";
+         const cards = document.querySelectorAll(".report-picker-card");
+         cards.forEach(c => c.style.display = "block");
+      }
+
+      // Check on load
+      document.addEventListener("DOMContentLoaded", () => {
+         setTimeout(loadActiveTarget, 1000);
+      });
+
     </script>
   </body>
 </html>

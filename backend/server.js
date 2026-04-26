@@ -10,6 +10,7 @@ const authRouter = require("./routes/auth");
 const binContentRouter = require("./routes/binContent");
 const binMasterRouter = require("./routes/binMaster");
 const templateRouter = require("./routes/template");
+const reportsRouter = require("./routes/reports");
 const connectDB = require("./config/database");
 
 const compression = require("compression");
@@ -160,6 +161,7 @@ app.use("/api/bin-master", binMasterRouter);
 app.use("/api/template", templateRouter);
 app.use("/api/transactions", syncRouter);
 app.use("/api/sync", syncRouter);
+app.use("/api/reports", reportsRouter);
 
 // 404 handler
 app.use((req, res) => {

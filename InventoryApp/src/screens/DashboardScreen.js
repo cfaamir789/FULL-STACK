@@ -30,6 +30,10 @@ import {
   attemptSync,
   setSyncStatusListener,
   setDataClearedListener,
+  downloadItemDelta,
+  downloadBinContentDelta,
+  checkItemMasterUpdate,
+  checkBinContentUpdate,
 } from "../services/syncService";
 import StatsCard from "../components/StatsCard";
 import SyncStatusBanner from "../components/SyncStatusBanner";
@@ -72,6 +76,8 @@ export default function DashboardScreen({ username }) {
   });
   const [syncing, setSyncing] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [query, setQuery] = useState("");
   const [showAllRecent, setShowAllRecent] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -160,6 +166,39 @@ export default function DashboardScreen({ username }) {
   );
 
   useEffect(() => {
+    let _mounted = true;
+    const checkBgUpdates = async () => {
+      try {
+        const [itemRes, binRes] = await Promise.all([
+          checkItemMasterUpdate(),
+          checkBinContentUpdate()
+        ]);
+        if (_mounted) {
+          setUpdateAvailable(itemRes.updateAvailable || binRes.updateAvailable);
+        }
+      } catch (err) {
+        // silent fail on bg network drop
+      }
+    };
+    checkBgUpdates();
+    return () => { _mounted = false; };
+  }, []);
+
+  const handleUpdate = async () => {
+    setUpdating(true);
+    try {
+      await downloadItemDelta();
+      await downloadBinContentDelta();
+      setUpdateAvailable(false);
+      await loadData();
+    } catch {
+       // Silent pass here if network interrupted
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  useEffect(() => {
     const unsub = setSyncStatusListener((status) => {
       setSyncStatus(status);
     });
@@ -221,6 +260,28 @@ export default function DashboardScreen({ username }) {
           <Text style={styles.scannerHint}>Scan a barcode to search</Text>
         </View>
       )}
+
+      {updateAvailable && (
+        <TouchableOpacity 
+          style={styles.updateBanner} 
+          onPress={handleUpdate} 
+          disabled={updating}
+        >
+          <View style={styles.updateBannerContent}>
+            <MaterialCommunityIcons name="cloud-download" size={24} color="#fff" />
+            <View style={styles.updateBannerText}>
+              <Text style={styles.updateBannerTitle}>Update Available</Text>
+              <Text style={styles.updateBannerSub}>New items & bins are ready to sync</Text>
+            </View>
+            {updating ? (
+              <ActivityIndicator color="#fff" style={{marginRight: 8}} />
+            ) : (
+              <Text style={styles.updateBtnTxt}>Download</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      )}
+
       <SyncStatusBanner
         online={syncStatus.online}
         lastSync={syncStatus.lastSync}
@@ -359,6 +420,34 @@ export default function DashboardScreen({ username }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  updateBanner: {
+    backgroundColor: Colors.primary,
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 8,
+    elevation: 3,
+    overflow: "hidden",
+  },
+  updateBannerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+  },
+  updateBannerText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  updateBannerTitle: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  updateBannerSub: { color: "#fff", fontSize: 13, opacity: 0.9 },
+  updateBtnTxt: {
+    color: Colors.primary,
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    fontWeight: "bold",
+    fontSize: 13,
+  },
   scroll: { paddingBottom: 24 },
   sectionTitle: {
     fontSize: 14,

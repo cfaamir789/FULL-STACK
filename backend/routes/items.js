@@ -23,7 +23,7 @@ let _bulkCache = { version: null, gzBuf: null, etag: null };
 let _buildPromise = null;
 
 async function _buildBulkCache() {
-  const [items, version] = await Promise.all([
+  const [rawItems, version] = await Promise.all([
     Item.find(
       {},
       {
@@ -39,6 +39,10 @@ async function _buildBulkCache() {
       .lean(),
     getItemsVersion(),
   ]);
+  // Filter out items missing required fields to prevent client-side SQLite errors.
+  const items = rawItems.filter(
+    (item) => item.Barcode && String(item.Barcode).trim() !== "",
+  );
   const payload = JSON.stringify({
     success: true,
     version,
@@ -505,10 +509,13 @@ router.get("/version", async (req, res) => {
 router.get("/bulk-page", async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(10000, Math.max(100, parseInt(req.query.limit) || 5000));
+    const limit = Math.min(
+      10000,
+      Math.max(100, parseInt(req.query.limit) || 5000),
+    );
     const skip = (page - 1) * limit;
 
-    const [items, totalItems, version] = await Promise.all([
+    const [rawItems, totalItems, version] = await Promise.all([
       Item.find({}, { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1 })
         .sort({ _id: 1 }) // stable sort for consistent pagination
         .skip(skip)
@@ -518,6 +525,8 @@ router.get("/bulk-page", async (req, res) => {
       getItemsVersion(),
     ]);
 
+    // Filter items missing Barcode to prevent client-side SQLite NOT NULL errors.
+    const items = rawItems.filter((item) => item.Barcode && String(item.Barcode).trim() !== "");
     const totalPages = Math.ceil(totalItems / limit);
 
     res.json({
@@ -604,10 +613,15 @@ router.get("/delta", async (req, res) => {
       }
     }
 
+    const skip = parseInt(req.query.skip) || 0;
     const items = await Item.find(
       { updatedAt: { $gte: since } },
-      { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1, UOM: 1 },
-    ).lean();
+      { _id: 0, ItemCode: 1, Barcode: 1, Item_Name: 1, UOM: 1, isDeleted: 1 }
+    )
+      .sort({ updatedAt: 1, _id: 1 })
+      .skip(skip)
+      .limit(3000)
+      .lean();
 
     return res.json({
       success: true,
@@ -616,6 +630,7 @@ router.get("/delta", async (req, res) => {
       requiresFullSync: false,
       items,
       total: items.length,
+      hasMore: items.length === 3000
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

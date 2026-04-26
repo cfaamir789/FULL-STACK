@@ -522,13 +522,16 @@ router.get("/delta", async (req, res) => {
         .json({ success: false, error: "invalid since date" });
     }
 
+    const skip = parseInt(req.query.skip) || 0;
     const [version, items] = await Promise.all([
       getBinVersion(),
       BinContent.find(
         { updatedAt: { $gt: since } },
-        { _id: 0, BinCode: 1, ItemCode: 1, Qty: 1 },
+        { _id: 0, BinCode: 1, ItemCode: 1, Qty: 1, isDeleted: 1 }
       )
-        .sort({ BinCode: 1 })
+        .sort({ updatedAt: 1, _id: 1 })
+        .skip(skip)
+        .limit(3000)
         .lean(),
     ]);
 
@@ -538,6 +541,7 @@ router.get("/delta", async (req, res) => {
       serverTime: new Date().toISOString(),
       total: items.length,
       items,
+      hasMore: items.length === 3000
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -848,13 +852,17 @@ router.delete("/all", requireAuth, requireSuperAdmin, async (req, res) => {
 // DELETE /api/bin-content/:id — delete a single record
 router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const doc = await BinContent.findByIdAndDelete(req.params.id);
+    const doc = await BinContent.findByIdAndUpdate(
+      req.params.id,
+      { $set: { isDeleted: true, updatedAt: new Date() } },
+      { new: true }
+    );
     if (!doc)
       return res
         .status(404)
         .json({ success: false, error: "Record not found" });
     await bumpBinVersion(req);
-    res.json({ success: true });
+    res.json({ success: true, isDeleted: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

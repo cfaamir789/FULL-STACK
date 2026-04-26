@@ -7,6 +7,7 @@ const itemSchema = new mongoose.Schema({
   CategoryCode: { type: String, default: "" },
   UOM: { type: String, default: "PCS" },
   updatedAt: { type: Date, default: Date.now },
+  isDeleted: { type: Boolean, default: false },
 });
 
 itemSchema.index({ Item_Name: 1 });

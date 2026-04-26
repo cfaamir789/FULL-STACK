@@ -10,6 +10,7 @@ const binContentSchema = new mongoose.Schema({
   BinRanking: { type: Number, default: 0 }, // overridden by BinMaster on upload
   ZoneCode: { type: String, default: "" },
   notInMaster: { type: Boolean, default: false }, // true when ItemCode had no Item Master match
+  isDeleted: { type: Boolean, default: false },
   updatedAt: { type: Date, default: Date.now },
 });
 

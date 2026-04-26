@@ -118,9 +118,13 @@ export const downloadItemMaster = async (onProgress) => {
       delta: false,
     };
   } catch (bulkErr) {
-    // Only fall through to paginated on server/network errors, not auth/logic errors
+    // Only fall through to paginated on server/network errors, not local DB/logic errors
     const status = bulkErr?.response?.status;
     if (status && status !== 500 && status !== 503 && status !== 504) {
+      throw bulkErr;
+    }
+    // Non-HTTP errors (SQLite, parse errors, etc.) should also surface to the user
+    if (!bulkErr?.response) {
       throw bulkErr;
     }
     // fall through to paginated fallback below
@@ -165,7 +169,8 @@ export const downloadItemMaster = async (onProgress) => {
   for (let page = 2; page <= totalPages; page += PARALLEL_PAGES) {
     const end = Math.min(page + PARALLEL_PAGES, totalPages + 1);
     const fetches = [];
-    for (let p = page; p < end; p++) fetches.push(fetchItemsBulkPage(p, PAGE_SIZE));
+    for (let p = page; p < end; p++)
+      fetches.push(fetchItemsBulkPage(p, PAGE_SIZE));
     const batchData = await Promise.all(fetches);
     for (const pageData of batchData) {
       totalInserted += await insertItemsPage(pageData.items);
@@ -215,40 +220,61 @@ export const downloadItemDelta = async (onProgress) => {
 
   onProgress?.({ phase: "checking", percent: 0 });
 
-  let deltaData;
-  try {
-    deltaData = await fetchItemsDelta(lastSyncTime, lastFullSync);
-  } catch (err) {
-    // Network error on delta → fall back to full download
-    return downloadItemMaster(onProgress);
+  let hasMore = true;
+  let skip = 0;
+  let totalSaved = 0;
+  let latestServerTime = null;
+  let latestVersion = null;
+
+  while (hasMore) {
+    try {
+      const deltaData = await fetchItemsDelta(lastSyncTime, lastFullSync, skip);
+      
+      // Server says a full replace happened after our last full sync → full download
+      if (deltaData.requiresFullSync) {
+        return downloadItemMaster(onProgress);
+      }
+
+      const { items, total, version, serverTime } = deltaData;
+      latestServerTime = serverTime;
+      latestVersion = version;
+
+      if (total === 0) {
+        hasMore = false;
+        break;
+      }
+
+      onProgress?.({ phase: "saving chunk", percent: Math.min(100, (skip / (skip + 3000)) * 100) });
+      
+      // Upsert the chunk of items
+      await upsertItems(items);
+      
+      totalSaved += total;
+      skip += total;
+      hasMore = deltaData.hasMore;
+
+    } catch (err) {
+      // Network error on delta → fall back to full download
+      console.log("[downloadItemDelta] error fetching delta: ", err.message);
+      return downloadItemMaster(onProgress);
+    }
   }
 
-  // Server says a full replace happened after our last full sync → full download
-  if (deltaData.requiresFullSync) {
-    return downloadItemMaster(onProgress);
-  }
-
-  const { items, total, version, serverTime } = deltaData;
-
-  // Nothing changed
-  if (total === 0) {
+  if (totalSaved === 0) {
     onProgress?.({ phase: "done", percent: 100 });
-    return { success: true, count: 0, version, delta: true, unchanged: true };
+    return { success: true, count: 0, version: latestVersion, delta: true, unchanged: true };
   }
-
-  onProgress?.({ phase: "saving", percent: 0 });
-
-  // Upsert only the changed items — existing items stay untouched
-  await upsertItems(items);
 
   // Save updated sync timestamps and version
-  await Promise.all([
-    AsyncStorage.setItem("itemsVersion", String(version)),
-    AsyncStorage.setItem("lastItemSyncTime", serverTime),
-  ]);
+  if (latestServerTime && latestVersion) {
+    await Promise.all([
+      AsyncStorage.setItem("itemsVersion", String(latestVersion)),
+      AsyncStorage.setItem("lastItemSyncTime", latestServerTime),
+    ]);
+  }
 
   onProgress?.({ phase: "done", percent: 100 });
-  return { success: true, count: total, version, delta: true };
+  return { success: true, count: totalSaved, version: latestVersion, delta: true };
 };
 
 // Check if a newer item master version is available on server
@@ -270,7 +296,9 @@ const syncInChunks = async (payload) => {
   for (let i = 0; i < payload.length; i += CHUNK_SIZE) {
     chunks.push(payload.slice(i, i + CHUNK_SIZE));
   }
-  const results = await Promise.all(chunks.map((chunk) => syncTransactions(chunk)));
+  const results = await Promise.all(
+    chunks.map((chunk) => syncTransactions(chunk)),
+  );
   return results.reduce((sum, r) => sum + (r.synced ?? 0), 0);
 };
 
@@ -490,30 +518,54 @@ export const downloadBinContentDelta = async (onProgress) => {
 
   onProgress?.({ phase: "checking", percent: 0 });
 
-  let deltaData;
-  try {
-    deltaData = await fetchBinContentDelta(lastSyncTime);
-  } catch {
-    return downloadBinContent(onProgress);
+  let hasMore = true;
+  let skip = 0;
+  let totalSaved = 0;
+  let latestServerTime = null;
+  let latestVersion = null;
+
+  while (hasMore) {
+    try {
+      const deltaData = await fetchBinContentDelta(lastSyncTime, skip);
+      
+      const { items, total, version, serverTime } = deltaData;
+      latestServerTime = serverTime;
+      latestVersion = version;
+
+      if (total === 0) {
+        hasMore = false;
+        break;
+      }
+
+      onProgress?.({ phase: "saving chunk", percent: Math.min(100, (skip / (skip + 3000)) * 100) });
+      
+      // Upsert the chunk of bin content
+      await upsertBinContents(items);
+      
+      totalSaved += total;
+      skip += total;
+      hasMore = deltaData.hasMore;
+
+    } catch (err) {
+      console.log("[downloadBinContentDelta] error fetching delta: ", err.message);
+      return downloadBinContent(onProgress);
+    }
   }
 
-  const { items, total, version, serverTime } = deltaData;
-
-  if (total === 0) {
+  if (totalSaved === 0) {
     onProgress?.({ phase: "done", percent: 100 });
-    return { success: true, count: 0, version, delta: true, unchanged: true };
+    return { success: true, count: 0, version: latestVersion, delta: true, unchanged: true };
   }
 
-  onProgress?.({ phase: "saving", percent: 0 });
-  await upsertBinContents(items);
-
-  await Promise.all([
-    AsyncStorage.setItem("binContentVersion", String(version)),
-    AsyncStorage.setItem("lastBinContentSyncTime", serverTime),
-  ]);
+  if (latestServerTime && latestVersion) {
+    await Promise.all([
+      AsyncStorage.setItem("binContentVersion", String(latestVersion)),
+      AsyncStorage.setItem("lastBinContentSyncTime", latestServerTime),
+    ]);
+  }
 
   onProgress?.({ phase: "done", percent: 100 });
-  return { success: true, count: total, version, delta: true };
+  return { success: true, count: totalSaved, version: latestVersion, delta: true };
 };
 
 // Check if a newer bin content version is available on the server.

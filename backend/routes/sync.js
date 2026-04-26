@@ -30,6 +30,59 @@ function requireDB(req, res, next) {
   next();
 }
 
+/**
+ * Check if delta updates are available for a given app.
+ * Pass `itemsSince` and `binContentSince` timestamps.
+ */
+router.get("/check-updates", requireAuth, async (req, res) => {
+  try {
+    const { itemsSince, binContentSince, itemsLastFullSyncRaw } = req.query;
+    
+    let itemsCount = 0;
+    let binContentCount = 0;
+    let requiresItemsFullSync = false;
+
+    // Check full-replace overrides first for items
+    if (itemsLastFullSyncRaw) {
+      const Meta = require("../models/Meta");
+      const lastFullReplaceDoc = await Meta.findOne({ key: "lastFullReplace" }).lean();
+      if (lastFullReplaceDoc && lastFullReplaceDoc.value) {
+        const lastFullReplace = new Date(lastFullReplaceDoc.value);
+        const lastFullSync = new Date(itemsLastFullSyncRaw);
+        if (!isNaN(lastFullSync.getTime()) && lastFullReplace > lastFullSync) {
+          requiresItemsFullSync = true;
+        }
+      }
+    }
+
+    if (requiresItemsFullSync) {
+      itemsCount = await require("../models/Item").countDocuments({});
+    } else if (itemsSince) {
+      const sinceDate = new Date(itemsSince);
+      if (!isNaN(sinceDate.getTime())) {
+        itemsCount = await require("../models/Item").countDocuments({ updatedAt: { $gt: sinceDate } });
+      }
+    }
+
+    if (binContentSince) {
+      const sinceDate = new Date(binContentSince);
+      if (!isNaN(sinceDate.getTime())) {
+        binContentCount = await require("../models/BinContent").countDocuments({ updatedAt: { $gt: sinceDate } });
+      }
+    }
+
+    res.json({
+      success: true,
+      hasUpdates: requiresItemsFullSync || itemsCount > 0 || binContentCount > 0,
+      requiresItemsFullSync,
+      itemsCount,
+      binContentCount,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 const PENDING_QUERY = {
   $or: [
     { syncStatus: { $exists: false } },

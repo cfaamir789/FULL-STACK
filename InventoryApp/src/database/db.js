@@ -251,11 +251,14 @@ export const initDB = async () => {
 
 export const upsertItems = async (itemsArray) => {
   if (!itemsArray || itemsArray.length === 0) return;
-  // 300 rows × 3 params = 900, safely under SQLite's 999 param limit
-  const CHUNK_SIZE = 300;
+  const toDelete = itemsArray.filter((i) => i.isDeleted);
+  const toUpdate = itemsArray.filter((i) => !i.isDeleted);
+
   await db.withTransactionAsync(async () => {
-    for (let i = 0; i < itemsArray.length; i += CHUNK_SIZE) {
-      const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
+    // 300 rows × 3 params = 900
+    const CHUNK_SIZE = 300;
+    for (let i = 0; i < toUpdate.length; i += CHUNK_SIZE) {
+      const chunk = toUpdate.slice(i, i + CHUNK_SIZE);
       const placeholders = chunk.map(() => "(?,?,?)").join(",");
       const params = chunk.flatMap((item) => [
         item.ItemCode,
@@ -269,6 +272,19 @@ export const upsertItems = async (itemsArray) => {
            item_name = excluded.item_name`,
         params,
       );
+    }
+    
+    // Handle deletes
+    if (toDelete.length > 0) {
+      for (let i = 0; i < toDelete.length; i += CHUNK_SIZE) {
+        const chunk = toDelete.slice(i, i + CHUNK_SIZE);
+        const placeholders = chunk.map(() => "?").join(",");
+        const params = chunk.map((item) => item.Barcode);
+        await db.runAsync(
+          `DELETE FROM items WHERE barcode IN (${placeholders})`,
+          params,
+        );
+      }
     }
   });
 };
@@ -606,19 +622,25 @@ export const clearAllItems = async () => {
 // If ANY chunk fails, the entire operation rolls back — local data stays untouched.
 export const clearAndReplaceAllItems = async (itemsArray, onProgress) => {
   if (!itemsArray || itemsArray.length === 0) return 0;
+  // Filter items missing required fields to prevent NOT NULL constraint errors.
+  // MongoDB only requires Barcode, but SQLite requires all three columns NOT NULL.
+  const validItems = itemsArray.filter(
+    (item) => item.Barcode != null && String(item.Barcode).trim() !== "",
+  );
   // 150 rows = 450 params per INSERT — well within SQLite's 999-param limit.
   // Smaller chunks reduce peak heap usage on 1 GB RAM devices.
   const CHUNK_SIZE = 150;
-  const total = itemsArray.length;
+  const total = validItems.length;
+  if (total === 0) return 0;
   await db.withTransactionAsync(async () => {
     await db.runAsync("DELETE FROM items");
     for (let i = 0; i < total; i += CHUNK_SIZE) {
-      const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
+      const chunk = validItems.slice(i, i + CHUNK_SIZE);
       const placeholders = chunk.map(() => "(?,?,?)").join(",");
       const params = chunk.flatMap((item) => [
-        item.ItemCode,
-        item.Barcode,
-        item.Item_Name,
+        item.ItemCode != null ? String(item.ItemCode) : "",
+        String(item.Barcode).trim(),
+        item.Item_Name != null ? String(item.Item_Name) : "",
       ]);
       await db.runAsync(
         `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
@@ -631,8 +653,7 @@ export const clearAndReplaceAllItems = async (itemsArray, onProgress) => {
         onProgress({ processed: Math.min(i + CHUNK_SIZE, total), total });
       // Yield to the JS event loop every ~3000 rows so the GC can reclaim
       // memory and the UI progress bar can update on 1 GB RAM devices.
-      if (i > 0 && i % 3000 === 0)
-        await new Promise((r) => setTimeout(r, 0));
+      if (i > 0 && i % 3000 === 0) await new Promise((r) => setTimeout(r, 0));
     }
   });
   return total;
@@ -695,7 +716,9 @@ export const searchItemSummaries = async (query, limit = 200) => {
 };
 
 export const getItemBarcodes = async (itemCode, itemName) => {
-  const code = String(itemCode || "").trim().toLowerCase();
+  const code = String(itemCode || "")
+    .trim()
+    .toLowerCase();
   if (code) {
     const rows = await db.getAllAsync(
       "SELECT barcode FROM items WHERE LOWER(item_code) = ? ORDER BY barcode ASC",
@@ -703,7 +726,9 @@ export const getItemBarcodes = async (itemCode, itemName) => {
     );
     return rows.map((r) => r.barcode);
   }
-  const name = String(itemName || "").trim().toLowerCase();
+  const name = String(itemName || "")
+    .trim()
+    .toLowerCase();
   const rows = await db.getAllAsync(
     "SELECT barcode FROM items WHERE LOWER(item_name) = ? ORDER BY barcode ASC",
     [name],
@@ -718,15 +743,20 @@ export const deleteAllItemRows = async () => {
 
 export const insertItemsPage = async (itemsArray) => {
   if (!itemsArray || itemsArray.length === 0) return 0;
+  // Skip items with null/empty Barcode to avoid NOT NULL constraint errors.
+  const validItems = itemsArray.filter(
+    (item) => item.Barcode != null && String(item.Barcode).trim() !== "",
+  );
+  if (validItems.length === 0) return 0;
   const CHUNK_SIZE = 150;
   await db.withTransactionAsync(async () => {
-    for (let i = 0; i < itemsArray.length; i += CHUNK_SIZE) {
-      const chunk = itemsArray.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < validItems.length; i += CHUNK_SIZE) {
+      const chunk = validItems.slice(i, i + CHUNK_SIZE);
       const placeholders = chunk.map(() => "(?,?,?)").join(",");
       const params = chunk.flatMap((item) => [
-        item.ItemCode,
-        item.Barcode,
-        item.Item_Name,
+        item.ItemCode != null ? String(item.ItemCode) : "",
+        String(item.Barcode).trim(),
+        item.Item_Name != null ? String(item.Item_Name) : "",
       ]);
       await db.runAsync(
         `INSERT INTO items (item_code, barcode, item_name) VALUES ${placeholders}
@@ -737,17 +767,20 @@ export const insertItemsPage = async (itemsArray) => {
       );
     }
   });
-  return itemsArray.length;
+  return validItems.length;
 };
 
 // ─── Bin Contents ─────────────────────────────────────────────────────────────
 
 export const upsertBinContents = async (rows) => {
   if (!rows || rows.length === 0) return;
+  const toDelete = rows.filter((r) => r.isDeleted);
+  const toUpdate = rows.filter((r) => !r.isDeleted);
+
   const CHUNK_SIZE = 150;
   await db.withTransactionAsync(async () => {
-    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
-      const chunk = rows.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < toUpdate.length; i += CHUNK_SIZE) {
+      const chunk = toUpdate.slice(i, i + CHUNK_SIZE);
       const placeholders = chunk.map(() => "(?,?,?)").join(",");
       const params = chunk.flatMap((r) => [
         String(r.BinCode || r.bin_code || "").trim(),
@@ -759,6 +792,21 @@ export const upsertBinContents = async (rows) => {
          ON CONFLICT(bin_code, item_code) DO UPDATE SET qty = excluded.qty`,
         params,
       );
+    }
+
+    if (toDelete.length > 0) {
+      for (let i = 0; i < toDelete.length; i += CHUNK_SIZE) {
+        const chunk = toDelete.slice(i, i + CHUNK_SIZE);
+        const conditionStr = chunk.map(() => "(bin_code = ? AND item_code = ?)").join(" OR ");
+        const params = chunk.flatMap((r) => [
+          String(r.BinCode || r.bin_code || "").trim(),
+          String(r.ItemCode || r.item_code || "").trim()
+        ]);
+        await db.runAsync(
+          `DELETE FROM bin_contents WHERE ${conditionStr}`,
+          params,
+        );
+      }
     }
   });
 };
@@ -851,7 +899,9 @@ export const checkBinExists = async (binCode) => {
 };
 
 export const searchBinMaster = async (prefix, limit = 30) => {
-  const q = String(prefix || "").trim().toUpperCase();
+  const q = String(prefix || "")
+    .trim()
+    .toUpperCase();
   if (!q) return [];
   return await db.getAllAsync(
     "SELECT bin_code FROM bin_master WHERE bin_code LIKE ? ORDER BY bin_code ASC LIMIT ?",

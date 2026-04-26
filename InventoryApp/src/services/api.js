@@ -365,9 +365,10 @@ export const fetchItemsBulkPage = async (page = 1, limit = 5000) => {
 // Download only items created/updated after `since` (ISO string).
 // Pass `lastFullSync` (ISO) so server can detect if a full replace happened.
 // Returns { version, serverTime, requiresFullSync, items, total }
-export const fetchItemsDelta = async (since, lastFullSync) => {
+export const fetchItemsDelta = async (since, lastFullSync, skip = 0) => {
   const params = new URLSearchParams({ since });
   if (lastFullSync) params.set("lastFullSync", lastFullSync);
+  if (skip) params.set("skip", skip);
   const res = await apiClient.get(`/items/delta?${params}`, { timeout: 30000 });
   return res.data;
 };
@@ -527,12 +528,22 @@ export const fetchBinContentBulk = async (etag) => {
 };
 
 // Delta — only records updated since `since` (ISO string)
-export const fetchBinContentDelta = async (since) => {
+export const fetchBinContentDelta = async (since, skip = 0) => {
   const res = await apiClient.get(
-    `/bin-content/delta?since=${encodeURIComponent(since)}`,
+    `/bin-content/delta?since=${encodeURIComponent(since)}&skip=${skip}`,
     { timeout: 30000 },
   );
-  return res.data; // { version, serverTime, total, items }
+  return res.data; // { version, serverTime, total, items, hasMore }
+};
+
+// Check if delta updates are available for a given app.
+export const checkUpdatesApi = async (itemsSince, binContentSince, itemsLastFullSyncRaw) => {
+  const params = new URLSearchParams();
+  if (itemsSince) params.set("itemsSince", itemsSince);
+  if (binContentSince) params.set("binContentSince", binContentSince);
+  if (itemsLastFullSyncRaw) params.set("itemsLastFullSyncRaw", itemsLastFullSyncRaw);
+  const res = await apiClient.get(`/sync/check-updates?${params.toString()}`);
+  return res.data;
 };
 
 // Fetch all bins for a specific item (live from server — fallback when local data may be stale)
