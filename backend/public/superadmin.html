@@ -703,12 +703,12 @@
 
       <div class="tab-bar" id="tabBar">
         <button class="active" onclick="switchPage('overview')">
-          Overview
+          🚀 Overview
         </button>
-        <button onclick="switchPage('users')">Users</button>
-        <button onclick="switchPage('reports')">Reports</button>
-        <button onclick="switchPage('data')">Data Management</button>
-        <button onclick="switchPage('logs')">&#128196; Activity Logs</button>
+        <button onclick="switchPage('users')">👥 Users</button>
+        <button onclick="switchPage('reports')">📊 Reports</button>
+        <button onclick="switchPage('data')">🗄️ Data Management</button>
+        <button onclick="switchPage('logs')">📜 Activity Logs</button>
       </div>
 
       <!-- PAGE: Overview -->
@@ -738,7 +738,7 @@
         <div class="card">
           <h2>&#128279; Admin Dashboard Links</h2>
           <p style="color: #5a6a7a; font-size: 12px; margin-bottom: 14px">
-            Quick access to admin dashboards — click to open or copy the URL.
+            Quick access to admin dashboards â€” click to open or copy the URL.
           </p>
           <div style="display: flex; flex-direction: column; gap: 10px">
             <div
@@ -1311,7 +1311,7 @@
     </div>
 
     <script>
-      // ─── Failover ──────────────────────────────────────────────────────
+      // â”€â”€â”€ Failover â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const SERVERS = [
         window.location.origin,
         "https://fullstck-production.up.railway.app",
@@ -1375,13 +1375,13 @@
         }
       }
 
-      // ─── Auth state ────────────────────────────────────────────────────
+      // â”€â”€â”€ Auth state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       let authToken = localStorage.getItem("saToken") || "";
       let adminUsername = localStorage.getItem("saUsername") || "";
       let adminRole = localStorage.getItem("saRole") || "";
       let currentPage = "overview";
 
-      // ─── Clock ─────────────────────────────────────────────────────────
+      // â”€â”€â”€ Clock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       function tickClock() {
         const now = new Date();
         document.getElementById("headerClock").textContent =
@@ -1397,7 +1397,7 @@
       tickClock();
       setInterval(tickClock, 1000);
 
-      // ─── Auto-login ────────────────────────────────────────────────────
+      // â”€â”€â”€ Auto-login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       (async function init() {
         if (authToken) {
           try {
@@ -1412,7 +1412,7 @@
         }
       })();
 
-      // ─── Login ─────────────────────────────────────────────────────────
+      // â”€â”€â”€ Login â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       async function doLogin() {
         const username = document.getElementById("loginUser").value.trim();
         const pin = document.getElementById("loginPin").value.trim();
@@ -1459,7 +1459,7 @@
         }
       }
 
-      // ─── Recovery ──────────────────────────────────────────────────────
+      // â”€â”€â”€ Recovery â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       function showRecovery() {
         document.getElementById("loginSection").classList.add("hidden");
         document.getElementById("recoverySection").classList.remove("hidden");
@@ -1509,7 +1509,7 @@
         }
       }
 
-      // ─── Panel ─────────────────────────────────────────────────────────
+      // â”€â”€â”€ Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       function showPanel() {
         document.getElementById("loginSection").classList.add("hidden");
         document.getElementById("recoverySection").classList.add("hidden");
@@ -1529,7 +1529,7 @@
         document.getElementById("loginSection").classList.remove("hidden");
       }
 
-      // ─── Tab switching ─────────────────────────────────────────────────
+      // â”€â”€â”€ Tab switching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       function switchPage(page) {
         currentPage = page;
         ["Overview", "Users", "Reports", "Data", "Logs"].forEach((p) => {
@@ -1554,7 +1554,7 @@
         if (page === "logs") loadAuditLogs();
       }
 
-      // ─── Overview ──────────────────────────────────────────────────────
+      // â”€â”€â”€ Overview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       async function loadOverview() {
         // Stats
         try {
@@ -1606,7 +1606,7 @@
         }
       }
 
-      // ─── Multi-Server Health Check ─────────────────────────────────────
+      // â”€â”€â”€ Multi-Server Health Check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       async function checkAllServers() {
         const container = document.getElementById("multiServerHealth");
         const results = await Promise.allSettled(
@@ -1656,7 +1656,7 @@
             <div style="display:flex;align-items:center;gap:8px;width:100%">
               <div class="health-dot ${dotColor}"></div>
               <div style="flex:1">
-                <div class="health-value" style="font-size:13px">${esc(s.label)}${s.isCurrent ? ' <span style="color:#e94560;font-size:10px">● ACTIVE</span>' : ""}</div>
+                <div class="health-value" style="font-size:13px">${esc(s.label)}${s.isCurrent ? ' <span style="color:#e94560;font-size:10px">â— ACTIVE</span>' : ""}</div>
                 <div class="health-label">${statusText}</div>
               </div>
             </div>
@@ -1673,7 +1673,7 @@
         container.innerHTML = html;
       }
 
-      // ─── Worker Devices & Clear Status ─────────────────────────────────
+      // â”€â”€â”€ Worker Devices & Clear Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       async function loadWorkerDevices() {
         const container = document.getElementById("workerDevices");
         try {
@@ -1772,7 +1772,7 @@
         }
       }
 
-      // ─── Users ─────────────────────────────────────────────────────────
+      // â”€â”€â”€ Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       async function loadUsers() {
         try {
           const data = await apiFetch("/auth/users");
@@ -1910,7 +1910,7 @@
         }
       }
 
-      // ─── Reports ───────────────────────────────────────────────────────
+      // â”€â”€â”€ Reports â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       async function loadReports() {
         // Worker summary
         try {
@@ -1987,7 +1987,7 @@
         }
       }
 
-      // ─── Data Management (Danger) ─────────────────────────────────────
+      // â”€â”€â”€ Data Management (Danger) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       let pendingDanger = null;
       const DANGER_MAP = {
         deleteBinContent: {
@@ -2060,7 +2060,7 @@
         btn.textContent = "Confirm";
       }
 
-      // ─── Export ────────────────────────────────────────────────────────
+      // â”€â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       async function exportData(type) {
         try {
           let data;
@@ -2084,7 +2084,7 @@
         }
       }
 
-      // ─── Utilities ─────────────────────────────────────────────────────
+      // â”€â”€â”€ Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       function esc(str) {
         if (!str) return "";
         const d = document.createElement("div");
@@ -2092,7 +2092,7 @@
         return d.innerHTML;
       }
 
-      // ─── Audit Logs ────────────────────────────────────────────────────
+      // â”€â”€â”€ Audit Logs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       let auditLogsData = [];
       let auditLogsPage = 1;
       const AUDIT_LOGS_PER_PAGE = 50;
@@ -2223,7 +2223,7 @@
 
         // Pagination
         if (pagination) {
-          let pHtml = `<span style="color:#5a6a7a;font-size:13px;margin-right:8px;">Showing ${start + 1}–${Math.min(start + AUDIT_LOGS_PER_PAGE, auditLogsData.length)} of ${auditLogsData.length}</span>`;
+          let pHtml = `<span style="color:#5a6a7a;font-size:13px;margin-right:8px;">Showing ${start + 1}â€“${Math.min(start + AUDIT_LOGS_PER_PAGE, auditLogsData.length)} of ${auditLogsData.length}</span>`;
           if (totalPages > 1) {
             if (auditLogsPage > 1) {
               pHtml += `<button class="btn btn-outline btn-sm" onclick="setAuditLogsPage(${auditLogsPage - 1})">&#8249; Prev</button>`;
@@ -2253,7 +2253,7 @@
           : "122,138,154";
       }
 
-      // ─── Copy URL ─────────────────────────────────────────────────────
+      // â”€â”€â”€ Copy URL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       function copyUrl(url, btn) {
         navigator.clipboard
           .writeText(url)
@@ -2269,11 +2269,11 @@
             }, 2000);
           })
           .catch(() => {
-            alert("Copy failed — URL: " + url);
+            alert("Copy failed â€” URL: " + url);
           });
       }
 
-      // ─── Emergency Impersonation ───────────────────────────────────────
+      // â”€â”€â”€ Emergency Impersonation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       async function impersonateAdmin(username) {
         if (
           !confirm(
@@ -2290,7 +2290,7 @@
             alert("Error: " + (data.error || "Unknown"));
             return;
           }
-          // Same-origin localStorage is shared — admin.html reads "adminToken"
+          // Same-origin localStorage is shared â€” admin.html reads "adminToken"
           localStorage.setItem("adminToken", data.token);
           localStorage.setItem("adminUsername", data.targetUsername);
           localStorage.setItem("adminRole", "admin");
